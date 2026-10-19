@@ -48,7 +48,7 @@ def call(client, eps, name, overrides):
     return client.predict(api_name=name, **kwargs)
 
 
-for space in ["tencent/Hunyuan3D-2", "stabilityai/TripoSR", "ACE-Step/ACE-Step"]:
+for space in ["ACE-Step/ACE-Step", "tencent/Hunyuan3D-2"]:
     tag = space.split("/")[1]
     try:
         try:
@@ -58,11 +58,11 @@ for space in ["tencent/Hunyuan3D-2", "stabilityai/TripoSR", "ACE-Step/ACE-Step"]
         eps = endpoints(c, space)
         report[space] = {"reachable": True, "endpoints": list(eps.keys())}
         if space == "tencent/Hunyuan3D-2":
-            name = next((n for n in eps if "shape" in n), None) or next(iter(eps))
+            name = "/generation_all" if "/generation_all" in eps else next((n for n in eps if "shape" in n), None)
             res = call(c, eps, name, {"image": handle_file(IMG)})
             report[space]["result"] = save(res, tag)
         elif space == "ACE-Step/ACE-Step":
-            name = next((n for n in eps if any(p.get("parameter_name") == "lyrics" for p in eps[n].get("parameters", []))), None)
+            name = "/__call__" if "/__call__" in eps else None
             if name:
                 res = call(c, eps, name, {"prompt": "cinematic orchestral documentary underscore, soft strings, warm piano, low drones, 80 bpm, instrumental",
                                           "lyrics": "[instrumental]", "audio_duration": 30})
