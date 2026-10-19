@@ -1,0 +1,9 @@
+{
+  "name": "videomaps-smoke",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Smoke test: Remotion + Three.js (@remotion/three) + Apache ECharts (SSR SVG) + d3-geo/world-atlas + flag-icons",
+  "scripts": {
+    "render": "remotion render src/index.ts Smoke out/remotion.mp4 --gl=swangle"
+  }
+}
