@@ -51,7 +51,10 @@ def call(client, eps, name, overrides):
 for space in ["tencent/Hunyuan3D-2", "stabilityai/TripoSR", "ACE-Step/ACE-Step"]:
     tag = space.split("/")[1]
     try:
-        c = Client(space, hf_token=TOKEN, verbose=False)
+        try:
+            c = Client(space, token=TOKEN, verbose=False) if TOKEN else Client(space, verbose=False)
+        except TypeError:
+            c = Client(space)
         eps = endpoints(c, space)
         report[space] = {"reachable": True, "endpoints": list(eps.keys())}
         if space == "tencent/Hunyuan3D-2":
