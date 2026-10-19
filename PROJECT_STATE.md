@@ -24,3 +24,11 @@
 - [ ] Research + script + sources → user approval.
 - [ ] Voice → word timings.  - [ ] Storyboard + style frames → approval.
 - [ ] Assets / scenes / preview / final render → Drive.
+
+## 2026-10-19 — Production stage 1 launched
+- Voice: 7 clips production/voice/vo_00..06.mp3 (voice-00), total 538 s narration (~9:10 with pauses).
+- Drive 01 Analysis: 4 Google Docs + 1 Sheet uploaded (00 DNA, 01-03, shot log).
+- stage1.yml run 39314086382 -> publishes GitHub release "stage1": voice.wav, timeline.json (word timings), subtitles.srt,
+  music.zip (5 cues c1..c5), sfx.zip, geo.json (LCC lon0=90, 8192x5996 px canvas), basemap.jpg, globe.jpg,
+  caucasus.mp4 + caucasus_labels.json, matryoshka.mov/.webm (alpha) + timing, matryoshka.glb, 6 Manim .mov overlays.
+- Next: Remotion production composition (stage2) synced to timeline.json -> preview -> final render -> Drive.
