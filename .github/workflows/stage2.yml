@@ -1,0 +1,131 @@
+name: stage2-render
+# Final film: Remotion composition (Three.js globe, ECharts chart, projected maps, flag-icons) + Manim + Blender clips,
+# rendered in parallel chunks; audio mixed and loudness-normalised to -14 LUFS; published to release "final".
+# Starts automatically when fix1-assets finishes (or manually).
+on:
+  workflow_dispatch:
+    inputs:
+      parts: { description: 'parallel chunks', default: '20' }
+      tag: { description: 'release tag', default: 'final' }
+  workflow_run:
+    workflows: [fix1-assets]
+    types: [completed]
+permissions:
+  contents: write
+env:
+  REL: https://github.com/${{ github.repository }}/releases/download/stage1
+  PARTS: ${{ inputs.parts || '20' }}
+  TAG: ${{ inputs.tag || 'final' }}
+jobs:
+  prep:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    outputs:
+      matrix: ${{ steps.m.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg unzip > /dev/null
+      - name: Assets from stage 1
+        working-directory: production/remotion
+        run: |
+          set -e
+          mkdir -p public/manim public/music public/sfx public/flags
+          for f in basemap.jpg basemap_half.jpg globe.jpg voice.wav caucasus.mp4 matryoshka.webm sfx.zip; do curl -sfL -o public/$f "$REL/$f"; done
+          for f in caucasus_labels.json matryoshka_timing.json; do curl -sfL -o src/data/$f "$REL/$f"; done
+          for c in c1_hook c2_origins c3_annex c4_collapse c5_resolution; do curl -sfL -o public/music/music_$c.mp3 "$REL/music_$c.mp3"; done
+          (cd public/sfx && unzip -q -o ../sfx.zip && rm ../sfx.zip)
+          for s in ThreeRules TatarstanEstonia Timeline SecessionLaw UtiPossidetis Hierarchy; do
+            curl -sfL -o /tmp/$s.mov "$REL/$s.mov"
+            ffmpeg -v error -y -i /tmp/$s.mov -c:v libvpx-vp9 -pix_fmt yuva420p -b:v 0 -crf 22 -row-mt 1 -deadline good -cpu-used 4 public/manim/$s.webm
+          done
+          ffmpeg -v error -y -i public/globe.jpg -vf scale=4096:2048 public/globe_4k.jpg && rm public/globe.jpg
+          curl -sfL -A "videomaps/1.0" -o public/flags/su.svg "https://upload.wikimedia.org/wikipedia/commons/a/a9/Flag_of_the_Soviet_Union.svg"
+          pip install -q geopandas shapely pillow && python ../pipeline/globe_overlay.py public/ussr_overlay.png
+          npm i --no-audit --no-fund --loglevel=error flag-icons@7.6.0 && cp -r node_modules/flag-icons/flags/4x3 public/flags/ && rm -rf node_modules
+          ffprobe -v error -count_frames -select_streams v:0 -show_entries stream=nb_read_frames -of csv=p=0 public/matryoshka.webm
+          du -sh public; ls -la public public/manim
+      - id: m
+        run: echo "matrix=$(python3 -c "print(list(range(int('${{ env.PARTS }}'))))")" >> $GITHUB_OUTPUT
+      - uses: actions/upload-artifact@v4
+        with:
+          name: film-assets
+          path: |
+            production/remotion/public
+            production/remotion/src/data
+          retention-days: 3
+
+  render:
+    needs: prep
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        part: ${{ fromJson(needs.prep.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: film-assets, path: production/remotion }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: Render chunk
+        working-directory: production/remotion
+        run: |
+          npm i --no-audit --no-fund --loglevel=error
+          TOTAL=$(node -e "const t=require('./src/data/timeline.json'); console.log(Math.ceil(t.total*30))")
+          N=${{ env.PARTS }}; P=${{ matrix.part }}; SZ=$(( (TOTAL + N - 1) / N )); A=$(( P * SZ )); B=$(( A + SZ - 1 )); [ $B -ge $TOTAL ] && B=$(( TOTAL - 1 ))
+          echo "frames $A-$B of $TOTAL"
+          npx remotion render src/index.ts Main out/part_$(printf %02d $P).mp4 --frames=$A-$B --muted --codec=h264 --crf=18 \
+            --gl=swangle --concurrency=4 --timeout=180000 --log=warn 2>&1 | tail -15
+          ls -la out
+      - uses: actions/upload-artifact@v4
+        with: { name: 'part-${{ matrix.part }}', path: production/remotion/out, retention-days: 3 }
+
+  audio:
+    needs: prep
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: film-assets, path: production/remotion }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - working-directory: production/remotion
+        run: |
+          npm i --no-audit --no-fund --loglevel=error
+          npx remotion render src/index.ts Main out/mix.wav --codec=wav --log=warn 2>&1 | tail -8
+          ls -la out
+      - uses: actions/upload-artifact@v4
+        with: { name: audio-mix, path: production/remotion/out/mix.wav, retention-days: 3 }
+
+  final:
+    needs: [render, audio]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { pattern: 'part-*', path: parts, merge-multiple: true }
+      - uses: actions/download-artifact@v4
+        with: { name: audio-mix, path: audio }
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
+      - name: Concat, loudness -14 LUFS, mux, publish
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          set -e
+          N=$(ls parts/*.mp4 | wc -l); echo "parts: $N"; test "$N" -eq "${{ env.PARTS }}"
+          for f in $(ls parts/*.mp4 | sort); do echo "file '$PWD/$f'"; done > list.txt
+          ffmpeg -v error -y -f concat -safe 0 -i list.txt -c copy video.mp4
+          ffmpeg -hide_banner -i audio/mix.wav -af loudnorm=I=-14:TP=-1.5:LRA=11:print_format=json -f null - 2>&1 | sed -n '/{/,/}/p' > ln.json
+          cat ln.json
+          read II TP LRA TH OFF <<< $(python3 -c "import json; d=json.load(open('ln.json')); print(d['input_i'], d['input_tp'], d['input_lra'], d['input_thresh'], d['target_offset'])")
+          ffmpeg -v error -y -i audio/mix.wav -af "loudnorm=I=-14:TP=-1.5:LRA=11:measured_I=$II:measured_TP=$TP:measured_LRA=$LRA:measured_thresh=$TH:offset=$OFF:linear=true,aresample=48000" -ar 48000 mix_norm.wav
+          ffmpeg -v error -y -i video.mp4 -i mix_norm.wav -map 0:v -map 1:a -c:v copy -c:a aac -b:a 320k -movflags +faststart -shortest USSR15_final_1080p.mp4
+          ffmpeg -v error -y -i USSR15_final_1080p.mp4 -vf scale=1280:-2 -c:v libx264 -crf 24 -preset veryfast -c:a aac -b:a 160k USSR15_preview_720p.mp4
+          ffmpeg -hide_banner -i USSR15_final_1080p.mp4 -af ebur128=peak=true:framelog=quiet -f null - 2>&1 | grep -E "^\s+(I|Peak):" | tail -3
+          ls -la *.mp4
+          gh release delete ${{ env.TAG }} --repo $GITHUB_REPOSITORY -y --cleanup-tag || true
+          gh release create ${{ env.TAG }} --repo $GITHUB_REPOSITORY --title "Final film" --notes "Why the Soviet Union Broke Into Exactly 15 Countries" USSR15_final_1080p.mp4 USSR15_preview_720p.mp4

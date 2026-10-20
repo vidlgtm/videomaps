@@ -122,6 +122,10 @@ S["rsfsr_1954"] = RUS_NE
 S["kfssr"] = karelia
 S["karakalpakstan"] = karak
 S["crimea"] = crimea
+_open = lambda g: g.buffer(-0.01).buffer(0.01)
+S["rsfsr_1924"] = _open(S["rsfsr_1922"].difference(unary_union([S["uzb_1924"], G["TKM"]])))
+S["rsfsr_1929"] = _open(S["rsfsr_1922"].difference(unary_union([S["uzb_1929"], G["TKM"], G["TJK"]])))
+S["rsfsr_1940"] = _open(RUS_NE.difference(karelia)) if karelia is not None else RUS_NE
 
 # --- extent: USSR 1991 + margin
 X = transform(lambda x, y: fw.transform(x, y), S["ussr_1991"])
