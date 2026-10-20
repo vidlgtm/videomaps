@@ -82,10 +82,10 @@ rrep = {k: a1("RUS", v) for k, v in RREP.items()}
 
 # --- breakaway regions
 def brk_find(pattern):
-    for col in brk.columns:
-        if brk[col].dtype == object:
-            m = brk[brk[col].fillna("").astype(str).str.contains(pattern, case=False, regex=True)]
-            if len(m): return unary_union(m.geometry.values)
+    for col in brk.columns:                    # pandas 3 uses a string dtype (not object): test every non-geometry column
+        if col == "geometry": continue
+        m = brk[brk[col].astype(str).str.contains(pattern, case=False, regex=True, na=False)]
+        if len(m): return unary_union(m.geometry.values)
     say("WARN breakaway not found:", pattern); return None
 BRK = {"Abkhazia": brk_find(r"Abkhaz"), "South Ossetia": brk_find(r"South Ossetia"),
        "Transnistria": brk_find(r"Transnist|Pridnestrov"), "Nagorno-Karabakh": brk_find(r"Karabakh|Artsakh")}

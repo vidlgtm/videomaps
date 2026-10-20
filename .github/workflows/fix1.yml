@@ -1,0 +1,121 @@
+name: fix1-assets
+# Completes stage 1: re-renders the matryoshka frames that hit the time limit (56-110, 276-330),
+# re-renders the Caucasus fly-over with natural relief, re-renders 4 Manim overlays with fixed layout.
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+env:
+  PYTHONUNBUFFERED: "1"
+  STAGE1_RUN: "39314086382"
+jobs:
+  doll-fix:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        range: ["56 66", "67 77", "78 88", "89 99", "100 110", "276 286", "287 297", "298 308", "309 319", "320 330"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: model, path: out/model, run-id: '${{ env.STAGE1_RUN }}', github-token: '${{ github.token }}' }
+      - run: bash production/ci/install_blender.sh
+      - run: |
+          set -- ${{ matrix.range }}
+          $HOME/blender/blender -b -P production/blender/matryoshka.py -- --model out/model --out frames --start $1 --end $2 2>&1 | grep -E "rendered|Error|Traceback" | tail -20
+          rm -f frames/matryoshka_timing.json; ls frames | wc -l
+      - uses: actions/upload-artifact@v4
+        with: { name: 'dollfix-${{ strategy.job-index }}', path: frames, retention-days: 3 }
+
+  doll-encode:
+    needs: doll-fix
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { pattern: 'doll-frames-*', path: frames, merge-multiple: true, run-id: '${{ env.STAGE1_RUN }}', github-token: '${{ github.token }}' }
+      - uses: actions/download-artifact@v4
+        with: { pattern: 'dollfix-*', path: frames, merge-multiple: true }
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
+      - name: Encode + publish
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          mkdir -p out && N=$(ls frames/f_*.png | wc -l); echo "frames: $N"; test "$N" -eq 330
+          ffmpeg -v error -y -framerate 30 -start_number 1 -i frames/f_%04d.png -c:v prores_ks -profile:v 4444 -pix_fmt yuva444p10le -qscale:v 9 out/matryoshka.mov
+          ffmpeg -v error -y -framerate 30 -start_number 1 -i frames/f_%04d.png -c:v libvpx-vp9 -pix_fmt yuva420p -b:v 0 -crf 18 -row-mt 1 out/matryoshka.webm
+          ffmpeg -v error -y -f lavfi -i color=c=0x2a3640:s=1920x1080:r=30 -framerate 30 -i frames/f_%04d.png -filter_complex "[0][1]overlay=shortest=1" -c:v libx264 -crf 18 -pix_fmt yuv420p out/matryoshka_preview.mp4
+          ls -la out && gh release upload stage1 out/* --clobber --repo $GITHUB_REPOSITORY
+
+  cauc-prep:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: pip install -q geopandas shapely pillow requests numpy scipy && python production/blender/caucasus_prep.py
+      - uses: actions/upload-artifact@v4
+        with: { name: cauc-data2, path: out/cauc, retention-days: 3 }
+
+  cauc-render:
+    needs: cauc-prep
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: cauc-data2, path: out/cauc }
+      - run: bash production/ci/install_blender.sh
+      - run: |
+          S=$(( ${{ matrix.part }} * 20 + 1 )); E=$(( S + 19 ))
+          $HOME/blender/blender -b -P production/blender/caucasus.py -- --data out/cauc --out frames --start $S --end $E 2>&1 | grep -E "rendered|Error|Traceback" | tail -25
+      - uses: actions/upload-artifact@v4
+        with: { name: 'cauc2-${{ matrix.part }}', path: frames, retention-days: 3 }
+
+  cauc-encode:
+    needs: cauc-render
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: cauc-data2, path: out/cauc }
+      - uses: actions/download-artifact@v4
+        with: { pattern: 'cauc2-*', path: frames, merge-multiple: true }
+      - run: bash production/ci/install_blender.sh
+      - name: Labels + encode + publish
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          N=$(ls frames/f_*.jpg | wc -l); echo "frames: $N"; test "$N" -eq 300
+          $HOME/blender/blender -b -P production/blender/caucasus.py -- --data out/cauc --out out/final --labels-only 2>&1 | tail -2
+          ffmpeg -v error -y -framerate 30 -start_number 1 -i frames/f_%04d.jpg -c:v libx264 -crf 12 -preset slow -pix_fmt yuv420p out/final/caucasus.mp4
+          gh release upload stage1 out/final/caucasus.mp4 out/final/caucasus_labels.json --clobber --repo $GITHUB_REPOSITORY
+
+  manim-fix:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        scene: [Hierarchy, SecessionLaw, TatarstanEstonia, UtiPossidetis]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq libcairo2-dev libpango1.0-dev pkg-config ffmpeg fonts-dejavu-core > /dev/null
+      - run: |
+          mkdir -p ~/.fonts && cd ~/.fonts
+          for u in "ofl/cinzel/Cinzel%5Bwght%5D.ttf" "ofl/inter/Inter%5Bopsz,wght%5D.ttf" "ofl/cormorantgaramond/CormorantGaramond%5Bwght%5D.ttf"; do curl -sL -O "https://github.com/google/fonts/raw/main/$u"; done
+          fc-cache -f > /dev/null
+      - run: pip install -q manim
+      - working-directory: production/manim
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          manim -qh -t --fps 30 --media_dir media scenes.py ${{ matrix.scene }} 2>&1 | tail -2
+          gh release upload stage1 media/videos/scenes/1080p30/${{ matrix.scene }}.mov --clobber --repo $GITHUB_REPOSITORY

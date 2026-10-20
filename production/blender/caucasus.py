@@ -17,7 +17,7 @@ meta = json.load(open(f"{DATA}/meta.json"))
 hm = np.load(f"{DATA}/height.npy")
 H, W = hm.shape
 U = 100.0                                   # pixels per Blender unit
-VS = 4.5 / (meta["m_per_px"] * U)           # vertical exaggeration x4.5, metres -> units
+VS = 2.6 / (meta["m_per_px"] * U)           # vertical exaggeration x2.6, metres -> units
 SEA = -27.0                                 # Caspian surface; Black Sea bathymetry lies far below
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -57,14 +57,14 @@ L.new(sep.outputs["Z"], mr.inputs["Value"])
 ramp = N.new("ShaderNodeValToRGB"); L.new(mr.outputs["Result"], ramp.inputs["Fac"])
 cr = ramp.color_ramp; cr.interpolation = "EASE"
 stops = [(0.0, (0.30, 0.40, 0.20)), (0.05, (0.36, 0.45, 0.22)), (0.17, (0.46, 0.47, 0.27)), (0.33, (0.47, 0.39, 0.27)),
-         (0.52, (0.42, 0.38, 0.35)), (0.64, (0.55, 0.53, 0.52)), (0.70, (0.93, 0.94, 0.96)), (1.0, (0.98, 0.98, 1.0))]
+         (0.50, (0.42, 0.38, 0.35)), (0.57, (0.58, 0.56, 0.55)), (0.62, (0.93, 0.94, 0.96)), (1.0, (0.98, 0.98, 1.0))]
 cr.elements[0].position, cr.elements[0].color = stops[0][0], (*stops[0][1], 1)
 cr.elements[1].position, cr.elements[1].color = stops[-1][0], (*stops[-1][1], 1)
 for pos, col in stops[1:-1]:
     e = cr.elements.new(pos); e.color = (*col, 1)
 # steep slopes -> bare rock
 sepn = N.new("ShaderNodeSeparateXYZ"); L.new(geo.outputs["Normal"], sepn.inputs[0])
-slope = N.new("ShaderNodeMapRange"); slope.inputs["From Min"].default_value = 0.93; slope.inputs["From Max"].default_value = 0.70
+slope = N.new("ShaderNodeMapRange"); slope.inputs["From Min"].default_value = 0.80; slope.inputs["From Max"].default_value = 0.55
 L.new(sepn.outputs["Z"], slope.inputs["Value"])
 rock = N.new("ShaderNodeMix"); rock.data_type = "RGBA"; rock.inputs[7].default_value = (0.33, 0.31, 0.29, 1)
 L.new(slope.outputs["Result"], rock.inputs[0]); L.new(ramp.outputs["Color"], rock.inputs[6])
@@ -131,10 +131,10 @@ cam.data.lens = 30; cam.data.clip_end = 400
 tgt = bpy.data.objects.new("Tgt", None); sc.collection.objects.link(tgt)
 c = cam.constraints.new("TRACK_TO"); c.target = tgt; c.track_axis = "TRACK_NEGATIVE_Z"; c.up_axis = "UP_Y"
 KEYS = [  # frame, camera(lon,lat,z), target(lon,lat,z)
-    (1, (38.7, 42.3, 1.55), (41.6, 43.4, 0.15)),
-    (110, (40.9, 42.0, 1.25), (43.3, 43.2, 0.25)),
-    (210, (43.2, 41.6, 1.35), (45.6, 43.1, 0.10)),
-    (300, (45.0, 41.2, 1.75), (47.0, 43.0, 0.00)),
+    (1, (38.7, 42.3, 1.15), (41.6, 43.4, 0.10)),
+    (110, (40.9, 42.0, 0.95), (43.3, 43.2, 0.15)),
+    (210, (43.2, 41.6, 1.00), (45.6, 43.1, 0.06)),
+    (300, (45.0, 41.2, 1.30), (47.0, 43.0, 0.00)),
 ]
 for f, cp, tp in KEYS:
     cam.location = wpt(*cp); cam.keyframe_insert("location", frame=f)

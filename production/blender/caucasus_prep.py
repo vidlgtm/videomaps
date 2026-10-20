@@ -22,6 +22,8 @@ for ty in range(ty0, ty1 + 1):
         mos[(ty - ty0) * 256:(ty - ty0 + 1) * 256, (tx - tx0) * 256:(tx - tx0 + 1) * 256] = a[..., 0] * 256 + a[..., 1] + a[..., 2] / 256 - 32768
 ox, oy = tx0 * 256, ty0 * 256
 hm = mos[int(y0 - oy):int(y1 - oy), int(x0 - ox):int(x1 - ox)]
+from scipy.ndimage import gaussian_filter
+hm = gaussian_filter(hm, 0.8)          # remove single-pixel spikes
 np.save(f"{OUT}/height.npy", hm.astype(np.float32))
 H, W = hm.shape
 # metres per mercator pixel at mid latitude -> for true horizontal scale
