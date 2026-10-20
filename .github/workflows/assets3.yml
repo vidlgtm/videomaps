@@ -1,0 +1,61 @@
+name: assets3
+# Fixes after QA of assets2: terrain (scalerank-0 lakes, isotropic coast distance -> no Arctic streaks,
+# Caspian bathymetry, warmer grade, HD tiles extended to Central Asia, film-composite QA) and archive
+# (1936 constitution pages: cover / Article 13 / Article 17; Sukhumi photo instead of a modern war map).
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+
+jobs:
+  terrain:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: pip install -q numpy scipy "pillow==11.2.1" requests pyshp
+      - run: python -u production/pipeline/terrain2.py
+      - uses: actions/upload-artifact@v4
+        with: { name: terrain, path: out/terrain, retention-days: 14 }
+
+  archive:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: |
+          pip install -q torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          pip install -q spandrel "transformers>=4.45" "rembg[cpu]" "pillow==11.2.1" requests numpy
+      - run: python -u production/pipeline/archive2.py
+      - uses: actions/upload-artifact@v4
+        with: { name: archive, path: out/archive, retention-days: 14 }
+
+  publish:
+    needs: [terrain, archive]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with: { name: terrain, path: art/terrain }
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with: { name: archive, path: art/archive }
+      - name: Collect
+        shell: bash
+        run: |
+          mkdir -p rel; R=$PWD/rel
+          if [ -d art/terrain ]; then cd art/terrain; cp basemap_v2.jpg basemap_v2_half.jpg globe_night.jpg terrain_sheet.jpg $R/ || true; cp qa_*.jpg $R/ || true; zip -qr $R/hd_tiles.zip hd; cd - > /dev/null; fi
+          if [ -d art/archive ]; then cd art/archive; zip -qr $R/archive.zip . -x 'archive_sheet_*'; cp archive_sheet_*.jpg credits.json $R/ || true; cd - > /dev/null; fi
+          ls -la $R
+      - name: Release assets3
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          gh release view assets3 --repo ${{ github.repository }} > /dev/null 2>&1 || \
+            gh release create assets3 --repo ${{ github.repository }} --title "Assets v3 (QA fixes)" --notes "Terrain and archive after QA of assets2"
+          gh release upload assets3 rel/* --repo ${{ github.repository }} --clobber

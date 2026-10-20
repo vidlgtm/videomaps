@@ -56,14 +56,36 @@
  },
  {
   "id": "const1936",
-  "title": "The Soviet Socialist Constitution of december 5, 1936.djvu",
-  "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d0/The_Soviet_Socialist_Constitution_of_december_5%2C_1936.djvu/page1-1280px-The_Soviet_Socialist_Constitution_of_december_5%2C_1936.djvu.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "title": "The Soviet Socialist Constitution of december 5, 1936.djvu (cover)",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d0/The_Soviet_Socialist_Constitution_of_december_5%2C_1936.djvu/page3-1280px-The_Soviet_Socialist_Constitution_of_december_5%2C_1936.djvu.jpg",
   "page": "https://commons.wikimedia.org/wiki/File:The_Soviet_Socialist_Constitution_of_december_5,_1936.djvu",
   "w": 1375,
   "h": 2054,
   "license": "Public domain",
-  "artist": "SSSR",
-  "date": ""
+  "artist": "USSR (official text); Russia To-Day Society edition",
+  "date": "1936-12-05"
+ },
+ {
+  "id": "const1936_a13",
+  "title": "The Soviet Socialist Constitution of december 5, 1936.djvu (p. 9, Article 13)",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d0/The_Soviet_Socialist_Constitution_of_december_5%2C_1936.djvu/page9-1280px-The_Soviet_Socialist_Constitution_of_december_5%2C_1936.djvu.jpg",
+  "page": "https://commons.wikimedia.org/wiki/File:The_Soviet_Socialist_Constitution_of_december_5,_1936.djvu",
+  "w": 1375,
+  "h": 2054,
+  "license": "Public domain",
+  "artist": "USSR (official text); Russia To-Day Society edition",
+  "date": "1936-12-05"
+ },
+ {
+  "id": "const1936_a17",
+  "title": "The Soviet Socialist Constitution of december 5, 1936.djvu (p. 11, Article 17)",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d0/The_Soviet_Socialist_Constitution_of_december_5%2C_1936.djvu/page11-1280px-The_Soviet_Socialist_Constitution_of_december_5%2C_1936.djvu.jpg",
+  "page": "https://commons.wikimedia.org/wiki/File:The_Soviet_Socialist_Constitution_of_december_5,_1936.djvu",
+  "w": 1375,
+  "h": 2054,
+  "license": "Public domain",
+  "artist": "USSR (official text); Russia To-Day Society edition",
+  "date": "1936-12-05"
  },
  {
   "id": "stalin",
@@ -220,15 +242,15 @@
   "date": "1992"
  },
  {
-  "id": "abkhazia",
-  "title": "War in Abkhazia.jpg",
-  "url": "https://upload.wikimedia.org/wikipedia/commons/b/bc/War_in_Abkhazia.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
-  "page": "https://commons.wikimedia.org/wiki/File:War_in_Abkhazia.jpg",
-  "w": 1200,
-  "h": 772,
-  "license": "CC BY-SA 4.0",
-  "artist": "Nivzaq",
-  "date": "1994-01-01"
+  "id": "sukhumi",
+  "title": "The burned out shell of the former Parliament building of the Autonomous Republic of Abkhazia, (28489422794).jpg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/b/b2/The_burned_out_shell_of_the_former_Parliament_building_of_the_Autonomous_Republic_of_Abkhazia%2C_%2828489422794%29.jpg",
+  "page": "https://commons.wikimedia.org/wiki/File:The_burned_out_shell_of_the_former_Parliament_building_of_the_Autonomous_Republic_of_Abkhazia,_(28489422794).jpg",
+  "w": 3768,
+  "h": 2118,
+  "license": "CC BY-SA 2.0",
+  "artist": "Clay Gilliland",
+  "date": "2016-05-12"
  },
  {
   "id": "tallinn",

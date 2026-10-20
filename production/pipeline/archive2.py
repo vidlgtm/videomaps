@@ -15,7 +15,7 @@ M.append(dict(id="sovflag", title="Flag of the Soviet Union.svg", license="Publi
               url="https://commons.wikimedia.org/w/index.php?title=Special:Redirect/file/Flag_of_the_Soviet_Union.svg&width=2400",
               page="https://commons.wikimedia.org/wiki/File:Flag_of_the_Soviet_Union.svg"))
 CUT = {"lenin", "stalin1918", "stalin", "gorbachev"}
-NO_DEPTH = {"sovflag", "treaty1922", "const1936", "crimea1954", "ukr_ref"}
+NO_DEPTH = {"sovflag", "treaty1922", "const1936", "const1936_a13", "const1936_a17", "crimea1954", "ukr_ref"}
 MAXS = 2400
 torch.set_num_threads(4)
 

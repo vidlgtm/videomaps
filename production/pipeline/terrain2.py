@@ -75,7 +75,10 @@ def signed_area(r):
 
 
 LAND = ne("ne_10m_land"); LAKES = ne("ne_10m_lakes"); HIST = ne("ne_10m_lakes_historic")
-LAKE_SHAPES = [s for s, rec in zip(LAKES.shapes(), LAKES.records()) if (rec.as_dict().get("scalerank", 9) or 9) <= 7]
+def _rank(rec):
+    v = rec.as_dict().get("scalerank")
+    return 9 if v is None else v
+LAKE_SHAPES = [s for s, rec in zip(LAKES.shapes(), LAKES.records()) if _rank(rec) <= 7]
 ARAL = [s for s, rec in zip(HIST.shapes(), HIST.records()) if "aral" in str(rec.as_dict().get("name", "")).lower()]
 print("lakes", len(LAKE_SHAPES), "historic aral parts", len(ARAL))
 
@@ -158,7 +161,7 @@ def style(rgb, dem, land, dist_km, px_m, ve, shadow_px, rng):
     # ---- land: graded colour + relief
     lum = rgb @ np.array([0.3, 0.59, 0.11], np.float32)
     c = lum[..., None] + (rgb - lum[..., None]) * 0.86
-    c = np.clip(c, 0, 1) ** 0.7 * np.array([1.05, 1.0, 0.9], np.float32)
+    c = np.clip(c, 0, 1) ** 0.68 * np.array([1.08, 1.0, 0.86], np.float32)
     c = 0.05 + 0.95 * c
     z = np.where(land > 0.5, np.maximum(dem, -50), 0).astype(np.float32) * ve
     gy, gx = np.gradient(ndimage.gaussian_filter(z, 0.6), px_m)
@@ -175,7 +178,7 @@ def style(rgb, dem, land, dist_km, px_m, ve, shadow_px, rng):
     cl += (1 - np.clip(k, 0, 1))[..., None] * np.array([-0.015, 0.0, 0.035], np.float32)      # cool shadows
     cl += np.clip(k - 1, 0, 1)[..., None] * np.array([0.05, 0.04, 0.0], np.float32)          # warm light
     # ---- sea: depth ramp + shallows + texture
-    depth = np.clip(-dem, 0, 4000)
+    depth = np.clip(-ndimage.gaussian_filter(np.minimum(dem, 0), 3.0), 0, 4000)
     depth = np.maximum(depth, np.clip(dist_km, 0, 400) * 3.0)
     t = np.clip(np.log1p(depth / 15) / math.log1p(3000 / 15), 0, 1)
     cs = sea_ramp(t)
@@ -205,15 +208,33 @@ def render(origin, k, w, h, src, margin=48, seed=0):
     rgb = eq_sample(src["bm"], *src["bm_geo"], lonw, lat).astype(np.float32) / 255
     dem = src["dem"].sample(lon, lat).astype(np.float32)
     land = eq_sample(src["mask"], *src["mask_geo"], lonw, lat).astype(np.float32) / 255
-    dist = eq_sample(src["dist"], *src["dist_geo"], lonw, lat).astype(np.float32)
+    dx0, dy0, dk = src["dist_geo"]
+    dist = ndimage.map_coordinates(src["dist"], [(Y - dy0) * dk - 0.5, (X - dx0) * dk - 0.5], order=1, mode="nearest").astype(np.float32)
     polar = lat > 84.5
     land[polar] = 0; dem[polar] = -3000
+    # Caspian: terrain tiles mix a flat -28 m SRTM surface with ETOPO sea-bed cells -> blocky; use coast distance only
+    casp = (lonw > 46.0) & (lonw < 55.6) & (lat > 36.4) & (lat < 47.6) & (land < 0.5)
+    dem[casp] = 0.0
     out = style(rgb, dem, land, dist, RES / k, src["ve"], src["shadow_px"], np.random.default_rng(seed))
     return (out[margin:margin + h, margin:margin + w] * 255 + 0.5).astype(np.uint8)
 
 
 def water_dist(mask, km_per_px):
     return ndimage.distance_transform_edt(mask < 128).astype(np.float32) * km_per_px
+
+
+def canvas_dist(mask_fn, x0, y0, x1, y1, k):
+    """distance (km) from every water pixel to the nearest land, computed on the conformal canvas grid
+    (k samples per canvas px) -> isotropic on screen, unlike an equirectangular distance transform"""
+    u = (np.arange(int((x1 - x0) * k)) + 0.5) / k + x0
+    out = []
+    for r0 in range(0, int((y1 - y0) * k), 1024):
+        v = (np.arange(r0, min(r0 + 1024, int((y1 - y0) * k))) + 0.5) / k + y0
+        X, Y = np.meshgrid(u, v); lon, lat = inv(X, Y)
+        m = mask_fn((lon + 180) % 360 - 180, lat); m[lat > 84.5] = 0
+        out.append(m)
+    m = np.concatenate(out, 0)
+    return ndimage.distance_transform_edt(m < 128).astype(np.float32) * (RES / k / 1000.0)
 
 
 # ======================= 1) world basemap (k = 1) =======================
@@ -228,9 +249,10 @@ gx, gy = np.meshgrid(np.arange(0, CW + 1, 16.0), np.arange(0, CH + 1, 16.0))
 glon, glat = inv(gx, gy)
 dem_w = Dem(7, glon, glat)
 MW = land_mask(-180, 90, 60, 21600, 10800)
-MW_half = np.asarray(Image.fromarray(MW).resize((10800, 5400), Image.BILINEAR))
-DW = water_dist(MW_half, 111.0 / 30 * 0.6)    # ~km (latitude-averaged)
-src_w = dict(bm=BMW, bm_geo=(-180, 90, 60), dem=dem_w, mask=MW, mask_geo=(-180, 90, 60), dist=DW, dist_geo=(-180, 90, 30),
+mask_w = lambda lon, lat: eq_sample(MW, -180, 90, 60, lon, lat, order=0)
+DW = canvas_dist(mask_w, 0, 0, CW, CH, 0.5)
+print("world distance field", DW.shape, flush=True)
+src_w = dict(bm=BMW, bm_geo=(-180, 90, 60), dem=dem_w, mask=MW, mask_geo=(-180, 90, 60), dist=DW, dist_geo=(0, 0, 0.5),
              ve=9.0, shadow_px=4.0)
 rows = []
 for y in range(0, CH, 1024):
@@ -241,10 +263,10 @@ world = np.concatenate(rows, 0)
 Image.fromarray(world).save(f"{OUT}/basemap_v2.jpg", quality=92)
 Image.fromarray(world).resize((CW // 2, CH // 2), Image.LANCZOS).save(f"{OUT}/basemap_v2_half.jpg", quality=90)
 print(f"world done {time.time() - t0:.0f}s", flush=True)
-del BMW, dem_w, MW, MW_half, DW, src_w, rows
+del BMW, dem_w, DW, src_w, rows
 
 # ======================= 2) HD tiles (k = 4) for the western USSR =======================
-LO0, LO1, LA0, LA1 = 17.0, 63.0, 36.0, 67.0           # sample region (deg)
+LO0, LO1, LA0, LA1 = 8.0, 88.0, 30.0, 70.0            # sample region (deg): western USSR, Caucasus, Central Asia
 bm_c1 = "cache/bm_c1.jpg"
 if not os.path.exists(bm_c1):
     get("https://eoimages.gsfc.nasa.gov/images/imagerecords/74000/74092/world.200407.3x21600x21600.C1.jpg", bm_c1)
@@ -255,10 +277,9 @@ BMC = [np.ascontiguousarray(_im[..., c]) for c in range(3)]; del _im
 print("blue marble C1 crop", BMC[0].shape, flush=True)
 PPD = 400
 MH = land_mask(LO0, LA1, PPD, int((LO1 - LO0) * PPD), int((LA1 - LA0) * PPD))
-DH = water_dist(MH, 111.0 / PPD * 0.66)
 K, TILE = 4, 512
-ex = np.array([fwd(lo, la) for lo in np.linspace(18, 62, 45) for la in (37.5, 66.0)] +
-              [fwd(lo, la) for lo in (18, 62) for la in np.linspace(37.5, 66, 30)])
+ex = np.array([fwd(lo, la) for lo in np.linspace(LO0 + 1, LO1 - 1, 65) for la in (LA0 + 1.5, LA1 - 1)] +
+              [fwd(lo, la) for lo in (LO0 + 1, LO1 - 1) for la in np.linspace(LA0 + 1.5, LA1 - 1, 30)])
 gx0 = int(math.floor(ex[:, 0].min() / TILE) * TILE); gy0 = int(math.floor(ex[:, 1].min() / TILE) * TILE)
 gx1 = int(math.ceil(ex[:, 0].max() / TILE) * TILE); gy1 = int(math.ceil(ex[:, 1].max() / TILE) * TILE)
 gx0, gy0 = max(gx0, 0), max(gy0, 0); gx1, gy1 = min(gx1, int(math.ceil(CW / TILE) * TILE)), min(gy1, int(math.ceil(CH / TILE) * TILE))
@@ -266,8 +287,17 @@ sx, sy = np.meshgrid(np.arange(gx0, gx1 + 1, 8.0), np.arange(gy0, gy1 + 1, 8.0))
 slon, slat = inv(sx, sy)
 inside = (slon > LO0 + 0.3) & (slon < LO1 - 0.3) & (slat > LA0 + 0.3) & (slat < LA1 - 0.3)
 dem_h = Dem(9, slon[inside], slat[inside])
-src_h = dict(bm=BMC, bm_geo=(LO0, LA1, 240), dem=dem_h, mask=MH, mask_geo=(LO0, LA1, PPD), dist=DH, dist_geo=(LO0, LA1, PPD),
-             ve=3.4, shadow_px=11.0)
+def mask_h(lon, lat):
+    m = eq_sample(MW, -180, 90, 60, lon, lat, order=0)
+    ins = (lon > LO0) & (lon < LO1) & (lat > LA0) & (lat < LA1)
+    m[ins] = eq_sample(MH, LO0, LA1, PPD, lon[ins], lat[ins], order=0)
+    return m
+MG = 220
+DH = canvas_dist(mask_h, gx0 - MG, gy0 - MG, gx1 + MG, gy1 + MG, 2)
+print("HD distance field", DH.shape, flush=True)
+del MW
+src_h = dict(bm=BMC, bm_geo=(LO0, LA1, 240), dem=dem_h, mask=MH, mask_geo=(LO0, LA1, PPD), dist=DH, dist_geo=(gx0 - MG, gy0 - MG, 2),
+             ve=4.0, shadow_px=11.0)
 tiles = []
 for j in range((gy1 - gy0) // TILE):
     for i in range((gx1 - gx0) // TILE):
@@ -292,18 +322,41 @@ with cf.ProcessPoolExecutor(4) as ex_:
 json.dump({"x0": gx0, "y0": gy0, "tile": TILE, "k": K, "tiles": [[i, j] for i, j, _, _ in tiles]}, open(f"{OUT}/hd/index.json", "w"))
 print(f"HD done {time.time() - t0:.0f}s", flush=True)
 
-# ======================= 3) QA sheet: views at film zooms =======================
+# ======================= 3) QA sheet: exactly what the film shows (world basemap, HD tiles on top) =======================
+del BMC, dem_h, MH, DH, src_h
+WB = np.asarray(Image.open(f"{OUT}/basemap_v2.jpg").convert("RGB"))
+TL = {(i, j): (cx, cy) for i, j, cx, cy in tiles}
+
+
+def film_view(cx, cy, zoom, W=1920, H=1080):
+    u = (np.arange(W) + 0.5) / zoom + cx - W / 2 / zoom
+    v = (np.arange(H) + 0.5) / zoom + cy - H / 2 / zoom
+    X, Y = np.meshgrid(u, v)
+    out = np.stack([ndimage.map_coordinates(WB[..., c], [Y - 0.5, X - 0.5], order=1, mode="nearest") for c in range(3)], -1)
+    if zoom > 1.05:                       # the film switches to HD tiles above this zoom
+        ti = np.floor((X - gx0) / TILE).astype(int); tj = np.floor((Y - gy0) / TILE).astype(int)
+        for (i, j), (tx, ty) in TL.items():
+            sel = (ti == i) & (tj == j)
+            if not sel.any(): continue
+            T = np.asarray(Image.open(f"{OUT}/hd/t_{i}_{j}.jpg").convert("RGB")).astype(np.float32)
+            if zoom < K: T = ndimage.gaussian_filter(T, (0.45 * K / zoom, 0.45 * K / zoom, 0))   # ~ browser mip filtering
+            ys = (Y[sel] - ty) * K - 0.5; xs = (X[sel] - tx) * K - 0.5
+            for c in range(3): out[..., c][sel] = np.clip(ndimage.map_coordinates(T[..., c], [ys, xs], order=1, mode="nearest"), 0, 255)
+    return out
+
+
 views = [("CRIMEA", 34.3, 45.25, 3.6), ("CHECHNYA", 45.7, 43.2, 3.6), ("KARABAKH", 46.6, 40.0, 2.4),
-         ("BALTIC", 24.3, 57.3, 1.8), ("MOSCOW", 37.6, 55.75, 3.0), ("TATARSTAN", 50.5, 55.4, 2.2)]
-sheet = Image.new("RGB", (1920, 1440), (20, 20, 20))
+         ("BALTIC", 24.3, 57.3, 1.8), ("MOSCOW", 37.6, 55.75, 3.0), ("TATARSTAN", 50.5, 55.4, 2.2),
+         ("FERGANA", 71.5, 40.8, 2.5), ("SEAM_N", 35.0, 67.5, 1.5), ("SEAM_E", 84.5, 49.0, 1.5)]
+sheet = Image.new("RGB", (1920, 1800), (20, 20, 20))
 for n_, (name, lo, la, zoom) in enumerate(views):
     cx, cy = fwd(lo, la)
-    w_c, h_c = 1920 / zoom, 1080 / zoom
-    a = render((cx - w_c / 2, cy - h_c / 2), zoom, 1920, 1080, src_h, margin=48, seed=n_)
+    a = film_view(float(cx), float(cy), zoom)
     sheet.paste(Image.fromarray(a).resize((640, 360), Image.LANCZOS), ((n_ % 3) * 640, (n_ // 3) * 360))
     Image.fromarray(a).save(f"{OUT}/qa_{name.lower()}.jpg", quality=88)
-wv = Image.open(f"{OUT}/basemap_v2.jpg"); wv.thumbnail((1920, 720))
-sheet.paste(wv, ((1920 - wv.width) // 2, 720))
+    print("qa", name, flush=True)
+wv = Image.fromarray(WB); wv.thumbnail((1920, 720))
+sheet.paste(wv, ((1920 - wv.width) // 2, 1080))
 sheet.save(f"{OUT}/terrain_sheet.jpg", quality=86)
 
 # ======================= 4) night globe texture =======================
