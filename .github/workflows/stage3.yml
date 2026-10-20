@@ -52,7 +52,9 @@ jobs:
           (cd public/archive && unzip -q -o /tmp/archive.zip && ls | wc -l)
           if curl -sfL --retry 3 -o /tmp/icons.zip "$A2/icons.zip"; then (cd public/icons && unzip -q -o /tmp/icons.zip); else echo "WARN: icons.zip not published"; fi
           for f in article72.mp4 uti.mp4 caucasus2.mp4 caucasus2_labels.json; do curl -sfL --retry 3 -o public/clips/$f "$A2/$f" || echo "WARN: $f missing"; done
-          mkdir -p /tmp/s2 && (cd /tmp/s2 && python $GITHUB_WORKSPACE/production/pipeline/sfx2.py) && cp /tmp/s2/out/sfx/*.wav public/sfx/
+          mkdir -p /tmp/s2
+          (cd /tmp/s2; python $GITHUB_WORKSPACE/production/pipeline/sfx2.py)
+          cp /tmp/s2/out/sfx/*.wav public/sfx/
           curl -sfL --retry 3 -A "videomaps/1.0" -o public/flags/su.svg "https://upload.wikimedia.org/wikipedia/commons/a/a9/Flag_of_the_Soviet_Union.svg"
           npm i --no-audit --no-fund --loglevel=error flag-icons@7.6.0 && cp -r node_modules/flag-icons/flags/4x3 public/flags/ && rm -rf node_modules
           for f in archive/sovflag.jpg archive/kazan.jpg archive/tallinn.jpg archive/grozny.jpg archive/const1936.jpg archive/stalin_cut.png \
@@ -126,7 +128,9 @@ jobs:
           curl -sfL --retry 3 -o $PUB/voice.wav "$S1/voice.wav"
           for c in c1_hook c2_origins c3_annex c4_collapse c5_resolution; do curl -sfL --retry 3 -o $PUB/music/music_$c.mp3 "$S1/music_$c.mp3"; done
           curl -sfL --retry 3 -o /tmp/sfx.zip "$S1/sfx.zip" && (cd $PUB/sfx && unzip -q -o /tmp/sfx.zip)
-          mkdir -p /tmp/s2 && (cd /tmp/s2 && python $GITHUB_WORKSPACE/production/pipeline/sfx2.py) && cp /tmp/s2/out/sfx/*.wav $PUB/sfx/
+          mkdir -p /tmp/s2
+          (cd /tmp/s2; python $GITHUB_WORKSPACE/production/pipeline/sfx2.py)
+          cp /tmp/s2/out/sfx/*.wav $PUB/sfx/
           npm i --no-audit --no-fund --loglevel=error
           node scripts/build_audio.mjs && EVENTS_OUT=out/audio_events.json node out/audio_events.cjs
           python ../pipeline/mix.py out/audio_events.json $PUB out/audio

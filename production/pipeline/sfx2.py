@@ -30,7 +30,8 @@ def filt(x, kind, f, order=2):
 def reverb(x, sec=2.5, mix=0.3, damp=4.0):
     n = int(sec * SR)
     irs = [filt(rng.standard_normal(n) * np.exp(-T(sec) * damp), "low", 5000) for _ in range(2)]
-    wet = np.stack([signal.fftconvolve(x, ir)[: len(x) + n] for ir in irs], 1)
+    L = len(x) + n
+    wet = np.stack([np.pad(w := signal.fftconvolve(x, ir)[:L], (0, L - len(w))) for ir in irs], 1)
     wet /= np.abs(wet).max() + 1e-9
     dry = np.concatenate([x, np.zeros(n)])
     return np.stack([dry, dry], 1) * (1 - mix) + wet * mix * np.abs(x).max()
