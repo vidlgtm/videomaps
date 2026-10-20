@@ -41,3 +41,12 @@
   Globe = Three.js (@remotion/three); Chart = ECharts SSR; Clips = stepped Manim/Blender videos; AudioMix = voice + 5 cues ducked + SFX.
 - stage2.yml auto-runs after fix1 succeeds: 20 parallel chunks -> concat -> loudnorm -14 LUFS -> release "final" (USSR15_final_1080p.mp4 + 720p preview).
 - Next: download final from release, upload to Drive (resumable upload), report.
+
+## Stage 2 – rerun (2026-10-20)
+- Run 39403022652: video chunks OK but at high map zoom the 4-tab render dropped overlay layers (date cards, LTU flag, clip start);
+  Remotion audio job hit the 60-min limit.
+- Fixes: render = 3 independent browsers x concurrency 1 per chunk + self-check vs fresh-page stills (auto per-frame fallback);
+  audio = exact AudioMix event export (scripts/audio_events.tsx) -> pipeline/mix.py -> pipeline/master.py (-14 LUFS, -1.5 dBTP,
+  VO ~12 dB over music, SFX -5 dB); all job limits 360 min; QA sheets + qa_report.txt published with release "final".
+- Design fixes: chapter III title on one line; chapter IV card ends before Gorbachev portrait; chapter V card before the dolls;
+  map flags hidden under the closing title; Stalin captions note "photo 1943".

@@ -325,7 +325,7 @@ export const FLAGS: Flag[] = [
   {iso: 'KAZ', t: c4.dec21 + 0.6, to: END, date: '16 Dec 1991'},
   {iso: 'RUS', t: c4.resigned + 0.5, to: END, date: 'successor state'},
 ];
-export const FLAG_HIDE: [number, number][] = [[c5.s - 0.5, c6.why]];   // flags hidden while the film looks inside
+export const FLAG_HIDE: [number, number][] = [[c5.s - 0.5, END + 1]];   // flags hidden while the film looks inside
 
 // ======================= OVERLAY CARDS =======================
 export const CARDS: Card[] = [
@@ -346,7 +346,7 @@ export const CARDS: Card[] = [
   {kind: 'big', text: '16', sub: 'union republics', from: c3.sixteen, to: c3.finland + 1.0},
   {kind: 'date', text: '16 JULY 1956', sub: 'KARELO-FINNISH SSR DOWNGRADED', from: c3.y1956, to: c3.became + 1.0},
   {kind: 'date', text: '19 FEBRUARY 1954', sub: 'CRIMEA TRANSFERRED TO THE UKRAINIAN SSR', from: c3.y1954 + 0.3, to: c3.detail + 1.0},
-  {kind: 'chapter', num: 'IV', text: 'THE COLLAPSE', from: cs(4) + 0.1, to: cs(4) + 3.6},
+  {kind: 'chapter', num: 'IV', text: 'THE COLLAPSE', from: cs(4) + 0.1, to: c4.gorby + 0.35},
   {kind: 'date', text: '23 AUGUST 1989', sub: 'THE BALTIC WAY · ~2 MILLION PEOPLE · 675 KM', from: c4.aug89, to: c4.mar90},
   {kind: 'date', text: '11 MARCH 1990', sub: 'LITHUANIA RESTORES INDEPENDENCE', from: c4.mar90, to: c4.law},
   {kind: 'date', text: '17 MARCH 1991', sub: 'ALL-UNION REFERENDUM · SIX REPUBLICS BOYCOTT', from: c4.mar91, to: c4.aug91},
@@ -357,7 +357,7 @@ export const CARDS: Card[] = [
   {kind: 'date', text: '21 DECEMBER 1991', sub: 'ALMA-ATA PROTOCOL · 11 REPUBLICS', from: c4.dec21, to: c4.four},
   {kind: 'date', text: '25 DECEMBER 1991', sub: 'GORBACHEV RESIGNS', from: c4.four, to: c4.shells + 1},
   {kind: 'big', text: '15', sub: 'independent states', from: c4.states - 0.2, to: c4.e + 1.2},
-  {kind: 'chapter', num: 'V', text: 'THE DOLLS INSIDE', from: cs(5) + 0.1, to: cs(5) + 3.2},
+  {kind: 'chapter', num: 'V', text: 'THE DOLLS INSIDE', from: c4.e + 1.25, to: c5.dolls + 1.75},
   {kind: 'date', text: '30 AUGUST 1990', sub: 'TATARSTAN DECLARES SOVEREIGNTY', from: c5.tatar, to: c5.sixty},
   {kind: 'date', text: '21 MARCH 1992', sub: 'REFERENDUM · 61.4% FOR SOVEREIGN STATUS', from: c5.sixty, to: c5.treaty},
   {kind: 'date', text: '15 FEBRUARY 1994', sub: 'POWER-SHARING TREATY WITH MOSCOW', from: c5.treaty, to: c5.chech},
@@ -373,8 +373,8 @@ export const CARDS: Card[] = [
 export const PORTRAITS: Portrait[] = [
   {img: 'img/stalin_1943.jpg', name: 'JOSEPH STALIN', sub: 'photographed 1943', side: 'left', from: c0.answer, to: c0.title - 0.3},
   {img: 'img/lenin_1920.jpg', name: 'VLADIMIR LENIN', sub: 'photographed 1920', caption: 'A union of equal republics', captionFrom: c1.overruled, side: 'right', from: c1.lenin, to: c1.dec30 - 0.2},
-  {img: 'img/stalin_1943.jpg', name: 'JOSEPH STALIN', sub: 'Commissar for Nationalities, 1917–1923', caption: '“Autonomization”: all join Russia', captionFrom: c1.join, side: 'left', from: c1.stalin, to: c1.dec30 - 0.2},
-  {img: 'img/stalin_1943.jpg', name: 'JOSEPH STALIN', sub: 'speech of 25 November 1936', side: 'left', from: c2.asked, to: c2.three + 0.3},
+  {img: 'img/stalin_1943.jpg', name: 'JOSEPH STALIN', sub: 'Commissar for Nationalities 1917–23 · photo 1943', caption: '“Autonomization”: all join Russia', captionFrom: c1.join, side: 'left', from: c1.stalin, to: c1.dec30 - 0.2},
+  {img: 'img/stalin_1943.jpg', name: 'JOSEPH STALIN', sub: 'speech of 25 Nov 1936 · photo 1943', side: 'left', from: c2.asked, to: c2.three + 0.3},
   {img: 'img/gorbachev_1987.jpg', name: 'MIKHAIL GORBACHEV', sub: 'photographed 1987', side: 'right', from: c4.gorby, to: c4.aug89 - 0.2},
 ];
 
@@ -393,7 +393,7 @@ export const CLIPS: Clip[] = [
   {kind: 'manim', src: MAN('Timeline'), from: c3.became - 0.2, to: c3.y1954 - 0.1, steps: [{at: c3.became - 0.2, s0: 0, s1: 10.8, rate: 2.2}]},
   {kind: 'manim', src: MAN('SecessionLaw'), from: c4.law, to: c4.mar91 - 0.2, steps: [
     {at: c4.law, s0: 0, s1: 0.9}, {at: c4.refs, s0: 0.9, s1: 1.9}, {at: c4.twoThirds, s0: 2.8, s1: 3.8}, {at: c4.five, s0: 4.7, s1: 5.3}]},
-  {kind: 'doll', src: 'matryoshka.webm', from: c5.dolls - 0.3, to: c5.tatar - 0.1, steps: [{at: c5.dolls - 0.3, s0: 320 / 30, s1: 330 / 30}]},
+  {kind: 'doll', src: 'matryoshka.webm', from: c5.dolls + 1.45, to: c5.tatar + 0.5, steps: [{at: c5.dolls + 1.45, s0: 320 / 30, s1: 330 / 30}]},
   {kind: 'cauc', src: 'caucasus.mp4', from: c5.chech - 0.3, to: c5.chech + 9.6, steps: [{at: c5.chech - 0.3, s0: 0, s1: 9.9}]},
   {kind: 'manim', src: MAN('UtiPossidetis'), from: c5.uti - 0.3, to: c5.lines - 0.2, steps: [
     {at: c5.uti - 0.3, s0: 0, s1: 2.6}, {at: c5.means, s0: 2.6, s1: 4.6}, {at: c5.inherit, s0: 4.6, s1: 5.8}, {at: c5.legal, s0: 5.8, s1: 7.4}]},

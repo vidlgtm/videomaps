@@ -7,11 +7,13 @@ import {Globe} from './components/Globe';
 import {AudioMix} from './components/AudioMix';
 import {GLOBE} from './script';
 
-export const Main: React.FC<{lite?: boolean}> = ({lite}) => {
+export const Main: React.FC<{lite?: boolean; audioOnly?: boolean}> = ({lite, audioOnly}) => {
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
   const t = frame / fps;
   const globeFrames = Math.round(GLOBE.to * fps);
+  // audio-only pass: AudioMix is the sole sound source (all clips are muted), so this yields the identical mix fast
+  if (audioOnly) return <AudioMix />;
   return (
     <AbsoluteFill style={{background: '#0c1822'}}>
       {t > GLOBE.to - 1.4 ? <MapStage t={t} lite={!!lite} fps={fps} /> : null}

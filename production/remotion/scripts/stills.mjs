@@ -11,6 +11,6 @@ for (const t of ts) {
   const out = path.join(outDir, `still_${String(t).replace('.', '_')}.jpg`);
   const t0 = Date.now();
   await renderStill({composition: comp, serveUrl, output: out, frame, inputProps, imageFormat: 'jpeg', jpegQuality: 80,
-    chromiumOptions: {gl: 'swangle'}, timeoutInMilliseconds: 120000, scale: 0.5});
+    chromiumOptions: {gl: 'swangle'}, timeoutInMilliseconds: 120000, scale: parseFloat(process.env.SCALE || "0.5")});
   console.log('still', t, frame, ((Date.now() - t0) / 1000).toFixed(1) + 's');
 }

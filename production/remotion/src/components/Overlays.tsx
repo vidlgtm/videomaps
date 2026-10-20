@@ -27,8 +27,8 @@ const Chapter: React.FC<{num?: string; text: string; o: number; k: number}> = ({
     <div style={{fontFamily: FONTS.head, fontSize: 34, color: GOLD, letterSpacing: '0.5em', marginBottom: 18}}>{num ? `CHAPTER ${num}` : ''}</div>
     <div style={{display: 'flex', alignItems: 'center', gap: 34}}>
       <div style={{width: 160 * k, height: 1.5, background: GOLD}} />
-      <div style={{fontFamily: FONTS.head, fontWeight: 700, fontSize: 92, color: '#FFF8E6', letterSpacing: `${0.06 + 0.06 * k}em`,
-        textShadow: '0 6px 30px rgba(0,0,0,0.6)'}}>{text}</div>
+      <div style={{fontFamily: FONTS.head, fontWeight: 700, fontSize: text.length > 18 ? 74 : 92, color: '#FFF8E6', letterSpacing: `${0.06 + 0.06 * k}em`,
+        textShadow: '0 6px 30px rgba(0,0,0,0.6)', whiteSpace: 'nowrap'}}>{text}</div>
       <div style={{width: 160 * k, height: 1.5, background: GOLD}} />
     </div>
   </AbsoluteFill>
