@@ -50,3 +50,11 @@
   VO ~12 dB over music, SFX -5 dB); all job limits 360 min; QA sheets + qa_report.txt published with release "final".
 - Design fixes: chapter III title on one line; chapter IV card ends before Gorbachev portrait; chapter V card before the dolls;
   map flags hidden under the closing title; Stalin captions note "photo 1943".
+
+## FINAL (2026-10-20)
+- stage2 run 39419766208 (render + audio) -> assemble run 39443672706 (frame-exact) -> release `final`.
+- Final: 1920x1080p30 H.264, 16,807 frames = 9:20.23, AAC 320k, -14.0 LUFS integrated, true peak -1.3 dBFS.
+- QA sheets checked: all earlier defects fixed (chapter III title, Gorbachev card, chapter V/dolls, 1989/1990 date cards + LTU flag,
+  closing title clean, Stalin photo-year captions).
+- Drive "04 Final Film" 11AtYTpfPWmbDN8tzPdp5R9nMVhUcedbg: final 1X6PghuDCzXJx5W_mLrNPIoPcemBs064k,
+  preview 1ybJeH0iVjrz3qNGyJdrKU4OhPJCal9Im, subtitles 1sIRc4WG1kIXeYqObyIzneZfObWQrUeUP (production/subtitles/).
