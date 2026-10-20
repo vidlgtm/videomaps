@@ -166,7 +166,7 @@ jobs:
           curl -sfL --retry 3 -o ~/.local/share/fonts/CormorantGaramond-Italic.ttf "https://github.com/google/fonts/raw/main/ofl/cormorantgaramond/CormorantGaramond-Italic%5Bwght%5D.ttf"
           curl -sfL --retry 3 -o ~/.local/share/fonts/GreatVibes-Regular.ttf "https://github.com/google/fonts/raw/main/ofl/greatvibes/GreatVibes-Regular.ttf"
           fc-cache -f > /dev/null; fc-list | grep -iE "cormorant|great vibes" | head
-      - run: pip install -q manim scipy
+      - run: pip install -q "manim==0.22.0" "pillow==11.2.1" scipy
       - name: Render
         run: |
           cd production/manim
