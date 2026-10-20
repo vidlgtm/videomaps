@@ -5,6 +5,8 @@ import {px, project, cssTransform, meridian, KM_PER_PX, WORLD_W, WORLD_H, PERSP,
 import {env, clamp, ease, lerp, prog, easeOut} from '../lib/anim';
 import {CAMERA, CamKey, FILLS, STROKES, LABELS, MARKERS, FLAGS, FLAG_HIDE, LINES, RINGS, ISO15, FLAG_CODE, COL} from '../script';
 import {FONTS} from '../fonts';
+import hd from '../data/hd_index.json';
+import {V2Billboards, ArrowsSvg} from './V2';
 
 const G: any = geo;
 type P = {d: string; label: [number, number]; bbox?: number[]};
@@ -81,7 +83,17 @@ const WorldSvg: React.FC<{t: number; cam: CamState}> = ({t, cam}) => {
     const p = PATHS[f.id];
     const o = env(t, f.from, f.to, f.fi ?? 0.8, f.fo ?? 0.8) * (f.op ?? 0.6) * (f.pulse ? pulseK(t) : 1);
     if (!p || o <= 0.002) return null;
-    return <path key={'f' + i} d={p.d} fill={f.hatch ? `url(#hatch${HATCH_COLORS.indexOf(f.color)})` : f.color} fillRule="evenodd" opacity={o} />;
+    const glow = !f.hatch && f.id !== 'shape:ussr_1991_soft';
+    return (
+      <g key={'f' + i} opacity={o}>
+        <path d={p.d} fill={f.hatch ? `url(#hatch${HATCH_COLORS.indexOf(f.color)})` : f.color} fillRule="evenodd" />
+        {glow ? <>
+          <clipPath id={'fc' + i}><path d={p.d} fillRule="evenodd" /></clipPath>
+          <path d={p.d} fill="none" stroke={f.color} strokeWidth={16 / z} opacity={0.6} clipPath={`url(#fc${i})`} />
+          <path d={p.d} fill="none" stroke="#ffffff" strokeWidth={3.2 / z} opacity={0.32} clipPath={`url(#fc${i})`} />
+        </> : null}
+      </g>
+    );
   });
   const strokes = STROKES.flatMap((s, i) => {
     const o = env(t, s.from, s.to, 0.6, 0.8) * (s.op ?? 1);
@@ -97,6 +109,7 @@ const WorldSvg: React.FC<{t: number; cam: CamState}> = ({t, cam}) => {
       return (
         <g key={`s${i}_${j}`} opacity={o}>
           {s.glow ? <path {...common} {...dash} stroke={s.color} strokeWidth={(s.width * 5) / z} opacity={0.22} /> : null}
+          {!s.dash ? <path {...common} {...dash} stroke="rgba(0,0,0,0.38)" strokeWidth={(s.width * 1.5) / z} transform={`translate(${1.6 / z},${2.2 / z})`} /> : null}
           <path {...common} {...dash} stroke={s.color} strokeWidth={s.width / z} />
         </g>
       );
@@ -138,9 +151,10 @@ const WorldSvg: React.FC<{t: number; cam: CamState}> = ({t, cam}) => {
     const fs = l.size / z;
     return (
       <g key={'t' + i} opacity={o} transform={`translate(${x},${y}) rotate(${-cam.rot})`}>
-        <text textAnchor="middle" fontFamily={l.italic ? FONTS.serif : FONTS.head} fontSize={fs} fontWeight={l.italic ? 500 : 700}
-          fontStyle={l.italic ? 'italic' : 'normal'} letterSpacing={`${(l.spacing ?? 0.14) * fs}`}
-          fill={l.color ?? '#FFFFFF'} stroke="rgba(10,16,22,0.75)" strokeWidth={fs * 0.12} paintOrder="stroke" y={fs * 0.35}>
+        <text textAnchor="middle" fontFamily={l.italic ? FONTS.serif : FONTS.head} fontSize={fs} fontWeight={l.italic ? 600 : 700}
+          fontStyle={l.italic ? 'italic' : 'normal'} letterSpacing={`${(l.spacing ?? (l.italic ? 0.22 : 0.2)) * fs}`}
+          fill={l.color ?? (l.italic ? '#E6F3FA' : '#FFFFFF')} stroke={l.italic ? 'rgba(20,60,80,0.45)' : 'rgba(10,16,22,0.55)'}
+          strokeWidth={fs * (l.italic ? 0.06 : 0.09)} paintOrder="stroke" y={fs * 0.35} style={{filter: 'drop-shadow(0 2px 3px rgba(0,0,0,0.45))'}}>
           {l.text}
         </text>
         {l.sub ? (
@@ -167,6 +181,7 @@ const WorldSvg: React.FC<{t: number; cam: CamState}> = ({t, cam}) => {
       {strokes}
       {rings}
       {lines}
+      <ArrowsSvg t={t} z={z} />
       {labels}
     </svg>
   );
@@ -243,8 +258,8 @@ const Billboards: React.FC<{t: number; cam: CamState; fps: number}> = ({t, cam, 
           <div style={{position: 'absolute', whiteSpace: 'nowrap', top: side === 'b' ? 12 : side === 't' ? -54 : -14,
             left: side === 'r' ? 14 : undefined, right: side === 'l' ? 14 : undefined,
             transform: side === 't' || side === 'b' ? 'translateX(-50%)' : undefined, textAlign: side === 'l' ? 'right' : 'left'}}>
-            {m.label ? <div style={{fontFamily: FONTS.head, fontWeight: 700, fontSize: 22, color: '#FFFFFF', letterSpacing: '0.06em',
-              textShadow: '0 2px 6px rgba(0,0,0,0.9)'}}>{m.label}</div> : null}
+            {m.label ? <div style={{fontFamily: FONTS.serif, fontWeight: 700, fontSize: 25, color: '#FFFFFF', letterSpacing: '0.08em',
+              fontVariant: 'small-caps', textShadow: '0 2px 6px rgba(0,0,0,0.9)'}}>{m.label}</div> : null}
             {m.sub ? <div style={{fontFamily: FONTS.body, fontWeight: 600, fontSize: 15, color: '#F4E3B0', letterSpacing: '0.05em',
               textShadow: '0 1px 4px rgba(0,0,0,0.95)'}}>{m.sub}</div> : null}
           </div>
@@ -258,19 +273,41 @@ const Billboards: React.FC<{t: number; cam: CamState; fps: number}> = ({t, cam, 
   return <AbsoluteFill>{markers}{flags}</AbsoluteFill>;
 };
 
+const HD: any = hd;
+/** 4 px per canvas px terrain tiles, faded in above zoom 1 (only tiles in view are mounted) */
+const HdTiles: React.FC<{cam: CamState}> = ({cam}) => {
+  const o = clamp((cam.zoom - 1.0) / 0.18);
+  if (o <= 0) return null;
+  const pts = [[0, 0], [1920, 0], [0, 1080], [1920, 1080], [960, 0]].map(([x, y]) => unproject(cam, x, y));
+  const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+  const [x0, x1, y0, y1] = [Math.min(...xs) - 64, Math.max(...xs) + 64, Math.min(...ys) - 64, Math.max(...ys) + 64];
+  return (
+    <>
+      {HD.tiles.map(([i, j]: [number, number]) => {
+        const x = HD.x0 + i * HD.tile, y = HD.y0 + j * HD.tile;
+        if (x > x1 || x + HD.tile < x0 || y > y1 || y + HD.tile < y0) return null;
+        return <Img key={`hd${i}_${j}`} src={staticFile(`hd/t_${i}_${j}.jpg`)}
+          style={{position: 'absolute', left: x - 0.3, top: y - 0.3, width: HD.tile + 0.6, height: HD.tile + 0.6, opacity: o}} />;
+      })}
+    </>
+  );
+};
+
 export const MapStage: React.FC<{t: number; lite: boolean; fps: number}> = ({t, lite, fps}) => {
   const cam = cameraAt(t);
   return (
     <AbsoluteFill style={{background: '#0c1822', overflow: 'hidden'}}>
       <AbsoluteFill style={{perspective: PERSP, perspectiveOrigin: '960px 540px'}}>
         <div style={{position: 'absolute', left: 0, top: 0, width: WORLD_W, height: WORLD_H, transformOrigin: '0 0', transform: cssTransform(cam)}}>
-          <Img src={staticFile(lite ? 'basemap_half.jpg' : 'basemap.jpg')} style={{position: 'absolute', left: 0, top: 0, width: WORLD_W, height: WORLD_H}} />
+          <Img src={staticFile(lite ? 'basemap_v2_half.jpg' : 'basemap_v2.jpg')} style={{position: 'absolute', left: 0, top: 0, width: WORLD_W, height: WORLD_H}} />
+          {!lite ? <HdTiles cam={cam} /> : null}
           <WorldSvg t={t} cam={cam} />
         </div>
       </AbsoluteFill>
       {/* atmosphere: soft haze toward the receding top edge when tilted */}
       <AbsoluteFill style={{background: `linear-gradient(180deg, rgba(150,180,200,${0.32 * clamp(cam.tilt / 36)}) 0%, rgba(150,180,200,0) 38%)`}} />
       <Billboards t={t} cam={cam} fps={fps} />
+      <V2Billboards t={t} cam={cam} />
     </AbsoluteFill>
   );
 };

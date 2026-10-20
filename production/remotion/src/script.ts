@@ -1,5 +1,6 @@
 // The film's visual score: every event is pinned to a word of the narration (forced alignment).
 import {cue, cs, ce, TOTAL, WORDS} from './lib/cues';
+import {h, OPENING} from './v2';
 
 // ---------- helpers ----------
 const C = cue;
@@ -129,13 +130,23 @@ const c6 = {
 export const T = {c0, c1, c2, c3, c4, c5, c6};
 
 // ======================= GLOBE (Three.js) =======================
-export const GLOBE = {from: 0, to: c0.hours + 2.6, moscowAt: c0.flag - 0.6, pullBack: c0.hours - 0.2};
+export const GLOBE = {from: -10, to: -9, moscowAt: -9.5, pullBack: -9.2};   // v2: replaced by <Opening/>
 
 // ======================= CAMERA =======================
 export const CAMERA: CamKey[] = [
-  cam(0, V.OV, 0.01),
-  cam(c0.tatar - 0.3, {lon: 38, lat: 57.2, w: 2700, tilt: 26}, 2.4),
-  cam(c0.chech - 0.2, V.CAUC, 2.4), cam(c0.why - 0.1, V.OV, 2.4),
+  cam(0, {lon: 39, lat: 55.2, w: 1900, tilt: 34}, 0.01),
+  cam(h.hours - 0.1, V.OV, 2.6),                                              // Moscow -> the whole union
+  cam(h.stood - 0.3, {x: 3900, y: 2900, w: 8700, tilt: 10, rotK: 0}, 3.2),   // drift over the fifteen flags
+  cam(h.peoples - 0.2, {lon: 50, lat: 50, w: 5200, tilt: 18}, 2.4),          // the patchwork
+  cam(h.organized - 0.3, {x: 4060, y: 2860, w: 9000, tilt: 6, rotK: 0}, 2.2), // fifty-three homelands
+  cam(h.tatar - 0.5, {lon: 49.1, lat: 55.8, w: 1500, tilt: 34}, 1.6),        // Tatarstan
+  cam(h.est1 - 0.55, {lon: 25.2, lat: 58.9, w: 1250, tilt: 34}, 1.3),        // Estonia
+  cam(h.became - 0.6, {lon: 37.5, lat: 57.4, w: 2700, tilt: 28}, 1.4),       // both
+  cam(h.chech - 0.45, {lon: 45.6, lat: 43.6, w: 1150, tilt: 36}, 1.5),       // Chechnya
+  cam(h.endUp - 0.15, {lon: 41.5, lat: 50.5, w: 2700, tilt: 26}, 1.6),       // Moscow <- Grozny
+  cam(h.why - 0.2, V.OV, 1.6),
+  cam(h.answer - 0.1, {x: 4300, y: 2900, w: 8500, tilt: 12, rotK: 0}, 5.0),
+  cam(h.title - 0.2, {x: 4060, y: 2860, w: 9800, tilt: 4, rotK: 0}, 5.0),
   // chunk 1
   cam(c1.bols, {lon: 40, lat: 47, w: 3400, tilt: 20}, 2.6), cam(c1.dec30 - 0.4, V.OVW, 2.4),
   cam(c1.layer - 0.3, {lon: 44.9, lat: 41.4, w: 1250, tilt: 32}, 2.6), cam(c1.shell, V.OV, 2.6),
@@ -158,6 +169,10 @@ export const CAMERA: CamKey[] = [
 ];
 
 // ======================= MAP LAYERS =======================
+const RR = ['Tatarstan', 'Bashkortostan', 'Chuvashia', 'Mari El', 'Udmurtia', 'Mordovia', 'Chechnya', 'Ingushetia', 'Dagestan', 'North Ossetia',
+  'Kabardino-Balkaria', 'Karachay-Cherkessia', 'Adygea', 'Kalmykia', 'Karelia', 'Komi', 'Sakha (Yakutia)', 'Buryatia', 'Tuva', 'Khakassia', 'Altai Republic'];
+const QUILT = ['#B9785A','#7F9C6B','#C9A45C','#6E8FB0','#A0687E','#8FB0A0','#B58C55','#7C7AA8'];
+const QUILT_IDS = [...ISO15.map((i) => 'rep:' + i), ...RR.map((r) => 'rr:' + r), 'brk:Abkhazia', 'brk:South Ossetia', 'brk:Transnistria', 'brk:Nagorno-Karabakh'];
 const rep = (iso: string, from: number, to = END, op = 0.62, fi = 0.8, fo = 0.8): Fill => ({id: `rep:${iso}`, color: COL[iso], op, from, to, fi, fo});
 const all15 = (from: number, to = END, op = 0.62, except: string[] = []) => ISO15.filter((i) => !except.includes(i)).map((i) => rep(i, from, to, op));
 
@@ -165,10 +180,17 @@ const UNION_1922_END = c2.uzb;          // until Central Asia appears
 const STATE_1936_FROM = c2.kaz;
 export const FILLS: Fill[] = [
   // hook: the union, then fifteen nations
-  {id: 'shape:ussr_1991', color: COL.UNION, op: 0.66, from: c0.hours - 0.6, to: c0.fifteen + 1.2, fi: 1.2, fo: 1.0},
-  ...all15(c0.fifteen, cs(1) + 2.0, 0.6),
-  {id: 'rr:Tatarstan', color: COL.TATAR, op: 0.85, from: c0.tatar, to: c0.chech, pulse: true},
-  {id: 'rr:Chechnya', color: COL.RED, op: 0.9, from: c0.chech, to: c0.why + 0.5, pulse: true},
+  {id: 'shape:ussr_1991', color: COL.UNION, op: 0.64, from: h.hours - 0.15, to: h.gone + 0.7, fi: 1.0, fo: 0.9},
+  ...ISO15.map((i, k) => rep(i, h.fifteen + 0.05 + k * 0.12, h.patch + 0.3, 0.62, 0.45, 0.8)),
+  ...QUILT_IDS.map((id, k) => ({id, color: QUILT[k % QUILT.length], op: 0.62, from: h.patch - 0.1 + (k % 9) * 0.07, to: h.tatar - 0.2, fi: 0.4, fo: 0.6} as Fill)),
+  {id: 'rep:RUS', color: COL.UNION, op: 0.42, from: h.tatar - 0.5, to: h.why + 0.3},
+  {id: 'rr:Tatarstan', color: COL.TATAR, op: 0.88, from: h.tatar, to: h.tatarNot + 0.15, pulse: true},
+  {id: 'rr:Tatarstan', color: '#8E8A84', op: 0.75, from: h.tatarNot, to: h.chech - 0.3, fi: 0.3},
+  rep('EST', h.est1, h.chech - 0.3, 0.82, 0.4),
+  {id: 'rr:Chechnya', color: COL.RED, op: 0.9, from: h.chech, to: h.control + 0.15, pulse: true},
+  {id: 'rr:Chechnya', color: COL.UNION, op: 0.9, from: h.control, to: h.why + 0.3, fi: 0.35},
+  ...ISO15.map((i, k) => rep(i, h.f15 - 0.1 + k * 0.03, cs(1) + 2.0, 0.6, 0.5)),
+  ...RR.map((r) => ({id: 'rr:' + r, color: COL.TATAR, op: 0.78, from: h.twenty - 0.05, to: h.answer + 0.4, fi: 0.35} as Fill)),
   // chunk 1 - 1922
   {id: 'shape:ussr_1938', color: COL.UNION, op: 0.55, from: cs(1) + 1.0, to: c1.reality + 1.5, fi: 1.5},
   {id: 'shape:ussr_1938', color: COL.UNION, op: 0.35, from: c1.y1989 - 0.5, to: c1.layer + 0.5},
@@ -220,7 +242,13 @@ export const FILLS: Fill[] = [
 ];
 
 export const STROKES: Stroke[] = [
-  {id: 'borders', color: '#FFF6E0', width: 1.3, from: c0.fifteen, to: c0.title - 0.8, draw: 2.2},
+  {id: 'borders', color: '#FFF6E0', width: 1.4, from: h.gone - 0.2, to: h.patch + 0.3, draw: 1.6},
+  ...QUILT_IDS.map((id) => ({id, color: '#FFF6E0', width: 1.1, from: h.patch, to: h.tatar - 0.2, dash: true, op: 0.85} as Stroke)),
+  {id: 'rep:EST', color: '#FFFFFF', width: 2.6, from: h.became - 0.1, to: h.chech - 0.3, draw: 0.6, glow: true},
+  {id: 'rr:Tatarstan', color: '#FFE9A8', width: 2.2, from: h.tatar, to: h.tatarNot, glow: true},
+  {id: 'rr:Tatarstan', color: '#D8D2C4', width: 1.8, from: h.tatarNot, to: h.chech - 0.3, dash: true},
+  {id: 'rr:Chechnya', color: '#FFD0C8', width: 2.2, from: h.chech, to: h.why + 0.3, glow: true},
+  {id: 'borders', color: '#FFF6E0', width: 1.3, from: h.f15 - 0.1, to: cs(1) + 2.0, draw: 1.2},
   {id: 'borders', color: '#FFF6E0', width: 1.1, from: c1.shell, to: ce(1) + 1, op: 0.9},
   {id: 'frontier', color: COL.GOLD, width: 3.2, from: c1.shell + 0.2, to: c1.decades + 3, draw: 3.0, glow: true},
   {id: 'frontier', color: COL.GOLD, width: 3.4, from: c2.first + 0.3, to: c2.second, draw: 3.2, glow: true},
@@ -232,7 +260,6 @@ export const STROKES: Stroke[] = [
   {id: 'brk:Abkhazia', color: '#FFE7A0', width: 1.6, from: c1.layer + 0.6, to: c1.shell + 1, dash: true},
   {id: 'brk:South Ossetia', color: '#FFE7A0', width: 1.6, from: c1.layer + 1.0, to: c1.shell + 1, dash: true},
   {id: 'brk:Nagorno-Karabakh', color: '#FFE7A0', width: 1.6, from: c1.layer + 1.4, to: c1.shell + 1, dash: true},
-  {id: 'rr:Tatarstan', color: '#FFE9A8', width: 2.2, from: c0.tatar, to: c0.chech, glow: true},
   {id: 'rr:Tatarstan', color: '#FFE9A8', width: 2.2, from: c2.look, to: c2.practice + 0.5, glow: true},
   {id: 'rr:Tatarstan', color: '#FFE9A8', width: 2.2, from: c5.tatar, to: c5.chech + 1, glow: true},
   {id: 'borders', color: COL.GOLD, width: 2.0, from: c5.lines - 0.3, to: END, draw: 3.0, glow: true},
@@ -253,10 +280,12 @@ export const RINGS: Ring[] = [
 ];
 
 export const LABELS: Label[] = [
-  {text: 'TATARSTAN', at: 'rr:Tatarstan', size: 30, from: c0.tatar + 0.3, to: c0.chech, sub: '3.6 million people'},
-  {text: 'ESTONIA', at: 'rep:EST', size: 30, from: c0.tatar + 1.0, to: c0.chech, sub: '1.6 million people'},
-  {text: 'CHECHNYA', at: 'rr:Chechnya', size: 30, from: c0.chech + 0.3, to: c0.why + 0.4, sub: 'wars 1994–96 · 1999–2009'},
-  ...['RUS', 'KAZ', 'UKR', 'UZB', 'TKM'].map((i) => ({text: NAME[i].toUpperCase(), at: `rep:${i}`, size: i === 'RUS' ? 46 : 24, from: c0.fifteen + 0.8, to: c0.patch + 0.4} as Label)),
+  {text: 'U.S.S.R.', at: 'shape:ussr_1991', size: 118, from: h.largest - 0.1, to: h.gone + 0.6, spacing: 0.32},
+  {text: 'Arctic Ocean', at: [80, 77.5], size: 40, from: h.hours + 0.6, to: h.tatar - 0.4, italic: true},
+  {text: 'Black Sea', at: [34.2, 43.1], size: 30, from: h.hours + 0.9, to: h.tatar - 0.4, italic: true},
+  {text: 'Caspian Sea', at: [50.6, 41.6], size: 28, from: h.hours + 1.1, to: h.tatar - 0.4, italic: true},
+  {text: 'Baltic Sea', at: [19.4, 57.4], size: 26, from: h.hours + 1.3, to: h.tatar - 0.4, italic: true},
+  ...['RUS', 'KAZ', 'UKR', 'UZB', 'TKM', 'BLR'].map((i) => ({text: NAME[i].toUpperCase(), at: `rep:${i}`, size: i === 'RUS' ? 52 : 24, from: h.strange + 0.2, to: h.patch + 0.2} as Label)),
   {text: 'USSR', at: 'shape:ussr_1938', size: 64, from: c1.dec30, to: c1.reality, spacing: 0.4, sub: '30 December 1922'},
   {text: 'GEORGIA', at: 'rep:GEO', size: 26, from: c1.layer + 0.3, to: c1.shell + 0.8},
   {text: 'ARMENIA', at: 'rep:ARM', size: 22, from: c1.layer + 0.3, to: c1.shell + 0.8},
@@ -293,6 +322,7 @@ export const LABELS: Label[] = [
 ];
 
 export const MARKERS: Marker[] = [
+  {city: 'Moscow', label: 'Moscow', from: h.endUp - 0.1, to: h.why + 0.2},
   {city: 'Kyiv', label: 'Ukraine', sub: '1917–1921', from: c1.broke - 0.6, to: c1.lenin + 0.5},
   {city: 'Tbilisi', label: 'Georgia', sub: '1918–1921', from: c1.broke - 0.3, to: c1.lenin + 0.5},
   {city: 'Yerevan', label: 'Armenia', sub: '1918–1920', from: c1.broke, to: c1.lenin + 0.5, side: 'l'},
@@ -317,8 +347,8 @@ const ORDER: [string, string][] = [['GEO', '9 Apr 1991'], ['EST', '20 Aug 1991']
   ['TJK', '9 Sep 1991'], ['ARM', '23 Sep 1991'], ['TKM', '27 Oct 1991']];
 export const FLAGS: Flag[] = [
   // hook: fifteen new nations
-  ...ISO15.map((i, k) => ({iso: i, t: c0.fifteen + 0.5 + k * 0.16, to: c0.patch + 0.4} as Flag)),
-  {iso: 'EST', t: c0.yetEst + 0.3, to: c0.chech},
+  ...ISO15.map((i, k) => ({iso: i, t: h.fifteen + k * 0.13, to: h.strange + 0.3} as Flag)),
+  {iso: 'EST', t: h.became - 0.1, to: h.chech - 0.3},
   // 1990-1991
   {iso: 'LTU', t: c4.lith + 0.2, to: END, date: '11 Mar 1990'},
   ...ORDER.map(([i, d], k) => ({iso: i, t: c4.rar + 0.2 + k * 0.32, to: END, date: d} as Flag)),
@@ -329,12 +359,6 @@ export const FLAG_HIDE: [number, number][] = [[c5.s - 0.5, END + 1]];   // flags
 
 // ======================= OVERLAY CARDS =======================
 export const CARDS: Card[] = [
-  {kind: 'date', text: '25 DECEMBER 1991', sub: 'MOSCOW · THE KREMLIN', from: 0.4, to: c0.hours},
-  {kind: 'big', text: '53', sub: 'official national homelands', from: c0.fiftyThree - 0.1, to: c0.tatar - 0.2},
-  {kind: 'big', text: '15?', from: c0.why + 0.3, to: c0.twenty},
-  {kind: 'big', text: '20?', from: c0.twenty, to: c0.fifty},
-  {kind: 'big', text: '50?', from: c0.fifty, to: c0.answer},
-  {kind: 'title', text: 'WHY THE SOVIET UNION BROKE INTO EXACTLY 15 COUNTRIES', from: c0.title - 0.2, to: cs(1) + 0.2},
   {kind: 'chapter', num: 'I', text: 'THE NESTING DOLL', from: cs(1) + 0.1, to: cs(1) + 3.6},
   {kind: 'date', text: '30 DECEMBER 1922', sub: 'TREATY ON THE CREATION OF THE USSR', from: c1.dec30, to: c1.paper},
   {kind: 'quote', text: '“Each Union Republic shall retain the right freely to secede from the USSR.”', sub: 'Constitution of the USSR (1977), Article 72', from: c1.constit, to: ce(1) + 0.6},
@@ -371,7 +395,6 @@ export const CARDS: Card[] = [
 ];
 
 export const PORTRAITS: Portrait[] = [
-  {img: 'img/stalin_1943.jpg', name: 'JOSEPH STALIN', sub: 'photographed 1943', side: 'left', from: c0.answer, to: c0.title - 0.3},
   {img: 'img/lenin_1920.jpg', name: 'VLADIMIR LENIN', sub: 'photographed 1920', caption: 'A union of equal republics', captionFrom: c1.overruled, side: 'right', from: c1.lenin, to: c1.dec30 - 0.2},
   {img: 'img/stalin_1943.jpg', name: 'JOSEPH STALIN', sub: 'Commissar for Nationalities 1917–23 · photo 1943', caption: '“Autonomization”: all join Russia', captionFrom: c1.join, side: 'left', from: c1.stalin, to: c1.dec30 - 0.2},
   {img: 'img/stalin_1943.jpg', name: 'JOSEPH STALIN', sub: 'speech of 25 Nov 1936 · photo 1943', side: 'left', from: c2.asked, to: c2.three + 0.3},
@@ -405,7 +428,7 @@ export const DOLL_LABELS = [
   {text: 'COULD LEAVE', k: 0, from: c6.outer, to: c6.why + 0.2},
 ];
 export const CHART = {from: c2.m36 - 0.3, to: c2.deep - 0.2};
-export const FLAGPOLE = {from: c0.flag - 0.5, lower: c0.flag, lowered: c0.hours - 0.4, raise: c0.hours, to: c0.fifteen - 0.2,
+export const FLAGPOLE = {from: -10, lower: -9.8, lowered: -9.6, raise: -9.4, to: -9.2,
   from2: c4.resigned - 0.2, lower2: c4.resigned, raise2: c4.resigned + 2.2, to2: c4.shells};
 
 // ======================= MUSIC & SFX =======================
@@ -416,16 +439,29 @@ export const MUSIC = [
   {src: 'music/music_c4_collapse.mp3', from: cs(4) - 0.4, to: ce(4) + 1.6, lufs: -11.8},
   {src: 'music/music_c5_resolution.mp3', from: cs(5) - 0.4, to: END, lufs: -9.5},
 ];
-const whooshes: Sfx[] = CAMERA.filter((k) => (k.dur ?? 2) > 1.5 && k.t > 1).map((k, i) => ({f: `whoosh_${(i % 3) + 1}`, t: k.t - 0.15, v: 0.32}));
+// v2 hook Foley (sfx2.py: bell_toll, bell_small, wind_bed, cloth_flap, wood_thunk, war_rumble, forge_hiss, swell)
+const HOOK_SFX: Sfx[] = [
+  {f: 'wind_bed', t: 0.0, v: 0.5}, {f: 'bell_toll', t: OPENING.kremlinIn + 0.35, v: 0.5}, {f: 'bell_toll', t: OPENING.lower + 0.05, v: 0.42},
+  {f: 'bell_small', t: OPENING.lowered - 0.4, v: 0.35}, {f: 'cloth_flap', t: OPENING.kremlinIn + 0.6, v: 0.3},
+  {f: 'paper', t: h.dec - 0.05, v: 0.25}, {f: 'tick', t: h.y91 - 0.03, v: 0.4},
+  {f: 'line_draw', t: h.gone - 0.2, v: 0.3}, {f: 'shimmer', t: h.patch, v: 0.3},
+  {f: 'wood_thunk', t: h.tatar + 0.25, v: 0.5}, {f: 'cloth_flap', t: h.tatar + 0.35, v: 0.35},
+  {f: 'wood_thunk', t: h.est1 + 0.15, v: 0.5}, {f: 'cloth_flap', t: h.est1 + 0.25, v: 0.35},
+  {f: 'stamp', t: h.tatarNot, v: 0.4},
+  {f: 'wood_thunk', t: h.chech + 0.2, v: 0.5}, {f: 'cloth_flap', t: h.chech + 0.3, v: 0.35},
+  {f: 'war_rumble', t: h.two - 0.2, v: 0.5}, {f: 'line_draw', t: h.endUp + 0.1, v: 0.3},
+  {f: 'tick', t: h.f15, v: 0.45}, {f: 'tick', t: h.twenty, v: 0.45}, {f: 'tick', t: h.fifty, v: 0.45},
+  {f: 'paper', t: h.written - 0.1, v: 0.4}, {f: 'whoosh_2', t: h.joseph - 0.3, v: 0.3},
+  {f: 'swell', t: h.title - 3.0, v: 0.5}, {f: 'boom', t: h.title, v: 0.6}, {f: 'drone_hit', t: h.ff, v: 0.35},
+];
+const whooshes: Sfx[] = CAMERA.filter((k) => (k.dur ?? 2) > 1.5 && (k.dur ?? 2) <= 3.2 && k.t > 1).map((k, i) => ({f: `whoosh_${(i % 3) + 1}`, t: k.t - 0.15, v: 0.32}));
 export const SFX: Sfx[] = [
   ...whooshes,
   ...FLAGS.map((f) => ({f: 'flag_drop', t: f.t + 0.42, v: 0.38})),
   ...CARDS.filter((c) => c.kind === 'chapter').map((c) => ({f: 'boom', t: c.from, v: 0.45})),
   ...CARDS.filter((c) => c.kind === 'date').map((c) => ({f: 'paper', t: c.from, v: 0.35})),
   ...CARDS.filter((c) => c.kind === 'big').map((c) => ({f: 'tick', t: c.from + 0.05, v: 0.5})),
-  {f: 'riser', t: c0.title - 2.5, v: 0.4}, {f: 'boom', t: c0.title, v: 0.6}, {f: 'drone_hit', t: c0.title + 0.1, v: 0.35},
-  {f: 'line_draw', t: c0.fifteen, v: 0.3}, {f: 'shimmer', t: c0.tatar + 0.2, v: 0.3}, {f: 'stamp', t: c0.tatarNot, v: 0.35},
-  {f: 'drone_hit', t: c0.chech, v: 0.3}, {f: 'pop', t: c1.rus, v: 0.3}, {f: 'pop', t: c1.ukr, v: 0.3}, {f: 'pop', t: c1.blr, v: 0.3},
+  ...HOOK_SFX, {f: 'pop', t: c1.rus, v: 0.3}, {f: 'pop', t: c1.ukr, v: 0.3}, {f: 'pop', t: c1.blr, v: 0.3},
   {f: 'pop', t: c1.tsf, v: 0.3}, {f: 'shimmer', t: c1.inside + 1.2, v: 0.25}, {f: 'shimmer', t: c1.those + 1.2, v: 0.25},
   {f: 'shimmer', t: c1.districts + 1.2, v: 0.25}, {f: 'line_draw', t: c1.shell + 0.2, v: 0.3}, {f: 'pop', t: c2.uzb, v: 0.3},
   {f: 'pop', t: c2.tjk, v: 0.3}, {f: 'pop', t: c2.kaz, v: 0.3}, {f: 'line_draw', t: c2.first + 0.3, v: 0.3},

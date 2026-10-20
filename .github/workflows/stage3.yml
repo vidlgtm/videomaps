@@ -1,0 +1,164 @@
+name: stage3-render
+# v2 film: Remotion (Three.js night-globe opening, HD relief tiles, banners on poles, TripoSR/Blender icons, archive,
+# documents, cut-outs) + Manim + Blender clips. Renders any frame range (sample or full film) in parallel chunks,
+# each by 3 independent browsers with the fresh-page self-check; audio = offline mix of the exact event list,
+# mastered on the full film and trimmed to the range. Published to release TAG with QA sheets.
+on:
+  workflow_dispatch:
+    inputs:
+      parts: { description: 'parallel chunks', default: '20' }
+      tag: { description: 'release tag', default: 'sample3' }
+      a: { description: 'first frame', default: '0' }
+      b: { description: 'last frame (-1 = end of film)', default: '1784' }
+permissions:
+  contents: write
+env:
+  S1: https://github.com/${{ github.repository }}/releases/download/stage1
+  A2: https://github.com/${{ github.repository }}/releases/download/assets2
+  A3: https://github.com/${{ github.repository }}/releases/download/assets3
+  PARTS: ${{ inputs.parts || '20' }}
+  TAG: ${{ inputs.tag || 'sample3' }}
+  FA: ${{ inputs.a || '0' }}
+  FB: ${{ inputs.b || '1784' }}
+jobs:
+  prep:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    outputs:
+      matrix: ${{ steps.m.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg unzip > /dev/null && pip install -q numpy scipy
+      - name: Assets (stage1 voice/music/sfx, assets3 terrain/archive, assets2 icons/clips, Foley v2)
+        working-directory: production/remotion
+        run: |
+          set -e
+          mkdir -p public/manim public/music public/sfx public/flags public/archive public/icons public/clips
+          for f in voice.wav caucasus.mp4 matryoshka.webm sfx.zip; do curl -sfL --retry 3 -o public/$f "$S1/$f"; done
+          for f in caucasus_labels.json matryoshka_timing.json; do curl -sfL --retry 3 -o src/data/$f "$S1/$f"; done
+          for c in c1_hook c2_origins c3_annex c4_collapse c5_resolution; do curl -sfL --retry 3 -o public/music/music_$c.mp3 "$S1/music_$c.mp3"; done
+          (cd public/sfx && unzip -q -o ../sfx.zip && rm ../sfx.zip)
+          for s in ThreeRules TatarstanEstonia Timeline SecessionLaw UtiPossidetis Hierarchy; do
+            curl -sfL --retry 3 -o /tmp/$s.mov "$S1/$s.mov"
+            ffmpeg -v error -y -i /tmp/$s.mov -c:v libvpx-vp9 -pix_fmt yuva420p -b:v 0 -crf 22 -row-mt 1 -deadline good -cpu-used 4 public/manim/$s.webm
+            rm /tmp/$s.mov
+          done
+          for f in basemap_v2.jpg basemap_v2_half.jpg globe_night.jpg hd_tiles.zip archive.zip; do curl -sfL --retry 3 -o /tmp/$f "$A3/$f"; done
+          mv /tmp/basemap_v2.jpg /tmp/basemap_v2_half.jpg public/
+          ffmpeg -v error -y -i /tmp/globe_night.jpg -vf scale=4096:2048 -q:v 2 public/globe_night_4k.jpg
+          (cd public && unzip -q -o /tmp/hd_tiles.zip && rm -f hd/index.json && ls hd | wc -l)
+          (cd public/archive && unzip -q -o /tmp/archive.zip && ls | wc -l)
+          if curl -sfL --retry 3 -o /tmp/icons.zip "$A2/icons.zip"; then (cd public/icons && unzip -q -o /tmp/icons.zip); else echo "WARN: icons.zip not published"; fi
+          for f in article72.mp4 uti.mp4 caucasus2.mp4 caucasus2_labels.json; do curl -sfL --retry 3 -o public/clips/$f "$A2/$f" || echo "WARN: $f missing"; done
+          mkdir -p /tmp/s2 && (cd /tmp/s2 && python $GITHUB_WORKSPACE/production/pipeline/sfx2.py) && cp /tmp/s2/out/sfx/*.wav public/sfx/
+          curl -sfL --retry 3 -A "videomaps/1.0" -o public/flags/su.svg "https://upload.wikimedia.org/wikipedia/commons/a/a9/Flag_of_the_Soviet_Union.svg"
+          npm i --no-audit --no-fund --loglevel=error flag-icons@7.6.0 && cp -r node_modules/flag-icons/flags/4x3 public/flags/ && rm -rf node_modules
+          for f in archive/sovflag.jpg archive/kazan.jpg archive/tallinn.jpg archive/grozny.jpg archive/const1936.jpg archive/stalin_cut.png \
+                   globe_night_4k.jpg basemap_v2.jpg hd/t_1_3.jpg sfx/bell_toll.wav sfx/wood_thunk.wav; do test -s public/$f || { echo "MISSING $f"; exit 1; }; done
+          du -sh public; ls public public/icons | head -40
+      - id: m
+        run: echo "matrix=$(python3 -c "print(list(range(int('${{ env.PARTS }}'))))")" >> $GITHUB_OUTPUT
+      - uses: actions/upload-artifact@v4
+        with:
+          name: film-assets
+          path: |
+            production/remotion/public
+            production/remotion/src/data
+          retention-days: 5
+
+  render:
+    needs: prep
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        part: ${{ fromJson(needs.prep.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: film-assets, path: production/remotion }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null && pip install -q numpy pillow
+      - name: Render chunk (3 browsers x concurrency 1) + self-check
+        working-directory: production/remotion
+        run: |
+          npm i --no-audit --no-fund --loglevel=error
+          npx remotion bundle src/index.ts --out-dir=build --log=error > /dev/null 2>&1 && npx remotion still build Main /tmp/probe.jpg --frame=0 --scale=0.1 --gl=swangle --log=error > /dev/null 2>&1 \
+            && export SERVE=build || export SERVE=src/index.ts
+          echo "serve: $SERVE"
+          TOTAL=$(node -e "const t=require('./src/data/timeline.json'); console.log(Math.ceil(t.total*30))")
+          FA=${{ env.FA }}; FB=${{ env.FB }}; [ $FB -lt 0 -o $FB -ge $TOTAL ] && FB=$(( TOTAL - 1 ))
+          CNT=$(( FB - FA + 1 )); N=${{ env.PARTS }}; P=${{ matrix.part }}; SZ=$(( (CNT + N - 1) / N ))
+          A=$(( FA + P * SZ )); B=$(( A + SZ - 1 )); [ $B -gt $FB ] && B=$FB
+          if [ $A -gt $FB ]; then echo "part $P empty"; exit 0; fi
+          PART=$(printf %02d $P) WORKERS=3 bash scripts/render_chunk.sh $A $B out/part_$(printf %02d $P).mp4
+          ls -la out out/qa
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 'part-${{ matrix.part }}'
+          path: |
+            production/remotion/out/part_*.mp4
+            production/remotion/out/qa/
+          retention-days: 5
+          if-no-files-found: ignore
+
+  audio:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg unzip > /dev/null && pip install -q numpy scipy
+      - name: Mix + master (voice-led, -14 LUFS), trimmed to the frame range
+        working-directory: production/remotion
+        run: |
+          set -e
+          PUB=/tmp/rpub; mkdir -p $PUB/music $PUB/sfx out/audio
+          curl -sfL --retry 3 -o $PUB/voice.wav "$S1/voice.wav"
+          for c in c1_hook c2_origins c3_annex c4_collapse c5_resolution; do curl -sfL --retry 3 -o $PUB/music/music_$c.mp3 "$S1/music_$c.mp3"; done
+          curl -sfL --retry 3 -o /tmp/sfx.zip "$S1/sfx.zip" && (cd $PUB/sfx && unzip -q -o /tmp/sfx.zip)
+          mkdir -p /tmp/s2 && (cd /tmp/s2 && python $GITHUB_WORKSPACE/production/pipeline/sfx2.py) && cp /tmp/s2/out/sfx/*.wav $PUB/sfx/
+          npm i --no-audit --no-fund --loglevel=error
+          node scripts/build_audio.mjs && EVENTS_OUT=out/audio_events.json node out/audio_events.cjs
+          python ../pipeline/mix.py out/audio_events.json $PUB out/audio
+          python ../pipeline/master.py out/audio | tee out/audio/audio_report.txt
+          TOTAL=$(node -e "const t=require('./src/data/timeline.json'); console.log(Math.ceil(t.total*30))")
+          FA=${{ env.FA }}; FB=${{ env.FB }}; [ $FB -lt 0 -o $FB -ge $TOTAL ] && FB=$(( TOTAL - 1 ))
+          S=$(python3 -c "print($FA/30)"); E=$(python3 -c "print(($FB+1)/30)")
+          ffmpeg -v error -y -i out/audio/mix_final.wav -af "atrim=start=$S:end=$E,asetpts=PTS-STARTPTS" -c:a pcm_s24le out/audio/mix_range.wav
+          echo "range $FA-$FB ($S-$E s): $(ffprobe -v error -show_entries format=duration -of csv=p=0 out/audio/mix_range.wav) s" | tee -a out/audio/audio_report.txt
+          echo $(( FB - FA + 1 )) > out/audio/frames.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: audio-master
+          path: |
+            production/remotion/out/audio/mix_range.wav
+            production/remotion/out/audio/audio_report.txt
+            production/remotion/out/audio/frames.txt
+          retention-days: 5
+
+  final:
+    needs: [render, audio]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { pattern: 'part-*', path: parts, merge-multiple: true }
+      - uses: actions/download-artifact@v4
+        with: { name: audio-master, path: audio }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null && pip install -q pillow
+      - name: Assemble (frame-exact), QA, publish
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: bash production/pipeline/assemble.sh parts audio/mix_range.wav $(cat audio/frames.txt) "${{ env.TAG }}"
