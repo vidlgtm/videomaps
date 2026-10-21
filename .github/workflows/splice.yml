@@ -1,0 +1,39 @@
+name: splice
+# Replace one slow/stuck part of a stage3 run with the sub-parts of a re-render of the same frame range (another run),
+# then do the normal frame-exact final assembly + QA + release.
+on:
+  workflow_dispatch:
+    inputs:
+      main_run: { description: 'stage3 run id with the parts + audio-master', required: true }
+      fix_run: { description: 'stage3 run id that re-rendered the frame range of PART', required: true }
+      part: { description: 'part number being replaced', default: '13' }
+      tag: { description: 'release tag', default: 'film_v2' }
+permissions:
+  contents: write
+  actions: read
+jobs:
+  final:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { pattern: 'part-*', path: parts, merge-multiple: true, run-id: '${{ inputs.main_run }}', github-token: '${{ github.token }}' }
+      - uses: actions/download-artifact@v4
+        with: { pattern: 'part-*', path: fix, merge-multiple: true, run-id: '${{ inputs.fix_run }}', github-token: '${{ github.token }}' }
+      - uses: actions/download-artifact@v4
+        with: { name: audio-master, path: audio, run-id: '${{ inputs.main_run }}', github-token: '${{ github.token }}' }
+      - name: Splice
+        run: |
+          set -e
+          P=$(printf %02d ${{ inputs.part }})
+          rm -f parts/part_$P.mp4
+          for f in fix/part_*.mp4; do b=$(basename $f .mp4); mv $f parts/part_${P}_${b#part_}.mp4; done
+          mkdir -p parts/qa; for q in fix/qa/*; do [ -f "$q" ] && cp "$q" parts/qa/fix${P}_$(basename $q); done
+          ls parts | sort | tr '\n' ' '; echo
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: sudo rm -f /etc/apt/sources.list.d/microsoft*; sudo apt-get update -qq || true; sudo apt-get install -y -qq ffmpeg > /dev/null && pip install -q pillow
+      - name: Assemble (frame-exact), QA, publish
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: bash production/pipeline/assemble.sh parts audio/mix_range.wav $(cat audio/frames.txt) "${{ inputs.tag }}"
