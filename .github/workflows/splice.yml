@@ -17,6 +17,17 @@ jobs:
     timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
+      - name: Wait for the re-render (all render jobs of FIX_RUN done)
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          for i in $(seq 1 600); do
+            J=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/${{ inputs.fix_run }}/jobs?per_page=100" \
+              --jq '[.jobs[] | select(.name | startswith("render"))] | "\(length) \([.[] | select(.status=="completed")] | length) \([.[] | select(.conclusion=="failure" or .conclusion=="cancelled")] | length)"')
+            set -- $J; echo "$(date -u +%H:%M) fix renders: total $1 done $2 bad $3"
+            [ "$3" != "0" ] && { echo "re-render has failed jobs"; exit 1; }
+            [ "$1" != "0" ] && [ "$1" = "$2" ] && break
+            sleep 30
+          done
       - uses: actions/download-artifact@v4
         with: { pattern: 'part-*', path: parts, merge-multiple: true, run-id: '${{ inputs.main_run }}', github-token: '${{ github.token }}' }
       - uses: actions/download-artifact@v4
