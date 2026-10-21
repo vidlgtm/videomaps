@@ -127,7 +127,7 @@ export const K = {k1, k2, k3, k4, k5};
 const MOSCOW: [number, number] = [37.62, 55.75];
 
 BANNERS.push(
-  {at: MOSCOW, img: 'archive/redarmy.jpg', title: 'THE RED ARMY', sub: 'Moscow', from: k1.bols + 0.3, to: k1.broke - 0.4},
+  {at: MOSCOW, img: 'archive/redarmy.jpg', title: 'THE RED ARMY', sub: 'Moscow', from: cs(1) + 3.75, to: k1.broke - 0.4},
   {at: [34.8, 63.6], img: 'archive/gulag.jpg', title: 'THE GULAG', sub: 'White Sea Canal · 1930s', from: k1.any + 0.1, to: k1.words + 2.4},
   {at: [49.12, 55.79], img: 'archive/kazan.jpg', title: 'TATARSTAN', sub: '3.6 million people (1989)', from: k2.look + 0.25, to: k2.same - 0.3},
   {at: [24.75, 59.44], img: 'archive/tallinn.jpg', title: 'ESTONIA', sub: '1.6 million people (1989)', from: k2.m16 - 0.2, to: k2.deep - 0.3},
@@ -146,10 +146,10 @@ ICONS.push(
   {name: 'scroll', az: 270, at: [39.6, 55.2], from: k1.treaty, to: k1.paper + 3.0, size: 1.1},
   {name: 'kremlin', az: 180, at: MOSCOW, from: k2.practice + 0.1, to: k2.kazProm - 0.2, size: 1.1},
   {name: 'ballot', az: 270, at: MOSCOW, from: k4.mar91 + 0.4, to: k4.aug91 - 0.2, size: 1.1},
-  {name: 'tank', az: 270, at: [39.0, 55.15], from: k4.aug91 + 0.7, to: k4.weeks - 0.2, size: 1.2},
+  {name: 'tank', az: 270, at: [39.5, 54.05], from: k4.aug91 + 0.7, to: k4.weeks - 0.2, size: 1.2},
   {name: 'ballot', az: 270, at: [30.52, 50.45], from: k4.dec1 + 0.3, to: k4.week - 0.2, size: 1.1},
   {name: 'scroll', az: 270, at: [52.3, 54.9], from: k5.treaty, to: k5.chech - 0.4, size: 1.1},
-  {name: 'swords', az: 270, at: [47.0, 42.85], from: k5.chech + 9.7, to: k5.abkh - 0.35, size: 1.35},
+  {name: 'swords', az: 270, at: [47.65, 42.1], from: k5.chech + 9.7, to: k5.abkh - 0.35, size: 1.35},
   {name: 'swords', az: 270, at: [46.75, 39.82], from: k5.abkh + 0.8, to: k5.cis - 0.3, size: 1.1},
   {name: 'scroll', az: 270, at: [76.95, 43.25], from: k5.cis + 0.2, to: k5.uti - 0.3, size: 1.1},
 );
