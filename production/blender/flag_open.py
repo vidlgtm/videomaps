@@ -13,6 +13,7 @@ arg = lambda k, d=None: a[a.index(k) + 1] if k in a else d
 TEX, WORK, OUT = arg("--tex"), arg("--work", "/tmp/fo"), arg("--out", "frames")
 S, E = int(arg("--start", 61)), int(arg("--end", 367))
 RES, SPP = int(arg("--res", 100)), int(arg("--samples", 160))
+GPU = arg("--gpu")                             # OPTIX | CUDA | None (CPU); GPU frames match CPU frames
 FPS, F0, F1 = 30, 1, 375                      # cache frames
 os.makedirs(WORK, exist_ok=True); os.makedirs(OUT, exist_ok=True)
 tf = lambda bf: (bf - 61) / FPS               # Blender frame -> film seconds
@@ -252,6 +253,19 @@ for t, cl, ll, fl, lens, fs in KEYS:
 
 # ------------------------------------------------------------------ render
 sc.render.engine = "CYCLES"; sc.cycles.device = "CPU"
+if GPU:                                       # Kaggle / any NVIDIA box: OptiX first, CUDA fallback, all cards
+    cp = bpy.context.preferences.addons["cycles"].preferences
+    for typ in dict.fromkeys([GPU.upper(), "OPTIX", "CUDA"]):
+        try:
+            cp.compute_device_type = typ; cp.refresh_devices()
+            if any(d.type == typ for d in cp.devices): break
+        except Exception as e: print("gpu backend", typ, "unavailable:", e, flush=True)
+    for d in cp.devices: d.use = d.type == cp.compute_device_type
+    print("GPU devices:", cp.compute_device_type, [d.name for d in cp.devices if d.use], flush=True)
+    if any(d.use for d in cp.devices):
+        sc.cycles.device = "GPU"; sc.render.use_persistent_data = True
+        try: sc.cycles.denoising_use_gpu = True
+        except Exception: pass
 sc.cycles.samples = SPP; sc.cycles.use_adaptive_sampling = True; sc.cycles.adaptive_threshold = 0.02
 sc.cycles.use_denoising = True
 try: sc.cycles.denoiser = "OPENIMAGEDENOISE"
