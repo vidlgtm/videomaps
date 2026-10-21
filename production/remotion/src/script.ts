@@ -1,6 +1,6 @@
 // The film's visual score: every event is pinned to a word of the narration (forced alignment).
 import {cue, cs, ce, TOTAL, WORDS} from './lib/cues';
-import {h, OPENING} from './v2';
+import {h, OPENING, BANNERS, ICONS, DOCS, CUTOUTS, NUMERALS, TAGS, CHAIN} from './v2';
 
 // ---------- helpers ----------
 const C = cue;
@@ -148,22 +148,43 @@ export const CAMERA: CamKey[] = [
   cam(h.answer - 0.1, {x: 4300, y: 2900, w: 8500, tilt: 12, rotK: 0}, 5.0),
   cam(h.title - 0.2, {x: 4060, y: 2860, w: 9800, tilt: 4, rotK: 0}, 5.0),
   // chunk 1
-  cam(c1.bols, {lon: 40, lat: 47, w: 3400, tilt: 20}, 2.6), cam(c1.dec30 - 0.4, V.OVW, 2.4),
+  cam(c1.bols - 0.2, {lon: 38.6, lat: 54.6, w: 2000, tilt: 30}, 2.2),          // Moscow: the Red Army
+  cam(c1.broke - 0.6, {lon: 40, lat: 47, w: 3400, tilt: 20}, 2.4),              // nations break free
+  cam(c1.lenin - 0.2, {lon: 44, lat: 50, w: 4200, tilt: 16}, 6.0),              // slow drift under Lenin & Stalin
+  cam(c1.dec30 - 0.4, V.OVW, 2.4), cam(c1.paper, {lon: 52, lat: 52, w: 5600, tilt: 12}, 3.4),
+  cam(c1.y1989 - 0.3, V.OV, 1.8),                                               // the 53 homelands, layer by layer
   cam(c1.layer - 0.3, {lon: 44.9, lat: 41.4, w: 1250, tilt: 32}, 2.6), cam(c1.shell, V.OV, 2.6),
+  cam(c1.decades + 3.4, {lon: 40, lat: 60, w: 3800, tilt: 18}, 2.4),            // the Gulag (White Sea Canal)
+  cam(c1.words, {lon: 50, lat: 54, w: 6200, tilt: 10}, 4.0),
   // chunk 2
-  cam(c2.s + 0.5, V.OV, 1.0), cam(c2.uzb - 0.5, V.CASIA, 2.4), cam(c2.kaz - 0.3, {lon: 58, lat: 46, w: 4600, tilt: 16}, 2.2),
-  cam(c2.look - 0.2, V.VOLGA, 2.6), cam(c2.same, {lon: 50, lat: 55.2, w: 1900, tilt: 28}, 2.0),
-  cam(c2.practice, V.KAZ, 2.4), cam(c2.principle, V.OV, 2.4),
+  cam(c2.s + 0.5, V.OV, 1.0), cam(c2.uzb - 0.5, V.CASIA, 2.4),
+  cam(c2.y1936 - 0.2, {lon: 56, lat: 49, w: 5000, tilt: 14}, 2.4), cam(c2.kaz - 0.3, {lon: 58, lat: 46, w: 4600, tilt: 16}, 2.2),
+  cam(c2.eleven - 0.2, V.OV, 1.8),
+  cam(c2.first - 0.1, {x: 4060, y: 2860, w: 9300, tilt: 10, rotK: 0}, 3.0),     // rule I: the outer frontier
+  cam(c2.afterAll, {lon: 50, lat: 55, w: 2600, tilt: 26}, 2.4),                 // an enclosed republic
+  cam(c2.second, {lon: 60, lat: 48, w: 5600, tilt: 14}, 2.4),
+  cam(c2.look - 0.2, V.VOLGA, 2.0),
+  cam(c2.m16 - 0.5, {lon: 37.5, lat: 57.4, w: 2700, tilt: 28}, 1.5),            // Tatarstan and Estonia together
+  cam(c2.deep - 0.3, {lon: 49, lat: 55.5, w: 2300, tilt: 28}, 1.8), cam(c2.same, {lon: 50, lat: 55.2, w: 1900, tilt: 28}, 2.0),
+  cam(c2.practice - 0.2, {lon: 44, lat: 53.5, w: 2600, tilt: 24}, 1.8),         // Moscow decides
+  cam(c2.kazProm - 0.2, V.KAZ, 2.2), cam(c2.principle, V.OV, 2.4),
   // chunk 3
-  cam(c3.y1940 - 0.3, V.WEST40, 2.6), cam(c3.kf - 0.3, V.KARELIA, 2.2), cam(c3.y1956 - 0.3, {lon: 33, lat: 60, w: 2600, tilt: 22}, 2.0),
+  cam(c3.y1940 - 0.3, V.WEST40, 2.6), cam(c3.kf - 0.3, V.KARELIA, 2.2),
+  cam(c3.sixteen + 0.6, {lon: 40, lat: 54, w: 5200, tilt: 12}, 2.2), cam(c3.y1956 - 0.3, {lon: 33, lat: 60, w: 2600, tilt: 22}, 2.0),
+  cam(c3.became - 0.2, V.OV, 1.8),
   cam(c3.y1954 - 0.2, V.CRIMEA, 2.8), cam(c3.detail, {lon: 35, lat: 47, w: 1600, tilt: 26}, 2.4), cam(c3.nobody, V.OV, 2.6),
   // chunk 4
-  cam(c4.aug89 - 0.4, V.BALTIC, 2.6), cam(c4.law - 0.2, {lon: 30, lat: 55, w: 2200, tilt: 22}, 2.2),
+  cam(c4.gorby - 0.2, {lon: 37.6, lat: 55.2, w: 2600, tilt: 24}, 3.0),
+  cam(c4.aug89 - 0.4, V.BALTIC, 2.6), cam(c4.mar90 - 0.2, {lon: 25, lat: 55.2, w: 900, tilt: 34}, 1.6),
+  cam(c4.law - 0.2, {lon: 30, lat: 55, w: 2200, tilt: 22}, 2.2),
   cam(c4.mar91 - 0.3, V.OVW, 2.4), cam(c4.aug91 - 0.2, V.MOSCOW, 2.4), cam(c4.weeks - 0.2, V.OV, 2.4),
-  cam(c4.dec1 - 0.2, V.UKR, 2.4), cam(c4.week - 0.2, V.BELO, 2.2), cam(c4.dec21 - 0.2, V.OV, 2.4),
+  cam(c4.dec1 - 0.2, V.UKR, 2.4), cam(c4.week - 0.2, V.BELO, 2.2), cam(c4.dec21 - 0.2, {lon: 62, lat: 47, w: 5200, tilt: 14}, 2.4),
+  cam(c4.shells, V.OV, 2.0),
   // chunk 5
-  cam(c5.tatar - 0.4, V.VOLGA, 2.6), cam(c5.chech + 2.0, V.CHECH, 0.01), cam(c5.wars + 0.5, {lon: 45.3, lat: 43.0, w: 900, tilt: 34}, 3.0),
+  cam(c5.tatar - 0.4, V.VOLGA, 2.6), cam(c5.treaty - 0.2, {lon: 44, lat: 55.6, w: 1800, tilt: 28}, 2.0),
+  cam(c5.chech + 2.0, V.CHECH, 0.01), cam(c5.wars + 0.5, {lon: 45.3, lat: 43.0, w: 900, tilt: 34}, 3.0),
   cam(c5.abkh - 0.4, V.BREAK, 2.6), cam(c5.cis - 0.3, V.OV, 2.6),
+  cam(c5.legal - 0.2, {x: 4060, y: 2860, w: 9000, tilt: 8, rotK: 0}, 4.0), cam(c5.lines - 0.2, V.OVW, 3.0),
   // chunk 6
   cam(c6.s, V.OV, 1.0), cam(c6.never, {x: 4060, y: 2860, w: 8200, tilt: 8, rotK: 0}, 10),
 ];
@@ -179,6 +200,7 @@ const all15 = (from: number, to = END, op = 0.62, except: string[] = []) => ISO1
 const UNION_1922_END = c2.uzb;          // until Central Asia appears
 const STATE_1936_FROM = c2.kaz;
 export const FILLS: Fill[] = [
+  {id: 'rr:Tatarstan', color: '#8E8A84', op: 0.78, from: c2.rule1, to: c2.same + 1.0, fi: 0.3},
   // hook: the union, then fifteen nations
   {id: 'shape:ussr_1991', color: COL.UNION, op: 0.64, from: h.hours - 0.15, to: h.gone + 0.7, fi: 1.0, fo: 0.9},
   ...ISO15.map((i, k) => rep(i, h.fifteen + 0.05 + k * 0.12, h.patch + 0.3, 0.62, 0.45, 0.8)),
@@ -242,6 +264,9 @@ export const FILLS: Fill[] = [
 ];
 
 export const STROKES: Stroke[] = [
+  {id: 'shape:ussr_frontier', color: '#FFD98A', width: 3.2, from: c2.first, to: c2.second - 0.2, draw: 2.0, glow: true},
+  {id: 'borders', color: '#FF8A3D', width: 2.6, from: c5.lines, to: c5.lines + 3.4, draw: 1.4, glow: true},
+  {id: 'borders', color: '#FFF6E0', width: 1.6, from: c5.lines + 3.0, to: ce(5) + 1.0},
   {id: 'borders', color: '#FFF6E0', width: 1.4, from: h.gone - 0.2, to: h.patch + 0.3, draw: 1.6},
   ...QUILT_IDS.map((id) => ({id, color: '#FFF6E0', width: 1.1, from: h.patch, to: h.tatar - 0.2, dash: true, op: 0.85} as Stroke)),
   {id: 'rep:EST', color: '#FFFFFF', width: 2.6, from: h.became - 0.1, to: h.chech - 0.3, draw: 0.6, glow: true},
@@ -361,13 +386,10 @@ export const FLAG_HIDE: [number, number][] = [[c5.s - 0.5, END + 1]];   // flags
 export const CARDS: Card[] = [
   {kind: 'chapter', num: 'I', text: 'THE NESTING DOLL', from: cs(1) + 0.1, to: cs(1) + 3.6},
   {kind: 'date', text: '30 DECEMBER 1922', sub: 'TREATY ON THE CREATION OF THE USSR', from: c1.dec30, to: c1.paper},
-  {kind: 'quote', text: '“Each Union Republic shall retain the right freely to secede from the USSR.”', sub: 'Constitution of the USSR (1977), Article 72', from: c1.constit, to: ce(1) + 0.6},
   {kind: 'chapter', num: 'II', text: "STALIN'S THREE RULES", from: cs(2) + 0.1, to: cs(2) + 3.6},
   {kind: 'date', text: '5 DECEMBER 1936', sub: 'THE "STALIN CONSTITUTION"', from: c2.y1936, to: c2.eleven},
-  {kind: 'big', text: '11', sub: 'union republics', from: c2.eleven, to: c2.asked},
   {kind: 'chapter', num: 'III', text: 'SIXTEEN BECOMES FIFTEEN', from: cs(3) + 0.1, to: cs(3) + 3.6},
   {kind: 'date', text: '1940', sub: 'ANNEXATIONS IN THE WEST', from: c3.y1940, to: c3.kf},
-  {kind: 'big', text: '16', sub: 'union republics', from: c3.sixteen, to: c3.finland + 1.0},
   {kind: 'date', text: '16 JULY 1956', sub: 'KARELO-FINNISH SSR DOWNGRADED', from: c3.y1956, to: c3.became + 1.0},
   {kind: 'date', text: '19 FEBRUARY 1954', sub: 'CRIMEA TRANSFERRED TO THE UKRAINIAN SSR', from: c3.y1954 + 0.3, to: c3.detail + 1.0},
   {kind: 'chapter', num: 'IV', text: 'THE COLLAPSE', from: cs(4) + 0.1, to: c4.gorby + 0.35},
@@ -380,7 +402,6 @@ export const CARDS: Card[] = [
   {kind: 'date', text: '8 DECEMBER 1991', sub: 'BELOVEZHA ACCORDS', from: c4.week, to: c4.dec21},
   {kind: 'date', text: '21 DECEMBER 1991', sub: 'ALMA-ATA PROTOCOL · 11 REPUBLICS', from: c4.dec21, to: c4.four},
   {kind: 'date', text: '25 DECEMBER 1991', sub: 'GORBACHEV RESIGNS', from: c4.four, to: c4.shells + 1},
-  {kind: 'big', text: '15', sub: 'independent states', from: c4.states - 0.2, to: c4.e + 1.2},
   {kind: 'chapter', num: 'V', text: 'THE DOLLS INSIDE', from: c4.e + 1.25, to: c5.dolls + 1.75},
   {kind: 'date', text: '30 AUGUST 1990', sub: 'TATARSTAN DECLARES SOVEREIGNTY', from: c5.tatar, to: c5.sixty},
   {kind: 'date', text: '21 MARCH 1992', sub: 'REFERENDUM · 61.4% FOR SOVEREIGN STATUS', from: c5.sixty, to: c5.treaty},
@@ -394,12 +415,7 @@ export const CARDS: Card[] = [
   {kind: 'end', text: 'WHY THE SOVIET UNION BROKE INTO EXACTLY 15 COUNTRIES', sub: 'Sources: Constitution of the USSR (1936, 1977) · 1939 & 1989 Soviet censuses · Alma-Ata Declaration (1991) · Natural Earth · historical-basemaps', from: c6.e + 2.5, to: END},
 ];
 
-export const PORTRAITS: Portrait[] = [
-  {img: 'img/lenin_1920.jpg', name: 'VLADIMIR LENIN', sub: 'photographed 1920', caption: 'A union of equal republics', captionFrom: c1.overruled, side: 'right', from: c1.lenin, to: c1.dec30 - 0.2},
-  {img: 'img/stalin_1943.jpg', name: 'JOSEPH STALIN', sub: 'Commissar for Nationalities 1917–23 · photo 1943', caption: '“Autonomization”: all join Russia', captionFrom: c1.join, side: 'left', from: c1.stalin, to: c1.dec30 - 0.2},
-  {img: 'img/stalin_1943.jpg', name: 'JOSEPH STALIN', sub: 'speech of 25 Nov 1936 · photo 1943', side: 'left', from: c2.asked, to: c2.three + 0.3},
-  {img: 'img/gorbachev_1987.jpg', name: 'MIKHAIL GORBACHEV', sub: 'photographed 1987', side: 'right', from: c4.gorby, to: c4.aug89 - 0.2},
-];
+export const PORTRAITS: Portrait[] = [];   // v2: archival cut-outs (v2.ts CUTOUTS)
 
 // ======================= VIDEO CLIPS =======================
 const MAN = (s: string) => `manim/${s}.webm`;
@@ -408,18 +424,12 @@ export const CLIPS: Clip[] = [
   {kind: 'doll', src: 'matryoshka.webm', from: c1.reality - 0.2, to: c1.y1989 + 0.4, steps: [
     {at: c1.reality - 0.2, s0: 0, s1: 34 / 30}, {at: c1.inside, s0: 34 / 30, s1: 112 / 30},
     {at: c1.those, s0: 112 / 30, s1: 190 / 30}, {at: c1.districts, s0: 190 / 30, s1: 330 / 30}]},
-  {kind: 'manim', src: MAN('Hierarchy'), from: c1.h15 - 0.3, to: c1.layer - 0.2, steps: [
-    {at: c1.h15 - 0.3, s0: 0, s1: 1.1}, {at: c1.h20, s0: 2.0, s1: 2.6}, {at: c1.h8, s0: 3.5, s1: 4.1}, {at: c1.h10, s0: 5.0, s1: 7.3}]},
-  {kind: 'manim', src: MAN('ThreeRules'), from: c2.three, to: c2.look - 0.2, steps: [
-    {at: c2.three, s0: 0, s1: 1.6}, {at: c2.first, s0: 1.6, s1: 2.3}, {at: c2.second, s0: 3.9, s1: 4.6}, {at: c2.third, s0: 6.2, s1: 6.9}]},
-  {kind: 'manim', src: MAN('TatarstanEstonia'), from: c2.rule1 - 0.2, to: c2.same + 0.1, steps: [{at: c2.rule1 - 0.2, s0: 0, s1: 9.5, rate: 1.6}]},
-  {kind: 'manim', src: MAN('Timeline'), from: c3.became - 0.2, to: c3.y1954 - 0.1, steps: [{at: c3.became - 0.2, s0: 0, s1: 10.8, rate: 2.2}]},
-  {kind: 'manim', src: MAN('SecessionLaw'), from: c4.law, to: c4.mar91 - 0.2, steps: [
-    {at: c4.law, s0: 0, s1: 0.9}, {at: c4.refs, s0: 0.9, s1: 1.9}, {at: c4.twoThirds, s0: 2.8, s1: 3.8}, {at: c4.five, s0: 4.7, s1: 5.3}]},
   {kind: 'doll', src: 'matryoshka.webm', from: c5.dolls + 1.45, to: c5.tatar + 0.5, steps: [{at: c5.dolls + 1.45, s0: 320 / 30, s1: 330 / 30}]},
   {kind: 'cauc', src: 'caucasus.mp4', from: c5.chech - 0.3, to: c5.chech + 9.6, steps: [{at: c5.chech - 0.3, s0: 0, s1: 9.9}]},
-  {kind: 'manim', src: MAN('UtiPossidetis'), from: c5.uti - 0.3, to: c5.lines - 0.2, steps: [
-    {at: c5.uti - 0.3, s0: 0, s1: 2.6}, {at: c5.means, s0: 2.6, s1: 4.6}, {at: c5.inherit, s0: 4.6, s1: 5.8}, {at: c5.legal, s0: 5.8, s1: 7.4}]},
+  // v2: Manim documents (Article 72, uti possidetis) and the Blender flag-lowering callback at the resignation
+  {kind: 'cauc', src: 'clips/article72.mp4', from: c4.sudden - 0.1, to: c4.aug89 - 0.3, steps: [{at: c4.sudden - 0.1, s0: 0, s1: 6.25, rate: 1.25}]},
+  {kind: 'cauc', src: 'clips/uti.mp4', from: c5.uti - 0.3, to: c5.legal - 0.2, steps: [{at: c5.uti - 0.3, s0: 0, s1: 8.05}]},
+  {kind: 'cauc', src: 'clips/opening.mp4', from: c4.resigned - 0.15, to: c4.shells - 0.1, steps: [{at: c4.resigned - 0.15, s0: 6.3, s1: 9.3}]},
   {kind: 'doll', src: 'matryoshka.webm', from: c6.moment - 0.2, to: c6.why + 0.2, steps: [{at: c6.moment - 0.2, s0: 320 / 30, s1: 330 / 30}]},
 ];
 export const DOLL_LABELS = [
@@ -427,9 +437,9 @@ export const DOLL_LABELS = [
   {text: 'AUTONOMOUS REGIONS', k: 2, from: c1.those + 1.8, to: c1.y1989 + 0.4}, {text: 'AUTONOMOUS DISTRICTS', k: 3, from: c1.districts + 1.8, to: c1.y1989 + 0.4},
   {text: 'COULD LEAVE', k: 0, from: c6.outer, to: c6.why + 0.2},
 ];
-export const CHART = {from: c2.m36 - 0.3, to: c2.deep - 0.2};
+export const CHART = {from: -10, to: -9};   // v2: no charts (banners carry the numbers)
 export const FLAGPOLE = {from: -10, lower: -9.8, lowered: -9.6, raise: -9.4, to: -9.2,
-  from2: c4.resigned - 0.2, lower2: c4.resigned, raise2: c4.resigned + 2.2, to2: c4.shells};
+  from2: -10, lower2: -9.8, raise2: -9.6, to2: -9.4};   // v2: Blender callback clip instead
 
 // ======================= MUSIC & SFX =======================
 export const MUSIC = [
@@ -441,9 +451,11 @@ export const MUSIC = [
 ];
 // v2 hook Foley (sfx2.py: bell_toll, bell_small, wind_bed, cloth_flap, wood_thunk, war_rumble, forge_hiss, swell)
 const HOOK_SFX: Sfx[] = [
-  {f: 'wind_bed', t: 0.0, v: 0.5}, {f: 'bell_toll', t: OPENING.kremlinIn + 0.35, v: 0.5}, {f: 'bell_toll', t: OPENING.lower + 0.05, v: 0.42},
-  {f: 'bell_small', t: OPENING.lowered - 0.4, v: 0.35}, {f: 'cloth_flap', t: OPENING.kremlinIn + 0.6, v: 0.3},
-  {f: 'paper', t: h.dec - 0.05, v: 0.25}, {f: 'tick', t: h.y91 - 0.03, v: 0.4},
+  {f: 'bell_toll', t: 0.0, v: 0.6}, {f: 'wind_bed', t: 0.0, v: 0.5},
+  {f: 'cloth_flap', t: 0.25, v: 0.32}, {f: 'cloth_flap', t: 1.7, v: 0.28}, {f: 'cloth_flap', t: 3.2, v: 0.3},
+  {f: 'shimmer', t: h.y91 - 0.05, v: 0.25}, {f: 'whoosh_1', t: OPENING.kremlinIn - 0.1, v: 0.3},
+  {f: 'bell_toll', t: OPENING.lower + 0.05, v: 0.45}, {f: 'cloth_flap', t: OPENING.lower + 0.4, v: 0.25},
+  {f: 'bell_small', t: OPENING.lowered - 0.5, v: 0.3},
   {f: 'line_draw', t: h.gone - 0.2, v: 0.3}, {f: 'shimmer', t: h.patch, v: 0.3},
   {f: 'wood_thunk', t: h.tatar + 0.25, v: 0.5}, {f: 'cloth_flap', t: h.tatar + 0.35, v: 0.35},
   {f: 'wood_thunk', t: h.est1 + 0.15, v: 0.5}, {f: 'cloth_flap', t: h.est1 + 0.25, v: 0.35},
@@ -454,14 +466,24 @@ const HOOK_SFX: Sfx[] = [
   {f: 'paper', t: h.written - 0.1, v: 0.4}, {f: 'whoosh_2', t: h.joseph - 0.3, v: 0.3},
   {f: 'swell', t: h.title - 3.0, v: 0.5}, {f: 'boom', t: h.title, v: 0.6}, {f: 'drone_hit', t: h.ff, v: 0.35},
 ];
-const whooshes: Sfx[] = CAMERA.filter((k) => (k.dur ?? 2) > 1.5 && (k.dur ?? 2) <= 3.2 && k.t > 1).map((k, i) => ({f: `whoosh_${(i % 3) + 1}`, t: k.t - 0.15, v: 0.32}));
+const V2_SFX: Sfx[] = [
+  ...BANNERS.filter((b) => b.from > 40).flatMap((b) => [{f: 'wood_thunk', t: b.from + 0.2, v: 0.45}, {f: 'cloth_flap', t: b.from + 0.3, v: 0.3}]),
+  ...ICONS.filter((i) => i.from > 42).map((i) => ({f: 'pop', t: i.from, v: 0.35})),
+  ...DOCS.filter((d) => d.from > 50).map((d) => ({f: 'paper', t: d.from, v: 0.4})),
+  ...CUTOUTS.filter((c) => c.from > 52).map((c) => ({f: 'whoosh_3', t: c.from - 0.15, v: 0.28})),
+  ...NUMERALS.filter((n) => n.from > 46).map((n) => ({f: 'tick', t: n.from + 0.05, v: 0.45})),
+  ...TAGS.map((g) => ({f: 'stamp', t: g.from + 0.15, v: 0.35})),
+  {f: 'line_draw', t: CHAIN.from, v: 0.3}, {f: 'crowd_bed', t: CHAIN.from - 0.4, v: 0.3},
+  {f: 'forge_hiss', t: c5.lines + 0.1, v: 0.45}, {f: 'war_rumble', t: c5.chech + 9.6, v: 0.4}, {f: 'bell_toll', t: c4.resigned - 0.1, v: 0.45},
+];
+const whooshes: Sfx[] = CAMERA.filter((k) => (k.dur ?? 2) > 1.5 && (k.dur ?? 2) <= 3.2 && k.t > 1).map((k, i) => ({f: `whoosh_${(i % 3) + 1}`, t: k.t - 0.15, v: 0.24}));
 export const SFX: Sfx[] = [
   ...whooshes,
   ...FLAGS.map((f) => ({f: 'flag_drop', t: f.t + 0.42, v: 0.38})),
   ...CARDS.filter((c) => c.kind === 'chapter').map((c) => ({f: 'boom', t: c.from, v: 0.45})),
   ...CARDS.filter((c) => c.kind === 'date').map((c) => ({f: 'paper', t: c.from, v: 0.35})),
   ...CARDS.filter((c) => c.kind === 'big').map((c) => ({f: 'tick', t: c.from + 0.05, v: 0.5})),
-  ...HOOK_SFX, {f: 'pop', t: c1.rus, v: 0.3}, {f: 'pop', t: c1.ukr, v: 0.3}, {f: 'pop', t: c1.blr, v: 0.3},
+  ...HOOK_SFX, ...V2_SFX, {f: 'pop', t: c1.rus, v: 0.3}, {f: 'pop', t: c1.ukr, v: 0.3}, {f: 'pop', t: c1.blr, v: 0.3},
   {f: 'pop', t: c1.tsf, v: 0.3}, {f: 'shimmer', t: c1.inside + 1.2, v: 0.25}, {f: 'shimmer', t: c1.those + 1.2, v: 0.25},
   {f: 'shimmer', t: c1.districts + 1.2, v: 0.25}, {f: 'line_draw', t: c1.shell + 0.2, v: 0.3}, {f: 'pop', t: c2.uzb, v: 0.3},
   {f: 'pop', t: c2.tjk, v: 0.3}, {f: 'pop', t: c2.kaz, v: 0.3}, {f: 'line_draw', t: c2.first + 0.3, v: 0.3},

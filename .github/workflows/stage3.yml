@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       parts: { description: 'parallel chunks', default: '20' }
-      tag: { description: 'release tag', default: 'sample3' }
+      tag: { description: 'release tag', default: 'film_v2' }
       a: { description: 'first frame', default: '0' }
-      b: { description: 'last frame (-1 = end of film)', default: '1784' }
+      b: { description: 'last frame (-1 = end of film)', default: '-1' }
 permissions:
   contents: write
 env:
@@ -17,9 +17,9 @@ env:
   A2: https://github.com/${{ github.repository }}/releases/download/assets2
   A3: https://github.com/${{ github.repository }}/releases/download/assets3
   PARTS: ${{ inputs.parts || '20' }}
-  TAG: ${{ inputs.tag || 'sample3' }}
+  TAG: ${{ inputs.tag || 'film_v2' }}
   FA: ${{ inputs.a || '0' }}
-  FB: ${{ inputs.b || '1784' }}
+  FB: ${{ inputs.b || '-1' }}
 jobs:
   prep:
     runs-on: ubuntu-24.04
@@ -55,10 +55,15 @@ jobs:
           mkdir -p /tmp/s2
           (cd /tmp/s2; python $GITHUB_WORKSPACE/production/pipeline/sfx2.py)
           cp /tmp/s2/out/sfx/*.wav public/sfx/
+          for i in $(seq 1 200); do
+            curl -sfL --retry 2 -o public/clips/opening.mp4 "https://github.com/${{ github.repository }}/releases/download/opening/opening.mp4" && break
+            echo "waiting for the Blender opening clip ($i)"; sleep 60
+          done
           curl -sfL --retry 3 -A "videomaps/1.0" -o public/flags/su.svg "https://upload.wikimedia.org/wikipedia/commons/a/a9/Flag_of_the_Soviet_Union.svg"
           npm i --no-audit --no-fund --loglevel=error flag-icons@7.6.0 && cp -r node_modules/flag-icons/flags/4x3 public/flags/ && rm -rf node_modules
           for f in archive/sovflag.jpg archive/kazan.jpg archive/tallinn.jpg archive/grozny.jpg archive/const1936.jpg archive/stalin_cut.png \
-                   globe_night_4k.jpg basemap_v2.jpg hd/t_1_3.jpg sfx/bell_toll.wav sfx/wood_thunk.wav; do test -s public/$f || { echo "MISSING $f"; exit 1; }; done
+                   clips/opening.mp4 clips/article72.mp4 clips/uti.mp4 archive/lenin_cut.png archive/gorbachev_cut.png icons/scroll_a270.png \
+                   basemap_v2.jpg hd/t_1_3.jpg sfx/bell_toll.wav sfx/wood_thunk.wav sfx/crowd_bed.wav; do test -s public/$f || { echo "MISSING $f"; exit 1; }; done
           du -sh public; ls public public/icons | head -40
       - id: m
         run: echo "matrix=$(python3 -c "print(list(range(int('${{ env.PARTS }}'))))")" >> $GITHUB_OUTPUT

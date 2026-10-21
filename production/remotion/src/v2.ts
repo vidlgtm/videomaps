@@ -7,7 +7,7 @@ export type Dot = {n: string; lon: number; lat: number; layer: 0 | 1 | 2 | 3};
 export type DotShow = {from: number; to: number; layers: number[]; stagger?: number};
 export type Doc = {img: string; from: number; to: number; side: 'l' | 'r'; cap?: string; w?: number};
 export type Cutout = {img: string; name: string; sub?: string; from: number; to: number; side: 'l' | 'r'};
-export type Numeral = {text: string; from: number; to: number; y?: number; size?: number};
+export type Numeral = {text: string; from: number; to: number; y?: number; size?: number; sub?: string};
 export type Arrow = {a: [number, number]; b: [number, number]; t: number; dur: number; to: number; color: string; bend?: number};
 export type TitleLine = {text: string; from: number; hi?: string; hiAt?: number};
 
@@ -53,13 +53,13 @@ export const OPENING = {kremlinIn: h.flag - 0.55, lower: h.down - 0.05, lowered:
 // ---------------- banners on poles (archival photos) ----------------
 export const BANNERS: Banner[] = [
   {at: [49.12, 55.79], img: 'archive/kazan.jpg', title: 'TATARSTAN', sub: '3.6 million people', from: h.tatar + 0.15, to: h.chech - 0.35},
-  {at: [24.75, 59.44], img: 'archive/tallinn.jpg', title: 'ESTONIA', sub: '1.6 million people', from: h.est1 + 0.05, to: h.chech - 0.35},
+  {at: [24.75, 59.44], img: 'archive/tallinn.jpg', title: 'ESTONIA', sub: '1.6 million people', from: h.est1 + 0.05, to: h.became - 0.1},
   {at: [45.69, 43.32], img: 'archive/grozny.jpg', title: 'CHECHNYA', sub: 'wars 1994–96 · 1999–2009', from: h.chech + 0.1, to: h.why - 0.2},
 ];
 
 // ---------------- 3D icons (TripoSR meshes rendered in Blender) ----------------
 export const ICONS: Icon[] = [
-  {name: 'swords', az: 270, at: [46.6, 43.75], from: h.wars - 0.1, to: h.why - 0.2, size: 1.0},
+  {name: 'swords', az: 270, at: [48.3, 42.35], from: h.wars - 0.1, to: h.why - 0.2, size: 1.35},
   {name: 'kremlin', az: 180, at: [37.62, 55.75], from: h.endUp - 0.1, to: h.why + 0.2, size: 0.95},
 ];
 
@@ -87,3 +87,123 @@ export const TITLE: {from: number; to: number; lines: TitleLine[]} = {
   lines: [{text: 'WHY THE SOVIET UNION', from: h.title - 0.1}, {text: 'BROKE INTO', from: C(0, 'broke into')},
     {text: 'EXACTLY 15 COUNTRIES', from: h.exactly, hi: '15', hiAt: h.ff}],
 };
+
+// =====================================================================================================
+// FULL FILM (chapters I-VI): same visual vocabulary as the hook, every element pinned to a narration word
+// =====================================================================================================
+export type Tag = {num?: string; text: string; from: number; to: number; slot?: number};
+export type Chain = {pts: [number, number][]; from: number; dur: number; to: number};
+const k1 = {
+  bols: C(1, 'When the Bolsheviks'), broke: C(1, 'briefly broken free'), lenin: C(1, "Lenin's solution"), stalin: C(1, 'Ironically, Stalin'),
+  overruled: C(1, 'Lenin overruled him'), dec30: C(1, 'On December 30th'), treaty: C(1, 'signed a treaty'), paper: C(1, 'On paper, it was'),
+  y1989: C(1, 'By 1989'), h15: C(1, 'fifteen union republics'), h20: C(1, 'twenty autonomous republics'), h8: C(1, 'eight autonomous regions'),
+  h10: C(1, 'ten autonomous districts'), layer: C(1, 'Every layer'), shell: C(1, 'But only the outer shell'),
+  constit: C(1, 'The Soviet constitution guaranteed'), decades: C(1, 'For decades'), any: C(1, 'Any real attempt'), words: C(1, 'But the words were there'),
+};
+const k2 = {
+  s: cs(2), y1936: C(2, 'Then, in 1936'), kaz: C(2, 'Kazakhstan and Kyrgyzstan'), eleven: C(2, 'That made eleven'), asked: C(2, 'Other nations asked'),
+  three: C(2, 'a nation needed three things'), first: C(2, 'First, it had'), afterAll: C(2, 'After all, Stalin argued'), second: C(2, 'Second, its namesake'),
+  third: C(2, 'And third'), look: C(2, 'Now look at Tatarstan'), m16: C(2, 'one point six million'), deep: C(2, 'deep inside Russia'),
+  rule1: C(2, "By Stalin's first rule"), same: C(2, 'The same was true'), practice: C(2, 'In practice'), kazProm: C(2, 'Kazakhstan was promoted'),
+};
+const k3 = {
+  y1940: C(3, 'In 1940'), est: C(3, 'annexed Estonia'), lva: C(3, 'Latvia and Lithuania'), mda: C(3, 'the Moldavian republic'), kf: C(3, 'Karelo-Finnish'),
+  sixteen: C(3, 'That brought the total'), finland: C(3, 'But Finland never fell'), became: C(3, 'Sixteen became fifteen'), y1954: C(3, 'Two years earlier'),
+  detail: C(3, 'At the time'),
+};
+const k4 = {
+  s: cs(4), gorby: C(4, 'Mikhail Gorbachev'), sudden: C(4, 'Suddenly'), aug89: C(4, 'In August 1989'), mar90: C(4, 'On March 11th, 1990'),
+  law: C(4, 'Moscow responded'), refs: C(4, 'demanding referendums'), twoThirds: C(4, 'two-thirds majorities'), five: C(4, 'up to five years'),
+  mar91: C(4, 'In March 1991'), aug91: C(4, 'Then, in August 1991'), weeks: C(4, 'Within weeks'), dec1: C(4, 'On December 1st'),
+  week: C(4, 'A week later'), lodge: C(4, 'hunting lodge'), dec21: C(4, 'On December 21st'), four: C(4, 'Four days later'),
+  resigned: C(4, 'Gorbachev resigned'), shells: C(4, 'The fifteen union republics'), states: C(4, 'fifteen independent states'),
+};
+const k5 = {
+  tatar: C(5, 'Tatarstan declared'), treaty: C(5, 'special treaty'), chech: C(5, 'Chechnya went further'), wars: C(5, 'two devastating wars'),
+  abkh: C(5, 'Abkhazia, South Ossetia'), tr: C(5, 'and Transnistria'), none: C(5, 'None of them'), cis: C(5, 'formed their Commonwealth'),
+  uti: C(5, 'uti possidetis juris'), legal: C(5, 'The fifteen union republics had'), lines: C(5, 'So the lines drawn'),
+};
+export const K = {k1, k2, k3, k4, k5};
+const MOSCOW: [number, number] = [37.62, 55.75];
+
+BANNERS.push(
+  {at: MOSCOW, img: 'archive/redarmy.jpg', title: 'THE RED ARMY', sub: 'Moscow', from: k1.bols + 0.3, to: k1.broke - 0.4},
+  {at: [34.8, 63.6], img: 'archive/gulag.jpg', title: 'THE GULAG', sub: 'White Sea Canal · 1930s', from: k1.any + 0.1, to: k1.words + 2.4},
+  {at: [49.12, 55.79], img: 'archive/kazan.jpg', title: 'TATARSTAN', sub: '3.6 million people (1989)', from: k2.look + 0.25, to: k2.same - 0.3},
+  {at: [24.75, 59.44], img: 'archive/tallinn.jpg', title: 'ESTONIA', sub: '1.6 million people (1989)', from: k2.m16 - 0.2, to: k2.deep - 0.3},
+  {at: [34.35, 61.79], img: 'archive/winterwar.jpg', title: 'THE WINTER WAR', sub: 'Soviet-Finnish war · 1939–40', from: k3.kf + 0.3, to: k3.sixteen - 0.2},
+  {at: [25.4, 57.45], img: 'archive/balticway.jpg', title: 'THE BALTIC WAY', sub: '23 August 1989', from: k4.aug89 + 0.4, to: k4.mar90 - 0.25},
+  {at: [25.28, 54.69], img: 'archive/lithuania90.jpg', title: 'LITHUANIA', sub: 'Vilnius · 11 March 1990', from: k4.mar90 + 0.2, to: k4.law - 0.25},
+  {at: MOSCOW, img: 'archive/tanks91.jpg', title: 'THE AUGUST COUP', sub: 'Moscow · 19–21 August 1991', from: k4.aug91 + 0.3, to: k4.weeks - 0.2},
+  {at: [23.85, 52.62], img: 'archive/viskuli.jpg', title: 'VISKULI', sub: 'Belovezha Forest · 8 Dec 1991', from: k4.week + 0.3, to: k4.dec21 - 0.25},
+  {at: [76.95, 43.25], img: 'archive/almaata.jpg', title: 'ALMA-ATA', sub: '21 December 1991', from: k4.dec21 + 0.3, to: k4.four - 0.1},
+  {at: [49.12, 55.79], img: 'archive/kazan.jpg', title: 'TATARSTAN', sub: 'sovereignty declared 1990', from: k5.tatar + 0.3, to: k5.chech - 0.4},
+  {at: [45.69, 43.32], img: 'archive/grozny.jpg', title: 'CHECHNYA', sub: 'Grozny · wars 1994–96 · 1999–2009', from: k5.chech + 9.5, to: k5.abkh - 0.35},
+  {at: [41.02, 43.0], img: 'archive/sukhumi.jpg', title: 'ABKHAZIA', sub: 'Sukhumi · parliament burned 1993', from: k5.abkh + 0.3, to: k5.cis - 0.3},
+  {at: [29.48, 46.83], img: 'archive/bender.jpg', title: 'TRANSNISTRIA', sub: 'Bender · 1992', from: k5.tr + 0.2, to: k5.cis - 0.3},
+);
+ICONS.push(
+  {name: 'scroll', az: 270, at: [39.6, 55.2], from: k1.treaty, to: k1.paper + 3.0, size: 1.1},
+  {name: 'kremlin', az: 180, at: MOSCOW, from: k2.practice + 0.1, to: k2.kazProm - 0.2, size: 1.1},
+  {name: 'ballot', az: 270, at: MOSCOW, from: k4.mar91 + 0.4, to: k4.aug91 - 0.2, size: 1.1},
+  {name: 'tank', az: 270, at: [39.0, 55.15], from: k4.aug91 + 0.7, to: k4.weeks - 0.2, size: 1.2},
+  {name: 'ballot', az: 270, at: [30.52, 50.45], from: k4.dec1 + 0.3, to: k4.week - 0.2, size: 1.1},
+  {name: 'scroll', az: 270, at: [52.3, 54.9], from: k5.treaty, to: k5.chech - 0.4, size: 1.1},
+  {name: 'swords', az: 270, at: [47.0, 42.85], from: k5.chech + 9.7, to: k5.abkh - 0.35, size: 1.35},
+  {name: 'swords', az: 270, at: [46.75, 39.82], from: k5.abkh + 0.8, to: k5.cis - 0.3, size: 1.1},
+  {name: 'scroll', az: 270, at: [76.95, 43.25], from: k5.cis + 0.2, to: k5.uti - 0.3, size: 1.1},
+);
+DOT_SHOWS.push(
+  {from: k1.h15 - 0.05, to: k1.layer - 0.3, layers: [0], stagger: 0}, {from: k1.h20 - 0.05, to: k1.layer - 0.3, layers: [1], stagger: 0},
+  {from: k1.h8 - 0.05, to: k1.layer - 0.3, layers: [2], stagger: 0}, {from: k1.h10 - 0.05, to: k1.layer - 0.3, layers: [3], stagger: 0},
+);
+DOCS.push(
+  {img: 'archive/treaty1922.jpg', from: k1.treaty - 0.2, to: k1.paper + 3.2, side: 'r', cap: 'TREATY ON THE CREATION OF THE USSR · 1922'},
+  {img: 'archive/const1936_a17.jpg', from: k1.constit, to: k1.any - 0.3, side: 'r', cap: 'ARTICLE 17 · “THE RIGHT FREELY TO SECEDE”'},
+  {img: 'archive/const1936.jpg', from: k2.y1936 + 0.2, to: k2.kaz + 4.5, side: 'r', cap: 'THE 1936 CONSTITUTION'},
+  {img: 'archive/const1936_a13.jpg', from: k2.eleven + 0.1, to: k2.three - 0.3, side: 'r', cap: 'ARTICLE 13 · ELEVEN UNION REPUBLICS'},
+  {img: 'archive/crimea1954.jpg', from: k3.y1954 + 0.6, to: k3.detail + 2.6, side: 'r', cap: '1954 · CRIMEA TRANSFERRED TO THE UKRAINIAN SSR'},
+  {img: 'archive/belovezha.jpg', from: k4.lodge + 1.6, to: k4.dec21 - 0.25, side: 'r', cap: 'THE BELOVEZHA ACCORDS · 8 DECEMBER 1991'},
+);
+CUTOUTS.push(
+  {img: 'archive/lenin_cut.png', name: 'VLADIMIR LENIN', sub: 'a union of “equal” republics', from: k1.lenin - 0.1, to: k1.dec30 - 0.3, side: 'r'},
+  {img: 'archive/stalin_cut.png', name: 'JOSEPH STALIN', sub: 'Commissar for Nationalities · 1917–23', from: k1.stalin, to: k1.overruled + 1.6, side: 'l'},
+  {img: 'archive/stalin_cut.png', name: 'JOSEPH STALIN', sub: 'speech of 25 November 1936', from: k2.asked, to: k2.three + 0.9, side: 'l'},
+  {img: 'archive/gorbachev_cut.png', name: 'MIKHAIL GORBACHEV', sub: 'General Secretary · 1985–91', from: k4.gorby - 0.1, to: k4.sudden - 0.2, side: 'r'},
+);
+NUMERALS.push(
+  {text: '15', sub: 'union republics', from: k1.h15 - 0.05, to: k1.h20 - 0.05, y: 760, size: 190},
+  {text: '20', sub: 'autonomous republics', from: k1.h20 - 0.05, to: k1.h8 - 0.05, y: 760, size: 190},
+  {text: '8', sub: 'autonomous regions', from: k1.h8 - 0.05, to: k1.h10 - 0.05, y: 760, size: 190},
+  {text: '10', sub: 'autonomous districts', from: k1.h10 - 0.05, to: k1.layer - 0.3, y: 760, size: 190},
+  {text: '11', sub: 'union republics', from: k2.eleven - 0.05, to: k2.asked - 0.1, y: 700, size: 220},
+  {text: '16', sub: 'union republics', from: k3.sixteen + 0.9, to: k3.finland - 0.1, y: 700, size: 220},
+  {text: '15', sub: 'and the number never changed again', from: k3.became - 0.05, to: k3.y1954 - 0.2, y: 700, size: 220},
+  {text: '90%+', sub: 'of Ukrainian voters chose independence', from: C(4, 'ninety percent') - 0.1, to: k4.week - 0.2, y: 700, size: 200},
+  {text: '15', sub: 'independent states', from: k4.states - 0.2, to: k4.states + 4.2, y: 700, size: 220},
+);
+ARROWS.push(
+  {a: MOSCOW, b: [24.75, 59.44], t: k3.est, dur: 0.9, to: k3.kf - 0.2, color: '#C8504F', bend: 0.18},
+  {a: MOSCOW, b: [24.11, 56.95], t: k3.lva, dur: 0.9, to: k3.kf - 0.2, color: '#C8504F', bend: 0.16},
+  {a: MOSCOW, b: [25.28, 54.69], t: k3.lva + 0.35, dur: 0.9, to: k3.kf - 0.2, color: '#C8504F', bend: 0.14},
+  {a: MOSCOW, b: [28.86, 47.0], t: k3.mda, dur: 1.0, to: k3.kf - 0.2, color: '#C8504F', bend: -0.16},
+  {a: [49.12, 55.79], b: MOSCOW, t: k5.treaty + 0.1, dur: 1.0, to: k5.chech - 0.4, color: '#E8C36A', bend: 0.2},
+);
+export const TAGS: Tag[] = [
+  {num: 'I', text: 'ON THE OUTER BORDER', from: k2.first, to: k2.second - 0.2},
+  {num: 'II', text: 'A COMPACT MAJORITY', from: k2.second, to: k2.third - 0.2},
+  {num: 'III', text: 'AT LEAST ~1 MILLION PEOPLE', from: k2.third, to: k2.look - 0.3},
+  {text: 'REFERENDUM', from: k4.refs, to: k4.mar91 - 0.3, slot: 0},
+  {text: 'TWO-THIRDS MAJORITY', from: k4.twoThirds, to: k4.mar91 - 0.3, slot: 1},
+  {text: 'UP TO FIVE YEARS', from: k4.five, to: k4.mar91 - 0.3, slot: 2},
+];
+export const CHAIN: Chain = {pts: [[24.75, 59.44], [24.42, 58.9], [24.5, 58.38], [24.36, 57.86], [24.11, 56.95], [24.19, 56.41],
+  [24.36, 55.73], [24.76, 55.25], [25.28, 54.69]], from: k4.aug89 + 1.0, dur: 6.5, to: k4.mar90 - 0.2};
+
+// archival credits (CC licences require attribution) — shown under the end card
+export const CREDITS = {from: cs(6) + 36.4, lines: [
+  'Archival images via Wikimedia Commons — Public domain: Lenin (1920) · Stalin · Red Army in Moscow · Treaty on the Creation of the USSR (1922) · White Sea Canal · USSR Constitution (1936) · Winter War · Transfer of Crimea (1954) · Gorbachev (1987)',
+  'CC BY-SA 4.0: Kazan Kremlin — Fendes · Baltic Way — Laimonis Stīpnieks · Alma-Ata, 21 Dec 1991 — EgemenMedia   |   CC BY 4.0: Lithuania, 11 Mar 1990 — Paulius Lileikis (Lithuanian Central State Archive) · Bender 1992 — unknown author',
+  'CC BY-SA 3.0: Belovezha & Viskuli, 8 Dec 1991 — Yuriy Ivanov / RIA Novosti · Grozny 1995 — Mikhail Evstafiev · Tallinn — Ivar Leidus (CC BY-SA 3.0 EE)   |   CC BY-SA 2.0: Moscow, 20 Aug 1991 — Tove Knutsen · Sukhumi — Clay Gilliland',
+  'Relief: AWS Terrain Tiles (SRTM, ETOPO) · Imagery: NASA Blue Marble & Black Marble · Boundaries: Natural Earth · Narration: synthetic voice · Music: original score',
+]};

@@ -5,7 +5,8 @@ import {AbsoluteFill, Img, staticFile, spring} from 'remotion';
 import {project, px, CamState, KM_PER_PX} from '../lib/proj';
 import {clamp, env, ease, easeOut, prog, lerp} from '../lib/anim';
 import {FONTS} from '../fonts';
-import {BANNERS, ICONS, DOTS, DOT_COL, DOT_SHOWS, DOCS, CUTOUTS, NUMERALS, ARROWS, TITLE, Banner} from '../v2';
+import {BANNERS, ICONS, DOTS, DOT_COL, DOT_SHOWS, DOCS, CUTOUTS, NUMERALS, ARROWS, TITLE, TAGS, CHAIN, CREDITS, Banner} from '../v2';
+import * as echarts from 'echarts';
 
 const FPS = 30;
 const sp = (t: number, from: number, cfg = {damping: 10, mass: 0.6, stiffness: 140}) =>
@@ -134,7 +135,7 @@ const HomelandDots: React.FC<{t: number; cam: CamState}> = ({t, cam}) => {
 
 /** screen-space v2 billboards (banners, icons, dots) for the map stage */
 export const V2Billboards: React.FC<{t: number; cam: CamState}> = ({t, cam}) => {
-  const sizeK = clamp(Math.sqrt(cam.zoom / 1.6), 0.7, 1.25);
+  const sizeK = 1.55 * clamp(Math.sqrt(cam.zoom / 1.6), 0.85, 1.12);   // banners ~270-360 px wide
   const items: {y: number; el: React.ReactNode}[] = [];
   BANNERS.forEach((b, i) => {
     if (t < b.from || t > b.to) return;
@@ -148,10 +149,10 @@ export const V2Billboards: React.FC<{t: number; cam: CamState}> = ({t, cam}) => 
     const [wx, wy] = px(ic.at[0], ic.at[1]);
     const q = project(cam, wx, wy);
     if (!onScreen(q)) return;
-    items.push({y: q.y, el: <IconSprite key={'i' + i} name={ic.name} az={ic.az} x={q.x} y={q.y} s={sizeK * q.s * (ic.size ?? 1)} t={t} from={ic.from} to={ic.to} />});
+    items.push({y: q.y, el: <IconSprite key={'i' + i} name={ic.name} az={ic.az} x={q.x} y={q.y} s={(sizeK / 1.55) * q.s * (ic.size ?? 1)} t={t} from={ic.from} to={ic.to} />});
   });
   items.sort((a, b) => a.y - b.y);
-  return <AbsoluteFill><HomelandDots t={t} cam={cam} />{items.map((x) => x.el)}</AbsoluteFill>;
+  return <AbsoluteFill><HomelandDots t={t} cam={cam} /><BalticChain t={t} cam={cam} />{items.map((x) => x.el)}</AbsoluteFill>;
 };
 
 // ---------------- curved growing arrows (world space, inside the map SVG) ----------------
@@ -195,6 +196,8 @@ const Numerals: React.FC<{t: number}> = ({t}) => (
           <span style={{fontFamily: FONTS.head, fontWeight: 800, fontSize: n.size ?? 250, letterSpacing: '0.04em',
             background: 'linear-gradient(180deg,#fff6d6 0%,#f0cf7a 45%,#b8892f 100%)', WebkitBackgroundClip: 'text', color: 'transparent',
             filter: 'drop-shadow(0 6px 18px rgba(0,0,0,0.65))'}}>{n.text}</span>
+          {n.sub ? <div style={{fontFamily: FONTS.serif, fontStyle: 'italic', fontWeight: 600, fontSize: 40, color: '#F4EBD6', letterSpacing: '0.06em',
+            marginTop: -18, textShadow: '0 2px 12px rgba(0,0,0,0.9)', opacity: clamp((t - n.from - 0.25) / 0.35)}}>{n.sub}</div> : null}
         </div>
       );
     })}
@@ -293,12 +296,83 @@ const TitleSmoke: React.FC<{t: number}> = ({t}) => {
   );
 };
 
+const Credits: React.FC<{t: number}> = ({t}) => t < CREDITS.from ? null : (
+  <div style={{position: 'absolute', left: 160, right: 160, bottom: 46, opacity: clamp((t - CREDITS.from) / 0.8), textAlign: 'center',
+    fontFamily: FONTS.serif, fontSize: 17, lineHeight: 1.45, color: 'rgba(240,232,214,0.78)', letterSpacing: '0.02em'}}>
+    {CREDITS.lines.map((l, i) => <div key={i} style={{marginTop: i ? 6 : 0}}>{l}</div>)}
+  </div>
+);
+
 export const V2Overlays: React.FC<{t: number}> = ({t}) => (
   <AbsoluteFill>
+    <Tags t={t} />
+    <Credits t={t} />
     <Numerals t={t} />
     <DocCard t={t} />
     <CutoutCard t={t} />
     <TitleSmoke t={t} />
   </AbsoluteFill>
+);
+// ---------------- the Baltic Way: a human chain drawn with Apache ECharts (SSR) along the real route ----------------
+const PERSON = 'path://M5,0 C6.4,0 7.5,1.1 7.5,2.5 C7.5,3.9 6.4,5 5,5 C3.6,5 2.5,3.9 2.5,2.5 C2.5,1.1 3.6,0 5,0 Z M1.5,6 L8.5,6 L10,12 L8.6,12 L7.4,8.5 L7.4,20 L5.6,20 L5,13.5 L4.4,20 L2.6,20 L2.6,8.5 L1.4,12 L0,12 Z';
+const BalticChain: React.FC<{t: number; cam: CamState}> = ({t, cam}) => {
+  const o = env(t, CHAIN.from, CHAIN.to, 0.3, 0.5);
+  if (o <= 0) return null;
+  const P = CHAIN.pts.map(([lon, lat]) => { const [wx, wy] = px(lon, lat); const q = project(cam, wx, wy); return [q.x, q.y]; });
+  const seg = P.slice(1).map((p, i) => Math.hypot(p[0] - P[i][0], p[1] - P[i][1]));
+  const total = seg.reduce((a, b) => a + b, 0);
+  let left = total * ease(prog(t, CHAIN.from, CHAIN.dur));
+  const vis: number[][] = [P[0]];
+  for (let i = 0; i < seg.length && left > 0; i++) {
+    const f = Math.min(1, left / seg[i]); vis.push([lerp(P[i][0], P[i + 1][0], f), lerp(P[i][1], P[i + 1][1], f)]); left -= seg[i];
+  }
+  const people: number[][] = [];
+  const step = Math.max(9, total / 420);
+  for (let i = 1, acc = 0; i < vis.length; i++) {
+    const L = Math.hypot(vis[i][0] - vis[i - 1][0], vis[i][1] - vis[i - 1][1]);
+    for (; acc < L; acc += step) people.push([lerp(vis[i - 1][0], vis[i][0], acc / L), lerp(vis[i - 1][1], vis[i][1], acc / L) - 7]);
+    acc -= L;
+  }
+  const chart = echarts.init(null as any, null as any, {renderer: 'svg', ssr: true, width: 1920, height: 1080});
+  chart.setOption({
+    animation: false, backgroundColor: 'transparent',
+    grid: {left: 0, right: 0, top: 0, bottom: 0},
+    xAxis: {type: 'value', min: 0, max: 1920, show: false}, yAxis: {type: 'value', min: 0, max: 1080, inverse: true, show: false},
+    series: [
+      {type: 'line', data: vis, smooth: 0.3, symbol: 'none', lineStyle: {width: 10, color: 'rgba(255,214,120,0.28)'}},
+      {type: 'line', data: vis, smooth: 0.3, symbol: 'none', lineStyle: {width: 3, color: '#FFE3A0', shadowBlur: 12, shadowColor: '#FFC24A'}},
+      {type: 'scatter', data: people, symbol: PERSON, symbolSize: [8, 15], itemStyle: {color: '#FFF6DD', borderColor: 'rgba(40,20,0,0.6)', borderWidth: 0.6}},
+    ],
+  } as any);
+  const svg = chart.renderToSVGString();
+  chart.dispose();
+  return <div style={{position: 'absolute', left: 0, top: 0, width: 1920, height: 1080, opacity: o}} dangerouslySetInnerHTML={{__html: svg}} />;
+};
+
+// ---------------- parchment plaques (Stalin's rules, the secession law) ----------------
+const Tags: React.FC<{t: number}> = ({t}) => (
+  <>
+    {TAGS.map((g, i) => {
+      if (t < g.from || t > g.to + 0.4) return null;
+      const k = sp(t, g.from, {damping: 11, mass: 0.7, stiffness: 150});
+      const out = clamp((g.to + 0.4 - t) / 0.4);
+      const W = g.num ? 700 : 500;
+      const cx = g.slot === undefined ? 960 : 960 + (g.slot - 1) * 560;
+      const swing = Math.sin((t - g.from) * 3.1) * 2.2 * Math.exp(-(t - g.from) * 1.4);
+      return (
+        <div key={i} style={{position: 'absolute', left: cx - W / 2, top: 852 + (1 - k) * -60, width: W, opacity: clamp(k * 2) * out,
+          transformOrigin: '50% -40px', transform: `rotate(${swing}deg)`}}>
+          <div style={{background: PARCH, borderRadius: 6, padding: '14px 26px', display: 'flex', alignItems: 'center', gap: 20,
+            boxShadow: '0 10px 26px rgba(0,0,0,0.55), inset 0 0 0 2px rgba(90,60,30,0.55), inset 0 0 26px rgba(120,80,30,0.25)'}}>
+            {g.num ? <div style={{width: 66, height: 66, borderRadius: '50%', flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'radial-gradient(circle at 38% 35%, #c2453f, #7d1a17 70%)', boxShadow: '0 3px 8px rgba(0,0,0,0.45), inset 0 0 0 3px rgba(255,210,160,0.25)',
+              fontFamily: FONTS.head, fontWeight: 800, fontSize: 30, color: '#F6E3C0'}}>{g.num}</div> : null}
+            <div style={{flex: 1, textAlign: g.num ? 'left' : 'center', fontFamily: FONTS.head, fontWeight: 700, fontSize: g.num ? 34 : 30,
+              letterSpacing: '0.12em', color: '#3a2614'}}>{g.text}</div>
+          </div>
+        </div>
+      );
+    })}
+  </>
 );
 export {KM_PER_PX};
