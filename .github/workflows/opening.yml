@@ -46,6 +46,25 @@ jobs:
           retention-days: 5
           if-no-files-found: ignore
 
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo rm -f /etc/apt/sources.list.d/microsoft*; bash production/ci/install_blender.sh
+      - name: Quick look (4 frames, 50 %, 32 spp)
+        run: |
+          sudo apt-get install -y -qq librsvg2-bin > /dev/null || true
+          curl -sfL --retry 3 -A "videomaps/1.0" -o /tmp/su.svg "https://upload.wikimedia.org/wikipedia/commons/a/a9/Flag_of_the_Soviet_Union.svg"
+          rsvg-convert -w 3000 -h 1500 /tmp/su.svg -o /tmp/sovflag.png
+          for f in 61 151 241 331; do
+            $HOME/blender/blender -b --python-exit-code 1 -P production/blender/flag_open.py -- --tex /tmp/sovflag.png --work /tmp/fo \
+              --out probe --start $f --end $f --res 50 --samples 32 > /tmp/b.log 2>&1 || { tail -60 /tmp/b.log; exit 1; }
+          done
+          ls probe
+      - uses: actions/upload-artifact@v4
+        with: { name: probe, path: probe/*.png, retention-days: 3 }
+
   join:
     needs: render
     runs-on: ubuntu-24.04

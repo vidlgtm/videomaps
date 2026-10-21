@@ -158,27 +158,17 @@ for row in (-15.5, -21.0):
         if rng.random() < 0.55:
             bpy.ops.mesh.primitive_plane_add(size=1, location=(float(x), -9.02, row), rotation=(math.pi / 2, 0, 0))
             w = bpy.context.active_object; w.scale = (1.1, 2.0, 1); put(w, win)
-bpy.ops.mesh.primitive_plane_add(size=4000, location=(0, 0, -30)); put(bpy.context.active_object, mat("ground", (0.03, 0.03, 0.035), 0.9))
-
-# Spasskaya tower with its ruby star, far behind on the left
-TX, TY = -75.0, 165.0
-bpy.ops.mesh.primitive_cube_add(size=1, location=(TX, TY, -10)); o = bpy.context.active_object; o.scale = (14, 14, 40); put(o, brick)
-bpy.ops.mesh.primitive_cube_add(size=1, location=(TX, TY, 17)); o = bpy.context.active_object; o.scale = (10, 10, 14); put(o, brick)
-bpy.ops.mesh.primitive_cone_add(vertices=8, radius1=5.6, radius2=0.3, depth=22, location=(TX, TY, 35)); put(bpy.context.active_object, mat("tent", (0.12, 0.2, 0.14), 0.5))
-bpy.ops.mesh.primitive_ico_sphere_add(radius=1.6, subdivisions=2, location=(TX, TY, 47.6)); put(bpy.context.active_object, emitter("star", (1.0, 0.08, 0.05), 70))
 
 # city lights behind (bokeh)
-cols = [emitter("c1", (1.0, 0.55, 0.22), 26), emitter("c2", (1.0, 0.78, 0.48), 20), emitter("c3", (0.92, 0.95, 1.0), 16)]
+cols = [emitter("c1", (1.0, 0.42, 0.12), 11), emitter("c2", (1.0, 0.62, 0.25), 9), emitter("c3", (0.95, 0.85, 0.7), 7)]
 bpy.ops.mesh.primitive_ico_sphere_add(radius=1, subdivisions=1, location=(0, 0, -500)); base = bpy.context.active_object
-for i in range(340):
+for i in range(700):
     m = bpy.data.objects.new(f"city{i}", base.data.copy()); sc.collection.objects.link(m)
-    m.location = (rng.uniform(-320, 320), rng.uniform(140, 520), rng.uniform(-48, -6)); r = rng.uniform(0.4, 1.1); m.scale = (r, r, r)
+    m.location = (rng.uniform(-520, 520), rng.uniform(250, 900), rng.uniform(-62, -16)); r = rng.uniform(0.6, 1.6); m.scale = (r, r, r)
     put(m, cols[int(rng.integers(0, 3))])
 
 # ------------------------------------------------------------------ snow (analytic, PC2 + points)
-pops = [(9000, (-1.6, 2.8), (-4.6, -0.4), (10.5, 24)),     # around the macro camera
-        (7000, (-3, 13), (-21, -2), (2, 26)),              # along the pull-back
-        (10000, (-14, 26), (-40, 8), (-8, 42))]            # wide shot
+pops = [(42000, (-8, 12), (-12, 14), (0, 40))]           # uniform ~2 flakes / m3 around the whole shot
 P0, SPD, AMP, PH, FR = [], [], [], [], []
 for n, (x0, x1), (y0, y1), (z0, z1) in pops:
     P0.append(np.stack([rng.uniform(x0, x1, n), rng.uniform(y0, y1, n), rng.uniform(z0, z1, n)], 1))
@@ -219,7 +209,6 @@ spot("rim", (2.5, 8.0, 16.5), (1.8, 0, 12.0), 3200, 40, (1.0, 0.8, 0.6))
 for i in range(4):
     an = math.radians(45 + 90 * i)
     spot(f"flood{i}", (24 * math.cos(an), 24 * math.sin(an), -18), (0, 0, -4), 22000, 38, (1.0, 0.78, 0.52), 0.5, 1.0)
-spot("tower", (TX + 18, TY - 40, -28), (TX, TY, 10), 60000, 30, (1.0, 0.8, 0.55), 0.5, 1.0)
 sd = bpy.data.lights.new("moon", "SUN"); sd.energy = 0.12; sd.color = (0.62, 0.72, 1.0); sd.angle = math.radians(2)
 so = bpy.data.objects.new("moon", sd); so.rotation_euler = (math.radians(55), 0, math.radians(160)); sc.collection.objects.link(so)
 
@@ -228,23 +217,32 @@ bg = wn.nodes["Background"]; bg.inputs["Strength"].default_value = 1.0
 tcw = wn.nodes.new("ShaderNodeTexCoord"); sep = wn.nodes.new("ShaderNodeSeparateXYZ")
 mr = wn.nodes.new("ShaderNodeMapRange"); mr.inputs["From Min"].default_value = -0.05; mr.inputs["From Max"].default_value = 0.55
 ramp = wn.nodes.new("ShaderNodeValToRGB")
-ramp.color_ramp.elements[0].color = (0.045, 0.03, 0.026, 1); ramp.color_ramp.elements[1].color = (0.003, 0.006, 0.016, 1)
+ramp.color_ramp.elements[0].color = (0.028, 0.017, 0.012, 1); ramp.color_ramp.elements[1].color = (0.003, 0.006, 0.017, 1)
+ramp.color_ramp.elements.new(0.18).color = (0.05, 0.032, 0.026, 1)
 wn.links.new(tcw.outputs["Generated"], sep.inputs[0]); wn.links.new(sep.outputs["Z"], mr.inputs["Value"])
-wn.links.new(mr.outputs["Result"], ramp.inputs["Fac"]); wn.links.new(ramp.outputs["Color"], bg.inputs["Color"])
+wn.links.new(mr.outputs["Result"], ramp.inputs["Fac"])
+cl = wn.nodes.new("ShaderNodeTexNoise"); cl.inputs["Scale"].default_value = 2.2; cl.inputs["Detail"].default_value = 7.0
+wn.links.new(tcw.outputs["Generated"], cl.inputs["Vector"])
+cmr = wn.nodes.new("ShaderNodeMapRange"); cmr.inputs["From Min"].default_value = 0.48; cmr.inputs["From Max"].default_value = 0.78
+wn.links.new(cl.outputs["Fac"], cmr.inputs["Value"])
+cadd = wn.nodes.new("ShaderNodeMix"); cadd.data_type = "RGBA"; cadd.blend_type = "ADD"
+cadd.inputs[7].default_value = (0.010, 0.013, 0.026, 1)
+wn.links.new(cmr.outputs["Result"], cadd.inputs[0]); wn.links.new(ramp.outputs["Color"], cadd.inputs[6])
+wn.links.new(cadd.outputs[2], bg.inputs["Color"])
 
 # ------------------------------------------------------------------ camera: macro -> crane pull-back
 camd = bpy.data.cameras.new("cam"); cam = bpy.data.objects.new("cam", camd); sc.collection.objects.link(cam); sc.camera = cam
 look = bpy.data.objects.new("look", None); sc.collection.objects.link(look)
 focus = bpy.data.objects.new("focus", None); sc.collection.objects.link(focus)
 c = cam.constraints.new("TRACK_TO"); c.target = look; c.track_axis = "TRACK_NEGATIVE_Z"; c.up_axis = "UP_Y"
-camd.sensor_width = 36; camd.dof.use_dof = True; camd.dof.focus_object = focus; camd.clip_start = 0.05; camd.clip_end = 3000
+camd.sensor_width = 36; camd.dof.use_dof = True; camd.dof.focus_object = focus; camd.clip_start = 0.6; camd.clip_end = 3000
 KEYS = [  # t, camera, look-at, focus point, lens, f-stop
     (-2.0, (-0.12, -2.95, 12.72), (0.20, 0, 13.04), (0.78, 0, 13.0), 50, 1.8),
     (0.0, (-0.08, -2.90, 12.75), (0.25, 0, 13.05), (0.80, 0, 13.0), 50, 1.8),
     (4.3, (0.45, -2.50, 13.00), (0.60, 0, 13.00), (0.85, 0, 13.0), 50, 1.8),
-    (6.7, (5.20, -13.8, 9.2), (1.80, 0, 11.3), (1.90, 0, 12.4), 35, 2.8),
-    (8.7, (10.6, -27.5, 4.6), (1.50, 0, 6.6), (1.90, 0, 8.0), 30, 4.0),
-    (10.4, (12.4, -31.0, 4.1), (1.40, 0, 5.6), (1.90, 0, 7.3), 30, 4.0),
+    (6.9, (3.20, -9.6, 11.2), (1.75, 0, 11.75), (1.95, 0, 12.6), 50, 2.8),
+    (9.0, (3.45, -10.6, 8.7), (1.80, 0, 9.2), (1.95, 0, 9.4), 50, 2.8),
+    (10.4, (3.55, -11.0, 7.9), (1.80, 0, 8.3), (1.95, 0, 8.6), 50, 2.8),
 ]
 for t, cl, ll, fl, lens, fs in KEYS:
     f = bf(t); cam.location = cl; look.location = ll; focus.location = fl; camd.lens = lens; camd.dof.aperture_fstop = fs
