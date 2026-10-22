@@ -63,7 +63,7 @@ class Mosaic:
             blk = v if kind == "s2" else (v[..., 0:1].astype(np.float32) * 256 + v[..., 1:2] + v[..., 2:3] / 256 - 32768)
             self.a[(b - self.ty0) * 256:(b - self.ty0 + 1) * 256, (a - self.tx0) * 256:(a - self.tx0 + 1) * 256] = blk
             return 1
-        with cf.ThreadPoolExecutor(24) as ex:
+        with cf.ThreadPoolExecutor(10) as ex:
             got = sum(ex.map(fetch, todo))
         print(f"  {kind} z{z}: {got}/{len(todo)} tiles", flush=True)
 
@@ -84,30 +84,40 @@ def lum(a):
     return a[..., 0] * 0.2126 + a[..., 1] * 0.7152 + a[..., 2] * 0.0722
 
 
-def do_cluster(ctiles, seed0):
-    """render all UHD tiles of one spatial cluster with cluster-local DEM / S2 / land mask / water distance"""
-    cx0, cy0 = min(t[0] for t in ctiles) - 64, min(t[1] for t in ctiles) - 64
-    cx1, cy1 = max(t[0] for t in ctiles) + T3 + 64, max(t[1] for t in ctiles) + T3 + 64
-    gx, gy = np.meshgrid(np.arange(cx0, cx1 + 1, 4.0), np.arange(cy0, cy1 + 1, 4.0))
+# Blue Marble crop over all UHD tiles, decoded once (children share it copy-on-write)
+_ex = np.array([inv(np.array([tx + u for u in (0, T3 / 2, T3)] * 3, float), np.array([ty + v for v in (0, 0, 0, T3 / 2, T3 / 2, T3 / 2, T3, T3, T3)], float))
+                for tx, ty in tiles])  # (n, 2, 9)
+LO0, LO1 = float(_ex[:, 0].min()) - 1.5, float(_ex[:, 0].max()) + 1.5
+LA0, LA1 = float(_ex[:, 1].min()) - 1.5, float(_ex[:, 1].max()) + 1.5
+_C1 = Image.open(bm_c1)
+_r0, _r1, _c0, _c1 = int((90 - LA1) * 240), int((90 - LA0) * 240) + 1, int(LO0 * 240), int(LO1 * 240) + 1
+_im = np.asarray(_C1.crop((_c0, _r0, _c1, _r1)).convert("RGB")); del _C1
+BM = [np.ascontiguousarray(_im[..., c]) for c in range(3)]; del _im
+BM_GEO = (_c0 / 240, 90 - _r0 / 240, 240)
+print(f"BM crop lon {LO0:.1f}..{LO1:.1f} lat {LA0:.1f}..{LA1:.1f}: {BM[0].shape}", flush=True)
+
+
+def do_tile(t):
+    """one UHD tile with tile-local DEM / S2 / land mask / water distance (windows wide enough to be seamless)"""
+    tx, ty = t
+    t1 = time.time()
+    gx, gy = np.meshgrid(np.arange(tx - 16, tx + T3 + 17, 4.0), np.arange(ty - 16, ty + T3 + 17, 4.0))
     glon, glat = inv(gx, gy)
-    lo0, lo1, la0, la1 = glon.min() - 0.3, glon.max() + 0.3, glat.min() - 0.3, glat.max() + 0.3
-    print(f"cluster {len(ctiles)} tiles  lon {lo0:.1f}..{lo1:.1f}  lat {la0:.1f}..{la1:.1f}", flush=True)
-    C1 = Image.open(bm_c1)
-    r0, r1, c0, c1 = int((90 - la1) * 240), int((90 - la0) * 240) + 1, int(lo0 * 240), int(lo1 * 240) + 1
-    im = np.asarray(C1.crop((c0, r0, c1, r1)).convert("RGB")); del C1
-    bm = [np.ascontiguousarray(im[..., c]) for c in range(3)]; bm_geo = (c0 / 240, 90 - r0 / 240, 240); del im
+    lo0, lo1, la0, la1 = glon.min() - 0.15, glon.max() + 0.15, glat.min() - 0.15, glat.max() + 0.15
     ppd = 900
-    mask = land_mask(lo0, la1, ppd, int((lo1 - lo0) * ppd), int((la1 - la0) * ppd))
-    mask_fn = lambda lon, lat: eq_sample(mask, lo0, la1, ppd, lon, lat, order=0)
-    MG = 200
-    dist = canvas_dist(mask_fn, cx0 - MG, cy0 - MG, cx1 + MG, cy1 + MG, 2)
+    mask = land_mask(lo0, la1, ppd, int((lo1 - lo0) * ppd) + 1, int((la1 - la0) * ppd) + 1)
+    MG = 320                                                     # water-distance window: tile +- 373 km
+    wx_, wy_ = np.meshgrid(np.arange(tx - MG, tx + T3 + MG + 1, 16.0), np.arange(ty - MG, ty + T3 + MG + 1, 16.0))
+    wlon, wlat = inv(wx_, wy_)
+    blo0, blo1, bla0, bla1 = wlon.min() - 0.3, wlon.max() + 0.3, wlat.min() - 0.3, wlat.max() + 0.3
+    mask2 = land_mask(blo0, bla1, 300, int((blo1 - blo0) * 300) + 1, int((bla1 - bla0) * 300) + 1)
+    dist = canvas_dist(lambda lon, lat: eq_sample(mask2, blo0, bla1, 300, lon, lat, order=0), tx - MG, ty - MG, tx + T3 + MG, ty + T3 + MG, 2)
     dem = Mosaic("dem", 10, glon, glat)
     s2 = Mosaic("s2", 10, glon, glat)
-    for n, (tx, ty) in enumerate(ctiles):
-        t1 = time.time()
-        a = render_uhd(tx, ty, bm, bm_geo, dem, s2, mask, (lo0, la1, ppd), dist, (cx0 - MG, cy0 - MG, 2), seed0 + n)
-        Image.fromarray(a).save(f"{OUT3}/uhd/u_{tx}_{ty}.jpg", quality=91)
-        print(f"  tile {tx},{ty}  {time.time() - t1:.0f}s", flush=True)
+    a = render_uhd(tx, ty, BM, BM_GEO, dem, s2, mask, (lo0, la1, ppd), dist, (tx - MG, ty - MG, 2), tx * 7 + ty)
+    Image.fromarray(a).save(f"{OUT3}/uhd/u_{tx}_{ty}.jpg", quality=91)
+    print(f"tile {tx},{ty} done {time.time() - t1:.0f}s", flush=True)
+    return t
 
 
 def render_uhd(tx, ty, bm, bm_geo, dem, s2, mask, mask_geo, dist, dist_geo, seed, margin=64):
@@ -136,21 +146,11 @@ def render_uhd(tx, ty, bm, bm_geo, dem, s2, mask, mask_geo, dist, dist_geo, seed
     return (out[margin:margin + h, margin:margin + w] * 255 + 0.5).astype(np.uint8)
 
 
-# ---------- clusters: connected groups of tiles ----------
-left = set(tiles); clusters = []
-while left:
-    st = [left.pop()]; grp = []
-    while st:
-        t = st.pop(); grp.append(t)
-        for dx in (-T3, 0, T3):
-            for dy in (-T3, 0, T3):
-                nb = (t[0] + dx, t[1] + dy)
-                if nb in left: left.remove(nb); st.append(nb)
-    clusters.append(sorted(grp))
-print("clusters:", [len(c) for c in clusters], flush=True)
+# ---------- render all tiles ----------
 t0 = time.time()
-with cf.ProcessPoolExecutor(min(3, len(clusters))) as ex:
-    list(ex.map(do_cluster, clusters, [i * 1000 for i in range(len(clusters))]))
+with cf.ProcessPoolExecutor(4) as ex:
+    for n, _ in enumerate(ex.map(do_tile, tiles)):
+        if n % 10 == 0: print(f"{n + 1}/{len(tiles)} tiles, {time.time() - t0:.0f}s", flush=True)
 json.dump({"tile": T3, "k": K3, "tiles": [list(t) for t in tiles]}, open(f"{OUT3}/uhd/index.json", "w"))
 print(f"UHD done {time.time() - t0:.0f}s", flush=True)
 
