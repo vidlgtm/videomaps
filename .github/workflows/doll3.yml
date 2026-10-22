@@ -1,0 +1,77 @@
+name: doll3
+# v3 matryoshka (no interpenetration) - rendered separately, added to release assets4
+on: { workflow_dispatch: {} }
+permissions: { contents: write }
+env:
+  REL1: https://github.com/vidlgtm/videomaps/releases/download/stage1
+jobs:
+  doll-model:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: pip install -q numpy pillow
+      - run: |
+          mkdir -p out/model && curl -sfL --retry 3 -o out/model/matryoshka.glb "$REL1/matryoshka.glb"
+          python3 - <<'EOF'
+          import json, shutil, numpy as np
+          from PIL import Image
+          SRC = "production/assets/matryoshka_ref.png"
+          im = Image.open(SRC).convert("RGB"); a = np.asarray(im).astype(int)
+          ys, xs = np.where(np.abs(a - 255).sum(-1) > 40)
+          json.dump({"img_w": im.width, "img_h": im.height, "bbox": [int(xs.min()), int(ys.min()), int(xs.max()), int(ys.max())]}, open("out/model/meta.json", "w"))
+          shutil.copy(SRC, "out/model/texture.png")
+          EOF
+          ls -la out/model
+      - uses: actions/upload-artifact@v4
+        with: { name: model, path: out/model, retention-days: 5 }
+
+  doll-render:
+    needs: doll-model
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: model, path: out/model }
+      - run: bash production/ci/install_blender.sh
+      - run: |
+          S=$(( ${{ matrix.part }} * 22 + 1 )); E=$(( S + 21 ))
+          $HOME/blender/blender -b --python-exit-code 1 -P production/blender/matryoshka.py -- --model out/model --out frames --start $S --end $E 2>&1 | grep -E "rendered|cut height|faces|Error|error|Traceback" | tail -40
+          test $(ls frames/f_*.png | wc -l) -eq 22
+      - uses: actions/upload-artifact@v4
+        with: { name: 'doll-frames-${{ matrix.part }}', path: frames, retention-days: 3 }
+
+  doll-encode:
+    needs: doll-render
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { pattern: 'doll-frames-*', path: frames, merge-multiple: true }
+      - run: |
+          sudo apt-get update -q && sudo apt-get install -y -q ffmpeg
+          test $(ls frames/f_*.png | wc -l) -eq 330
+          mkdir -p out && cp frames/matryoshka_timing.json out/
+          ffmpeg -v error -y -framerate 30 -start_number 1 -i frames/f_%04d.png -c:v libvpx-vp9 -pix_fmt yuva420p -b:v 0 -crf 16 -row-mt 1 out/matryoshka.webm
+          ffmpeg -v error -y -f lavfi -i color=c=0x2a3640:s=1920x1080:r=30 -framerate 30 -i frames/f_%04d.png -filter_complex "[0][1]overlay=shortest=1" -c:v libx264 -crf 18 -pix_fmt yuv420p out/matryoshka_preview.mp4
+          ls -la out
+      - uses: actions/upload-artifact@v4
+        with: { name: doll-final, path: out, retention-days: 14 }
+
+  publish:
+    needs: doll-encode
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { name: doll-final, path: out }
+      - env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          for i in $(seq 1 240); do gh release view assets4 -R ${{ github.repository }} > /dev/null 2>&1 && break; echo "waiting for release assets4 ($i)"; sleep 60; done
+          sleep 30
+          gh release upload assets4 out/matryoshka.webm out/matryoshka_timing.json out/matryoshka_preview.mp4 --clobber -R ${{ github.repository }}
