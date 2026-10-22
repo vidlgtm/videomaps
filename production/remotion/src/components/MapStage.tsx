@@ -157,10 +157,10 @@ const Flag: React.FC<{iso: string; x: number; y: number; ax: number; ay: number;
     const w = 60 * size, h = 45 * size, pole = 72 * size;
     const fall = (1 - drop) * -320;
     const wave = Math.sin(t * 3.1 + x * 0.05) * 2.2;
-    const leader = Math.hypot(x - ax, y - ay) > 4;
+    const dl = Math.hypot(x - ax, y - ay), leader = dl > 3, lo = clamp((dl - 3) / 12);   // leader fades in with the displacement
     return (
       <>
-        {leader ? <svg style={{position: 'absolute', left: 0, top: 0, overflow: 'visible', opacity: o * drop}} width={1} height={1}>
+        {leader ? <svg style={{position: 'absolute', left: 0, top: 0, overflow: 'visible', opacity: o * drop * lo}} width={1} height={1}>
           <line x1={ax} y1={ay} x2={x} y2={y} stroke="rgba(255,246,224,0.8)" strokeWidth={1.2} />
           <circle cx={ax} cy={ay} r={2.6} fill="#FFF6E0" />
         </svg> : null}
