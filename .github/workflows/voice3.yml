@@ -1,0 +1,24 @@
+name: voice3
+# v3 narration (corrected script): master voice track + word-accurate timeline + subtitles -> release voice3
+on: { workflow_dispatch: {} }
+permissions: { contents: write }
+jobs:
+  align:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: |
+          sudo rm -f /etc/apt/sources.list.d/microsoft-prod.list || true
+          sudo apt-get update -q || true
+          sudo apt-get install -y -q ffmpeg
+          pip install -q torch==2.5.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cpu
+          pip install -q soundfile num2words "numpy<2.3"
+      - run: python -u production/pipeline/align3.py
+      - env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          gh release delete voice3 -y --cleanup-tag 2>/dev/null || true
+          gh release create voice3 out/align/voice.wav out/align/timeline.json out/align/subtitles.srt out/align/align_report.txt \
+            --title "v3 narration (corrected script)" --notes "voice3: corrected script, MMS_FA word timings"
