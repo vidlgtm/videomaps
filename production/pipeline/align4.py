@@ -13,7 +13,7 @@ OUT = "out/align"; os.makedirs(OUT, exist_ok=True)
 CH = [c["text"] if isinstance(c, dict) else c for c in json.load(open(f"{ROOT}/narration_chunks.json"))]
 SR = 48000
 LEAD, TAIL = 1.2, 8.0
-TITLE_GAP, GAP, JOIN = 3.0, 0.85, 0.6      # word-to-word pauses: after the hook (title beat), chunk joins, 02a|02b
+TITLE_GAP, GAP, JOIN = 3.0, 0.85, 0.3      # word-to-word pauses: after the hook (title beat), chunk joins, 02a|02b (02b opens with a breath)
 KEEP_IN, KEEP_OUT = 0.05, 0.10             # speech edges kept around each take (s)
 # articulation rate of each take (letters per second of speech, measured on the v3 alignment)
 RATE = {"00": 13.45, "01": 14.39, "02a": 12.42, "02b": 14.24, "03": 13.95, "04": 13.94, "05": 13.09, "06": 13.64}
@@ -100,7 +100,7 @@ for n in names:
     rep.append(f"take {n}: {l:.1f} -> -19.0 LUFS, F0 after {median_f0(takes[n]):.1f} Hz, dur {len(takes[n]) / SR:.2f}s")
 edge = KEEP_IN + KEEP_OUT
 clips = [takes["00"], takes["01"],
-         np.concatenate([takes["02a"], np.zeros(int((JOIN - edge) * SR), np.float32), takes["02b"]]),
+         np.concatenate([takes["02a"], np.zeros(int(max(0.05, JOIN - edge) * SR), np.float32), takes["02b"]]),
          *[takes[f"{i:02d}"] for i in range(3, 7)]]
 assert len(clips) == len(CH) == 7
 starts, t = [], LEAD
