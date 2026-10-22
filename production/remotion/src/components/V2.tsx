@@ -5,7 +5,7 @@ import {AbsoluteFill, Img, staticFile, spring} from 'remotion';
 import {project, px, CamState, KM_PER_PX} from '../lib/proj';
 import {clamp, env, ease, easeOut, prog, lerp} from '../lib/anim';
 import {FONTS} from '../fonts';
-import {BANNERS, ICONS, DOTS, DOT_COL, DOT_SHOWS, DOCS, CUTOUTS, NUMERALS, ARROWS, TITLE, TAGS, CHAIN, CREDITS, Banner, STAR, STAR_TARGETS} from '../v2';
+import {BANNERS, ICONS, DOTS, DOT_COL, DOT_SHOWS, DOCS, CUTOUTS, NUMERALS, ARROWS, TITLE, TAGS, CHAIN, CREDITS, Banner, STAR, STAR_TARGETS, DEPTH_IDS, LIGHTS, CITY_LIGHTS} from '../v2';
 import * as echarts from 'echarts';
 
 const FPS = 30;
@@ -17,12 +17,27 @@ const WOOD = 'linear-gradient(90deg,#2e1b0f 0%,#6b4428 30%,#a77a4c 50%,#7a5130 6
 const onScreen = (q: {x: number; y: number}, m = 260) => q.x > -m && q.x < 1920 + m && q.y > -m && q.y < 1080 + m * 1.6;
 
 // ---------------- banner on a pole ----------------
-const ClothFace: React.FC<{img: string; W: number; H: number}> = ({img, W, H}) => (
+const depthId = (img: string) => { const id = img.replace(/^archive\//, '').replace(/\.(jpg|jpeg|png)$/i, ''); return DEPTH_IDS.includes(id) ? id : null; };
+/** v3 2.5D parallax: the photo (background) and its near layer (archive/<id>_fg.png, cut by the depth map) drift apart */
+const DepthPhoto: React.FC<{img: string; w: number; h?: number; p: number; filter?: string}> = ({img, w, h, p, filter}) => {
+  const id = depthId(img);
+  const st = (k: number, dx: number, dy: number): React.CSSProperties => ({position: 'absolute', left: 0, top: 0, width: w, height: h ?? 'auto',
+    objectFit: 'cover', filter, transform: `scale(${k}) translate(${dx}px, ${dy}px)`, transformOrigin: '50% 50%'});
+  return (
+    <>
+      <Img src={staticFile(img)} style={{...st(id ? 1.05 + 0.025 * p : 1, id ? -5 * p : 0, id ? -1.5 * p : 0), position: h ? 'absolute' : 'relative', display: 'block'}} />
+      {id ? <Img src={staticFile(`archive/${id}_fg.png`)} style={st(1.05 + 0.08 * p, 5 * p, 1.6 * p)} /> : null}
+    </>
+  );
+};
+
+const ClothFace: React.FC<{img: string; W: number; H: number; p?: number}> = ({img, W, H, p = 0}) => (
   <div style={{position: 'absolute', left: 0, top: 0, width: W, height: H + 12}}>
     <div style={{position: 'absolute', left: 0, top: 0, width: W, height: H, background: 'linear-gradient(180deg,#922b2b,#5c1414)',
       boxShadow: 'inset 0 0 0 3px #d8b25a, inset 0 0 0 6px #5c1414, inset 0 0 0 7px #d8b25a'}}>
-      <Img src={staticFile(img)} style={{position: 'absolute', left: 11, top: 11, width: W - 22, height: H - 22, objectFit: 'cover',
-        filter: 'sepia(0.12) contrast(1.06) saturate(0.95)'}} />
+      <div style={{position: 'absolute', left: 11, top: 11, width: W - 22, height: H - 22, overflow: 'hidden'}}>
+        <DepthPhoto img={img} w={W - 22} h={H - 22} p={p} filter="sepia(0.12) contrast(1.06) saturate(0.95)" />
+      </div>
       <div style={{position: 'absolute', left: 11, top: 11, width: W - 22, height: H - 22, boxShadow: 'inset 0 0 14px rgba(0,0,0,0.6)'}} />
     </div>
     <div style={{position: 'absolute', left: 4, top: H, width: W - 8, height: 12,
@@ -46,7 +61,7 @@ export const BannerOnPole: React.FC<{b: Banner; x: number; y: number; s: number;
     return (
       <div key={i} style={{position: 'absolute', left: (i * W) / N, top: 0, width: W / N + 0.9, height: H + 12, overflow: 'hidden',
         transformOrigin: '50% 0', transform: `scaleY(${sy * unfurl})`, filter: `brightness(${br.toFixed(3)})`}}>
-        <div style={{position: 'absolute', left: (-i * W) / N, top: 0}}><ClothFace img={b.img} W={W} H={H} /></div>
+        <div style={{position: 'absolute', left: (-i * W) / N, top: 0}}><ClothFace img={b.img} W={W} H={H} p={prog(t, b.from, Math.max(0.5, b.to - b.from))} /></div>
       </div>
     );
   });
@@ -209,6 +224,32 @@ const StarShatter: React.FC<{t: number; cam: CamState}> = ({t, cam}) => {
   );
 };
 
+
+// ---------------- v3: the union at night - city lights go out one by one, then 15 nations light up ----------------
+const CityLights: React.FC<{t: number; cam: CamState}> = ({t, cam}) => {
+  const L = LIGHTS;
+  if (t < L.from || t > L.lift1) return null;
+  const dark = clamp((t - L.from) / 0.5) * (1 - clamp((t - L.lift0) / (L.lift1 - L.lift0)));
+  const rz = clamp(Math.sqrt(cam.zoom / 0.3), 0.7, 1.5);
+  return (
+    <AbsoluteFill>
+      <AbsoluteFill style={{background: 'radial-gradient(ellipse at 50% 45%, rgba(3,7,16,0.62), rgba(2,4,10,0.82))', opacity: dark}} />
+      {CITY_LIGHTS.map(([lon, lat, sz], i) => {
+        const off = L.off0 + hash(i, 7) * (L.off1 - L.off0);
+        if (t > off + 0.15) return null;
+        const [wx, wy] = px(lon, lat); const q = project(cam, wx, wy);
+        if (q.x < -40 || q.x > 1960 || q.y < -40 || q.y > 1120) return null;
+        const flick = t > off - 0.28 ? 0.45 + 0.55 * Math.abs(Math.sin((t - off) * 47 + i * 1.7)) : 1;
+        const on = clamp((off + 0.15 - t) / 0.15) * clamp((t - L.from - 0.1 - hash(i, 3) * 0.45) / 0.3);
+        const r = (sz === 3 ? 30 : sz === 2 ? 19 : 11) * rz;
+        return <div key={i} style={{position: 'absolute', left: q.x - r, top: q.y - r, width: 2 * r, height: 2 * r, borderRadius: '50%',
+          opacity: on * flick * dark, mixBlendMode: 'screen',
+          background: 'radial-gradient(circle, rgba(255,248,222,1) 0%, rgba(255,216,130,0.9) 16%, rgba(255,170,60,0.38) 42%, rgba(255,150,40,0) 70%)'}} />;
+      })}
+    </AbsoluteFill>
+  );
+};
+
 export const V2Billboards: React.FC<{t: number; cam: CamState}> = ({t, cam}) => {
   const sizeK = 1.55 * clamp(Math.sqrt(cam.zoom / 1.6), 0.85, 1.12);   // banners ~270-360 px wide
   const items: {y: number; el: React.ReactNode}[] = [];
@@ -227,7 +268,7 @@ export const V2Billboards: React.FC<{t: number; cam: CamState}> = ({t, cam}) => 
     items.push({y: q.y, el: <IconSprite key={'i' + i} name={ic.name} az={ic.az} x={q.x} y={q.y} s={(sizeK / 1.55) * q.s * (ic.size ?? 1)} t={t} from={ic.from} to={ic.to} />});
   });
   items.sort((a, b) => a.y - b.y);
-  return <AbsoluteFill><HomelandDots t={t} cam={cam} /><BalticChain t={t} cam={cam} />{items.map((x) => x.el)}<StarShatter t={t} cam={cam} /></AbsoluteFill>;
+  return <AbsoluteFill><HomelandDots t={t} cam={cam} /><BalticChain t={t} cam={cam} />{items.map((x) => x.el)}<StarShatter t={t} cam={cam} /><CityLights t={t} cam={cam} /></AbsoluteFill>;
 };
 
 // ---------------- curved growing arrows (world space, inside the map SVG) ----------------
@@ -291,9 +332,26 @@ const DocCard: React.FC<{t: number}> = ({t}) => (
         <div key={i} style={{position: 'absolute', left, top: 120, width: w, opacity: clamp(k * 2) * out,
           transform: `translateX(${(1 - k) * (d.side === 'l' ? -700 : 700)}px) rotate(${d.side === 'l' ? -2.5 : 2.5}deg)`}}>
           <div style={{padding: 14, background: PARCH, borderRadius: 3, boxShadow: '0 18px 40px rgba(0,0,0,0.6), inset 0 0 0 1.5px rgba(90,60,30,0.5)'}}>
-            <div style={{overflow: 'hidden', borderRadius: 2}}>
-              <Img src={staticFile(d.img)} style={{width: w - 28, display: 'block', transform: `scale(${kb})`, transformOrigin: '50% 30%'}} />
+            <div style={{overflow: 'hidden', borderRadius: 2, position: 'relative'}}>
+              {depthId(d.img) ? <DepthPhoto img={d.img} w={w - 28} p={prog(t, d.from, d.to - d.from)} />
+                : <Img src={staticFile(d.img)} style={{width: w - 28, display: 'block', transform: `scale(${kb})`, transformOrigin: '50% 30%'}} />}
             </div>
+            {d.sigs ? <div style={{display: 'flex', justifyContent: 'space-between', gap: 6, marginTop: 10}}>
+              {d.sigs.map((g, j) => {
+                const s0 = d.from + 0.55 + j * 0.85, r = clamp((t - s0) / 0.8), x = r * 112 - 8;
+                const m = `linear-gradient(90deg, #000 ${x}%, transparent ${x + 8}%)`;
+                return (
+                  <div key={j} style={{flex: 1, textAlign: 'center'}}>
+                    <div style={{height: 46, display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+                      <Img src={staticFile(g.img)} style={{maxHeight: 42, maxWidth: '100%', objectFit: 'contain', mixBlendMode: 'multiply',
+                        WebkitMaskImage: m, maskImage: m} as React.CSSProperties} />
+                    </div>
+                    <div style={{borderTop: '1px solid rgba(90,60,30,0.45)', paddingTop: 3, fontFamily: FONTS.body, fontWeight: 700, fontSize: 10.5,
+                      letterSpacing: '0.12em', color: '#5a3d22', opacity: clamp((t - s0 - 0.45) / 0.3)}}>{g.name}</div>
+                  </div>
+                );
+              })}
+            </div> : null}
           </div>
           {d.cap ? <div style={{marginTop: 14, textAlign: 'center', fontFamily: FONTS.head, fontWeight: 700, fontSize: 22, letterSpacing: '0.18em',
             color: '#F6E7C1', textShadow: '0 2px 8px rgba(0,0,0,0.9)'}}>{d.cap}</div> : null}

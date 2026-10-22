@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: '3.11' }
-      - run: sudo rm -f /etc/apt/sources.list.d/microsoft*; sudo apt-get update -qq || true; sudo apt-get install -y -qq ffmpeg unzip > /dev/null && pip install -q numpy scipy
+      - run: sudo rm -f /etc/apt/sources.list.d/microsoft*; sudo apt-get update -qq || true; sudo apt-get install -y -qq ffmpeg unzip > /dev/null && pip install -q numpy scipy pillow
       - name: Assets (stage1 voice/music/sfx, assets3 terrain/archive, assets2 icons/clips, Foley v2)
         working-directory: production/remotion
         run: |
@@ -64,6 +64,27 @@ jobs:
           (cd public && unzip -q -o /tmp/hd_tiles.zip && rm -f hd/index.json && ls hd | wc -l)
           (cd public/archive && unzip -q -o /tmp/archive.zip && ls | wc -l)
           curl -sfL --retry 3 -o /tmp/cutouts.zip "$A4/cutouts.zip" && (cd public/archive && unzip -q -o /tmp/cutouts.zip && ls -la *_cut.png)
+          # v3: real signatures (Wikimedia Commons, public domain) for the Belovezha Accords card
+          mkdir -p public/sig
+          curl -sfL --retry 3 -A "videomaps/1.0" -o public/sig/yeltsin.svg "https://upload.wikimedia.org/wikipedia/commons/0/0a/Yeltsin_signature.svg"
+          curl -sfL --retry 3 -A "videomaps/1.0" -o public/sig/kravchuk.svg "https://upload.wikimedia.org/wikipedia/commons/4/4c/Leonid_Kravchuk_signature_1991.svg"
+          curl -sfL --retry 3 -A "videomaps/1.0" -o public/sig/shushkevich.png "https://upload.wikimedia.org/wikipedia/commons/7/76/Signature_of_Stanislau_Shushkevich.png"
+          # v3: near layer of each archival photo, cut by its Depth-Anything-V2 map -> 2.5D parallax in Remotion
+          python3 - <<'PY'
+          import numpy as np
+          from PIL import Image, ImageFilter
+          for i in ['kazan', 'tallinn', 'grozny', 'redarmy', 'gulag', 'winterwar', 'balticway', 'lithuania90', 'tanks91',
+                    'viskuli', 'almaata', 'sukhumi', 'bender', 'belovezha']:
+              im = Image.open(f'public/archive/{i}.jpg').convert('RGB')
+              if im.width > 1100: im = im.resize((1100, round(im.height * 1100 / im.width)), Image.LANCZOS)
+              d = np.asarray(Image.open(f'public/archive/{i}_depth.png').convert('L').resize(im.size, Image.BICUBIC)).astype(np.float32)
+              lo, hi = np.percentile(d, 3), np.percentile(d, 97)
+              n = np.clip((d - lo) / max(hi - lo, 1.0), 0, 1)
+              a = np.clip((n - 0.55) / 0.25, 0, 1); a = a * a * (3 - 2 * a)
+              m = Image.fromarray((a * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(1.6))
+              out = im.copy(); out.putalpha(m); out.save(f'public/archive/{i}_fg.png', optimize=True)
+              print(i, im.size, 'near share %.2f' % (a > 0.5).mean())
+          PY
           if curl -sfL --retry 3 -o /tmp/icons.zip "$A4/icons.zip"; then (cd public/icons && unzip -q -o /tmp/icons.zip); else echo "WARN: v3 icons missing"; exit 1; fi
           for f in article72.mp4 uti.mp4 caucasus2.mp4 caucasus2_labels.json; do curl -sfL --retry 3 -o public/clips/$f "$A2/$f" || echo "WARN: $f missing"; done
           mkdir -p /tmp/s2
@@ -77,7 +98,7 @@ jobs:
           npm i --no-audit --no-fund --loglevel=error flag-icons@7.6.0 && cp -r node_modules/flag-icons/flags/4x3 public/flags/ && rm -rf node_modules
           for f in archive/sovflag.jpg archive/kazan.jpg archive/tallinn.jpg archive/grozny.jpg archive/const1936.jpg archive/stalin_cut.png \
                    clips/opening.mp4 clips/article72.mp4 clips/uti.mp4 archive/lenin_cut.png archive/gorbachev_cut.png icons/scroll_a270.png \
-                   basemap_v2.jpg hd/t_1_3.jpg uhd/u_768_3328.jpg sfx/bell_toll.wav sfx/wood_thunk.wav sfx/crowd_bed.wav; do test -s public/$f || { echo "MISSING $f"; exit 1; }; done
+                   basemap_v2.jpg hd/t_1_3.jpg uhd/u_768_3328.jpg sig/yeltsin.svg sig/kravchuk.svg sig/shushkevich.png archive/kazan_fg.png archive/belovezha_fg.png sfx/bell_toll.wav sfx/wood_thunk.wav sfx/crowd_bed.wav; do test -s public/$f || { echo "MISSING $f"; exit 1; }; done
           du -sh public; ls public public/icons | head -40
       - id: m
         run: echo "matrix=$(python3 -c "print(list(range(int('${{ env.PARTS }}'))))")" >> $GITHUB_OUTPUT

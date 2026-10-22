@@ -5,7 +5,7 @@ export type Banner = {at: [number, number]; img: string; title: string; sub?: st
 export type Icon = {name: string; az: number; at: [number, number]; from: number; to: number; size?: number};
 export type Dot = {n: string; lon: number; lat: number; layer: 0 | 1 | 2 | 3};
 export type DotShow = {from: number; to: number; layers: number[]; stagger?: number};
-export type Doc = {img: string; from: number; to: number; side: 'l' | 'r'; cap?: string; w?: number};
+export type Doc = {img: string; from: number; to: number; side: 'l' | 'r'; cap?: string; w?: number; sigs?: {img: string; name: string}[]};
 export type Cutout = {img: string; name: string; sub?: string; from: number; to: number; side: 'l' | 'r'};
 export type Numeral = {text: string; from: number; to: number; y?: number; size?: number; sub?: string};
 export type Arrow = {a: [number, number]; b: [number, number]; t: number; dur: number; to: number; color: string; bend?: number};
@@ -164,7 +164,9 @@ DOCS.push(
   {img: 'archive/const1936.jpg', from: k2.y1936 + 0.2, to: k2.kaz + 4.5, side: 'r', cap: 'THE 1936 CONSTITUTION'},
   {img: 'archive/const1936_a13.jpg', from: k2.eleven + 0.1, to: k2.three - 0.3, side: 'r', cap: 'ARTICLE 13 · ELEVEN UNION REPUBLICS'},
   {img: 'archive/crimea1954.jpg', from: k3.y1954 + 0.6, to: k3.detail + 2.6, side: 'r', cap: '1954 · CRIMEA TRANSFERRED TO THE UKRAINIAN SSR'},
-  {img: 'archive/belovezha.jpg', from: k4.lodge + 1.6, to: k4.dec21 - 0.25, side: 'r', cap: 'THE BELOVEZHA ACCORDS · 8 DECEMBER 1991'},
+  {img: 'archive/belovezha.jpg', from: k4.lodge + 1.6, to: k4.dec21 - 0.25, side: 'r', cap: 'THE BELOVEZHA ACCORDS · 8 DECEMBER 1991',
+   sigs: [{img: 'sig/yeltsin.svg', name: 'B. YELTSIN · RUSSIA'}, {img: 'sig/kravchuk.svg', name: 'L. KRAVCHUK · UKRAINE'},
+          {img: 'sig/shushkevich.png', name: 'S. SHUSHKEVICH · BELARUS'}]},
 );
 CUTOUTS.push(
   {img: 'archive/lenin_cut.png', name: 'VLADIMIR LENIN', sub: 'a union of “equal” republics', from: k1.lenin - 0.1, to: k1.dec30 - 0.3, side: 'r'},
@@ -221,4 +223,31 @@ export const STAR_TARGETS: [string, number, number][] = [
   ['EST', 24.75, 59.44], ['LVA', 24.11, 56.95], ['RUS', 37.62, 55.75], ['LTU', 25.28, 54.69], ['BLR', 27.56, 53.9],
   ['UKR', 30.52, 50.45], ['MDA', 28.86, 47.01], ['GEO', 44.79, 41.72], ['ARM', 44.51, 40.18], ['AZE', 49.87, 40.41],
   ['TKM', 58.38, 37.95], ['UZB', 69.24, 41.3], ['TJK', 68.79, 38.56], ['KGZ', 74.59, 42.87], ['KAZ', 76.95, 43.24],
+];
+
+/** archival photos with a depth layer (prep builds archive/<id>_fg.png from the Depth-Anything-V2 map) -> 2.5D parallax */
+export const DEPTH_IDS = ['kazan', 'tallinn', 'grozny', 'redarmy', 'gulag', 'winterwar', 'balticway', 'lithuania90', 'tanks91',
+  'viskuli', 'almaata', 'sukhumi', 'bender', 'belovezha'];
+/** right after the flag comes down: the union at night, its city lights go out one by one, then 15 nations light up */
+export const LIGHTS = {from: h.hours - 0.3, off0: h.largest - 0.15, off1: h.gone + 0.5,
+  lift0: C(0, 'fifteen new nations') - 0.5, lift1: C(0, 'fifteen new nations') + 0.7};
+// [lon, lat, size class] - major Soviet cities (1991)
+export const CITY_LIGHTS: [number, number, number][] = [
+  [37.62, 55.75, 3], [30.32, 59.94, 3], [44.0, 56.33, 2], [50.1, 53.2, 2], [60.6, 56.84, 2], [61.4, 55.16, 2], [82.92, 55.03, 2],
+  [73.37, 54.99, 2], [56.25, 58.01, 2], [49.11, 55.79, 2], [55.96, 54.74, 2], [44.52, 48.71, 2], [39.72, 47.23, 2], [46.03, 51.53, 1],
+  [39.2, 51.67, 1], [92.87, 56.01, 2], [104.3, 52.29, 1], [135.07, 48.48, 1], [131.89, 43.12, 1], [39.89, 57.63, 1], [37.62, 54.19, 1],
+  [53.2, 56.85, 1], [83.78, 53.35, 1], [86.09, 55.35, 1], [87.12, 53.76, 1], [84.95, 56.5, 1], [65.53, 57.15, 1], [55.1, 51.77, 1],
+  [48.03, 46.35, 1], [38.98, 45.04, 1], [33.08, 68.97, 1], [40.54, 64.54, 1], [129.73, 62.03, 1], [150.8, 59.57, 1], [88.2, 69.35, 1],
+  [113.5, 52.03, 1], [107.6, 51.83, 1], [158.65, 53.02, 1], [20.51, 54.71, 1], [32.04, 54.78, 1], [34.36, 53.24, 1], [36.19, 51.73, 1],
+  [45.0, 53.2, 1], [48.4, 54.32, 1], [49.67, 58.6, 1], [39.9, 59.22, 1], [137.0, 50.55, 1], [73.4, 61.25, 1], [64.0, 67.5, 1],
+  [50.83, 61.67, 1], [34.35, 61.79, 1], [47.5, 42.98, 1], [45.69, 43.32, 1], [41.97, 45.04, 1],
+  [30.52, 50.45, 3], [36.23, 49.99, 2], [30.73, 46.48, 2], [35.05, 48.46, 2], [37.8, 48.0, 2], [35.14, 47.84, 1], [24.03, 49.84, 1],
+  [33.39, 47.91, 1], [34.1, 44.95, 1], [33.52, 44.62, 1], [39.3, 48.57, 1], [32.0, 46.97, 1], [28.47, 49.23, 1],
+  [27.56, 53.9, 2], [30.98, 52.43, 1], [30.2, 55.19, 1], [23.7, 52.1, 1], [23.83, 53.68, 1], [30.33, 53.9, 1],
+  [24.11, 56.95, 2], [25.28, 54.69, 1], [24.75, 59.44, 1], [23.9, 54.9, 1], [28.86, 47.01, 1],
+  [44.79, 41.72, 2], [44.51, 40.18, 2], [49.87, 40.41, 2], [42.7, 42.27, 1], [43.85, 40.79, 1], [46.36, 40.68, 1], [49.67, 40.59, 1],
+  [69.24, 41.3, 3], [76.95, 43.24, 2], [74.59, 42.87, 1], [68.79, 38.56, 1], [58.38, 37.95, 1], [66.96, 39.65, 1], [64.42, 39.77, 1],
+  [71.67, 41.0, 1], [72.34, 40.78, 1], [71.78, 40.38, 1], [73.1, 49.8, 2], [71.43, 51.13, 1], [80.25, 50.41, 1], [82.6, 49.95, 1],
+  [76.95, 52.29, 1], [69.6, 42.3, 1], [57.2, 50.28, 1], [69.15, 54.87, 1], [63.63, 53.21, 1], [72.8, 40.53, 1], [69.62, 40.28, 1],
+  [63.58, 39.08, 1], [59.6, 42.46, 1], [65.5, 44.85, 1],
 ];
