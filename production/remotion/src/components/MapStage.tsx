@@ -6,6 +6,7 @@ import {env, clamp, ease, lerp, prog, easeOut} from '../lib/anim';
 import {CAMERA, CamKey, FILLS, STROKES, LABELS, MARKERS, FLAGS, FLAG_HIDE, LINES, RINGS, ISO15, FLAG_CODE, COL} from '../script';
 import {FONTS} from '../fonts';
 import hd from '../data/hd_index.json';
+import uhd from '../data/uhd_index.json';
 import {V2Billboards, ArrowsSvg} from './V2';
 
 const G: any = geo;
@@ -293,6 +294,25 @@ const HdTiles: React.FC<{cam: CamState}> = ({cam}) => {
   );
 };
 
+const UHD: any = uhd;
+/** v3: 8 px per canvas px deep-zoom tiles (Sentinel-2 detail), faded in for close-ups only */
+const UhdTiles: React.FC<{cam: CamState}> = ({cam}) => {
+  const o = clamp((cam.zoom - 1.85) / 0.3);
+  if (o <= 0 || !UHD.tiles.length) return null;
+  const pts = [[0, 0], [1920, 0], [0, 1080], [1920, 1080], [960, 0]].map(([x, y]) => unproject(cam, x, y));
+  const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+  const [x0, x1, y0, y1] = [Math.min(...xs) - 32, Math.max(...xs) + 32, Math.min(...ys) - 32, Math.max(...ys) + 32];
+  return (
+    <>
+      {UHD.tiles.map(([x, y]: [number, number]) => {
+        if (x > x1 || x + UHD.tile < x0 || y > y1 || y + UHD.tile < y0) return null;
+        return <Img key={`u${x}_${y}`} src={staticFile(`uhd/u_${x}_${y}.jpg`)}
+          style={{position: 'absolute', left: x - 0.2, top: y - 0.2, width: UHD.tile + 0.4, height: UHD.tile + 0.4, opacity: o}} />;
+      })}
+    </>
+  );
+};
+
 export const MapStage: React.FC<{t: number; lite: boolean; fps: number}> = ({t, lite, fps}) => {
   const cam = cameraAt(t);
   return (
@@ -301,6 +321,7 @@ export const MapStage: React.FC<{t: number; lite: boolean; fps: number}> = ({t, 
         <div style={{position: 'absolute', left: 0, top: 0, width: WORLD_W, height: WORLD_H, transformOrigin: '0 0', transform: cssTransform(cam)}}>
           <Img src={staticFile(lite ? 'basemap_v2_half.jpg' : 'basemap_v2.jpg')} style={{position: 'absolute', left: 0, top: 0, width: WORLD_W, height: WORLD_H}} />
           {!lite ? <HdTiles cam={cam} /> : null}
+          {!lite ? <UhdTiles cam={cam} /> : null}
           <WorldSvg t={t} cam={cam} />
         </div>
       </AbsoluteFill>

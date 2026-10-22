@@ -11,9 +11,9 @@ const GOLD = COL.GOLD;
 const panel: React.CSSProperties = {background: 'linear-gradient(160deg, rgba(14,26,36,0.93), rgba(9,17,24,0.93))',
   border: `1.5px solid rgba(226,191,106,0.75)`, borderRadius: 14, boxShadow: '0 18px 50px rgba(0,0,0,0.55)'};
 
-const DateCard: React.FC<{text: string; sub?: string; o: number; k: number}> = ({text, sub, o, k}) => (
-  <div style={{position: 'absolute', left: 64 - 30 * (1 - k), top: 58, opacity: o, display: 'flex', alignItems: 'stretch'}}>
-    <div style={{width: 4, background: GOLD, borderRadius: 2, marginRight: 18, boxShadow: `0 0 12px ${GOLD}`}} />
+const DateCard: React.FC<{text: string; sub?: string; o: number; k: number; pos?: 'tl' | 'tr'}> = ({text, sub, o, k, pos}) => (
+  <div style={{position: 'absolute', ...(pos === 'tr' ? {right: 64 - 30 * (1 - k), flexDirection: 'row-reverse'} : {left: 64 - 30 * (1 - k)}), top: 58, opacity: o, display: 'flex', alignItems: 'stretch'} as React.CSSProperties}>
+    <div style={{width: 4, background: GOLD, borderRadius: 2, [pos === 'tr' ? 'marginLeft' : 'marginRight']: 18, boxShadow: `0 0 12px ${GOLD}`} as React.CSSProperties} />
     <div style={{...panel, padding: '14px 26px 14px 22px', borderRadius: 8}}>
       <div style={{fontFamily: FONTS.head, fontWeight: 700, fontSize: 40, color: '#FFF8E6', letterSpacing: '0.08em'}}>{text}</div>
       {sub ? <div style={{fontFamily: FONTS.body, fontWeight: 600, fontSize: 16, color: GOLD, letterSpacing: '0.2em', marginTop: 4}}>{sub}</div> : null}
@@ -205,8 +205,10 @@ const Flagpole: React.FC<{t: number}> = ({t}) => {
   return <>{seg(F.from, F.lower, F.lowered, F.raise, F.to)}{seg(F.from2, F.lower2, F.lower2 + 2.0, F.raise2, F.to2)}</>;
 };
 
-const CAUC_NAMES: Record<string, string> = {Grozny: 'CHECHNYA', Tbilisi: 'GEORGIA', 'Mount Elbrus': 'Mount Elbrus', Makhachkala: 'DAGESTAN',
-  Sukhumi: 'ABKHAZIA', Tskhinvali: 'SOUTH OSSETIA', 'CASPIAN SEA': 'Caspian Sea', 'BLACK SEA': 'Black Sea'};
+// v3: priority order (first = most important); a label never leaves the frame (soft fade at the edges) and
+// never covers a more important one (it is lifted on a longer stem, continuously, so nothing jumps)
+const CAUC_NAMES: [string, string][] = [['Grozny', 'CHECHNYA'], ['Sukhumi', 'ABKHAZIA'], ['Tskhinvali', 'SOUTH OSSETIA'],
+  ['Tbilisi', 'GEORGIA'], ['Mount Elbrus', 'Mount Elbrus'], ['CASPIAN SEA', 'Caspian Sea'], ['BLACK SEA', 'Black Sea']];
 const CaucLabels: React.FC<{t: number}> = ({t}) => {
   const clip = CLIPS.find((c) => c.kind === 'cauc');
   if (!clip) return null;
@@ -214,22 +216,38 @@ const CaucLabels: React.FC<{t: number}> = ({t}) => {
   if (o <= 0) return null;
   const f = Math.floor((t - clip.from) * 30);
   const tr: any = (cauc as any).tracks;
-  return (
-    <>
-      {Object.entries(CAUC_NAMES).map(([k, name]) => {
-        const a = tr[k]?.[Math.min(Math.max(f, 0), (tr[k]?.length ?? 1) - 1)];
-        if (!a || !a[2]) return null;
-        const sea = k.includes('SEA');
-        const chech = k === 'Grozny';
-        return <div key={k} style={{position: 'absolute', left: a[0], top: a[1], transform: 'translate(-50%,-100%)', opacity: o, textAlign: 'center',
-          fontFamily: sea ? FONTS.serif : FONTS.head, fontStyle: sea ? 'italic' : 'normal', fontWeight: 700, fontSize: chech ? 34 : sea ? 30 : 24,
-          color: chech ? '#FF8A80' : sea ? '#CFE9F5' : '#FFF8E6', letterSpacing: sea ? '0.04em' : '0.12em', whiteSpace: 'nowrap',
-          textShadow: '0 2px 10px rgba(0,0,0,0.95)'}}>
-          {name}{!sea ? <div style={{width: 1.5, height: 22, background: 'rgba(255,255,255,0.75)', margin: '6px auto 0'}} /> : null}
-        </div>;
-      })}
-    </>
-  );
+  const placed: {x0: number; x1: number; y0: number; y1: number}[] = [];
+  const out: React.ReactNode[] = [];
+  CAUC_NAMES.forEach(([k, name]) => {
+    const a = tr[k]?.[Math.min(Math.max(f, 0), (tr[k]?.length ?? 1) - 1)];
+    if (!a || !a[2]) return;
+    const sea = k.includes('SEA');
+    const chech = k === 'Grozny';
+    const fs = chech ? 34 : sea ? 30 : 24;
+    const hw = (name.length * fs * (sea ? 0.56 : 0.74)) / 2 + 8;
+    const stem0 = sea ? 0 : 28;
+    const h = fs * 1.25;
+    const edge = clamp((a[0] - hw - 24) / 70) * clamp((1896 - hw - a[0]) / 70) * clamp((a[1] - h - stem0 - 20) / 60);
+    if (edge <= 0) return;
+    let lift = 0;
+    for (let it = 0; it < 3; it++) {
+      for (const b of placed) {
+        const y1 = a[1] - stem0 - lift, y0 = y1 - h;
+        const hov = Math.min(a[0] + hw, b.x1) - Math.max(a[0] - hw, b.x0);
+        const vov = Math.min(y1, b.y1) - Math.max(y0, b.y0);
+        if (hov > 0 && vov > 0) lift += (vov + 6) * clamp(hov / 24);
+      }
+    }
+    const y1 = a[1] - stem0 - lift;
+    placed.push({x0: a[0] - hw, x1: a[0] + hw, y0: y1 - h, y1});
+    out.push(<div key={k} style={{position: 'absolute', left: a[0], top: a[1], transform: 'translate(-50%,-100%)', opacity: o * edge, textAlign: 'center',
+      fontFamily: sea ? FONTS.serif : FONTS.head, fontStyle: sea ? 'italic' : 'normal', fontWeight: 700, fontSize: fs,
+      color: chech ? '#FF8A80' : sea ? '#CFE9F5' : '#FFF8E6', letterSpacing: sea ? '0.04em' : '0.12em', whiteSpace: 'nowrap',
+      textShadow: '0 2px 10px rgba(0,0,0,0.95)'}}>
+      {name}{!sea ? <div style={{width: 1.5, height: 22 + lift, background: 'rgba(255,255,255,0.75)', margin: '6px auto 0'}} /> : null}
+    </div>);
+  });
+  return <>{out}</>;
 };
 
 export const Overlays: React.FC<{t: number}> = ({t}) => {
@@ -249,7 +267,7 @@ export const Overlays: React.FC<{t: number}> = ({t}) => {
         if (o <= 0) return null;
         const k = easeOut(prog(t, c.from, 1.2));
         switch (c.kind) {
-          case 'date': return <DateCard key={i} text={c.text} sub={c.sub} o={o} k={k} />;
+          case 'date': return <DateCard key={i} text={c.text} sub={c.sub} o={o} k={k} pos={c.pos} />;
           case 'chapter': return <Chapter key={i} num={c.num} text={c.text} o={o} k={k} />;
           case 'quote': return <Quote key={i} text={c.text} sub={c.sub} o={o} k={k} />;
           case 'big': return <Big key={i} text={c.text} sub={c.sub} o={o} k={k} />;

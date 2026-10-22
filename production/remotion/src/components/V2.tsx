@@ -5,7 +5,7 @@ import {AbsoluteFill, Img, staticFile, spring} from 'remotion';
 import {project, px, CamState, KM_PER_PX} from '../lib/proj';
 import {clamp, env, ease, easeOut, prog, lerp} from '../lib/anim';
 import {FONTS} from '../fonts';
-import {BANNERS, ICONS, DOTS, DOT_COL, DOT_SHOWS, DOCS, CUTOUTS, NUMERALS, ARROWS, TITLE, TAGS, CHAIN, CREDITS, Banner} from '../v2';
+import {BANNERS, ICONS, DOTS, DOT_COL, DOT_SHOWS, DOCS, CUTOUTS, NUMERALS, ARROWS, TITLE, TAGS, CHAIN, CREDITS, Banner, STAR, STAR_TARGETS} from '../v2';
 import * as echarts from 'echarts';
 
 const FPS = 30;
@@ -95,7 +95,9 @@ const IconSprite: React.FC<{name: string; az: number; x: number; y: number; s: n
     return (
       <div style={{position: 'absolute', left: x - size / 2, top: y - size * 0.86 + bob, width: size, height: size, opacity: o,
         transformOrigin: '50% 86%', transform: `scale(${Math.max(0, k)})`}}>
-        <Img src={staticFile(`icons/${name}_a${az}.png`)} style={{width: size, height: size}} />
+        <div style={{position: 'absolute', left: size * 0.24, top: size * 0.86 - size * 0.055, width: size * 0.52, height: size * 0.11, borderRadius: '50%',
+          background: 'radial-gradient(ellipse at center, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.28) 45%, rgba(0,0,0,0) 72%)'}} />
+        <Img src={staticFile(`icons/${name}_a${az}.png`)} style={{position: 'absolute', left: 0, top: 0, width: size, height: size, filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.35))'}} />
       </div>
     );
   };
@@ -134,6 +136,79 @@ const HomelandDots: React.FC<{t: number; cam: CamState}> = ({t, cam}) => {
 };
 
 /** screen-space v2 billboards (banners, icons, dots) for the map stage */
+
+// ---------------- v3: the Soviet star shatters into 15 shards, one lands on each republic ----------------
+const STAR_GEO = (() => {
+  const C0: [number, number] = [960, 455], R = 150, r = 61;
+  const V = Array.from({length: 10}, (_, i) => {
+    const a = -Math.PI / 2 + (i * Math.PI) / 5, rr = i % 2 ? r : R;
+    return [C0[0] + rr * Math.cos(a), C0[1] + rr * Math.sin(a)] as [number, number];
+  });
+  const tris: [number, number][][] = [];
+  for (let i = 0; i < 10; i++) {
+    const A = V[i], B = V[(i + 1) % 10];
+    if (i % 2 === 0) {               // tip triangle -> split in two (10 + 5 = 15 shards)
+      const M: [number, number] = [(C0[0] + A[0]) / 2, (C0[1] + A[1]) / 2];
+      tris.push([M, A, B], [C0, M, B]);
+    } else tris.push([C0, A, B]);
+  }
+  const shards = tris.map((p) => {
+    const c: [number, number] = [(p[0][0] + p[1][0] + p[2][0]) / 3, (p[0][1] + p[1][1] + p[2][1]) / 3];
+    return {c, rel: p.map(([x, y]) => [x - c[0], y - c[1]] as [number, number]), ang: Math.atan2(c[1] - C0[1], c[0] - C0[0])};
+  });
+  return {C0, V, shards};
+})();
+
+const StarShatter: React.FC<{t: number; cam: CamState}> = ({t, cam}) => {
+  const s0 = STAR.from;
+  if (t < s0 || t > s0 + 3.3) return null;
+  const {C0, V, shards} = STAR_GEO;
+  const pop = sp(t, s0, {damping: 11, mass: 0.6, stiffness: 160});
+  const crack = clamp((t - s0 - 0.55) / 0.2);
+  // targets on screen, matched to shards by angle around the star (paths do not cross much)
+  const tg = STAR_TARGETS.map(([iso, lon, lat]) => {
+    const [wx, wy] = px(lon, lat); const q = project(cam, wx, wy);
+    return {iso, x: q.x, y: q.y, ang: Math.atan2(q.y - C0[1], q.x - C0[0])};
+  });
+  const sOrd = shards.map((s, i) => ({i, a: s.ang})).sort((p, q) => p.a - q.a).map((p) => p.i);
+  const tOrd = tg.map((x, i) => ({i, a: x.ang})).sort((p, q) => p.a - q.a).map((p) => p.i);
+  const match: number[] = []; sOrd.forEach((si, k) => (match[si] = tOrd[k]));
+  const whole = t < s0 + 0.78;
+  return (
+    <svg style={{position: 'absolute', left: 0, top: 0, overflow: 'visible'}} width={1920} height={1080}>
+      <defs>
+        <radialGradient id="starG" cx="45%" cy="38%" r="70%"><stop offset="0%" stopColor="#ff5a4a" /><stop offset="55%" stopColor="#c8102e" /><stop offset="100%" stopColor="#6e0a12" /></radialGradient>
+        <filter id="starGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="7" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+      </defs>
+      {whole ? (
+        <g transform={`translate(${C0[0]},${C0[1]}) scale(${Math.max(0, pop)}) translate(${-C0[0]},${-C0[1]})`} filter="url(#starGlow)">
+          <polygon points={V.map((p) => p.join(',')).join(' ')} fill="url(#starG)" stroke="#f4cf73" strokeWidth={3} />
+          {crack > 0 ? shards.map((s, i) => (
+            <polyline key={i} points={[s.rel[0], s.rel[1], s.rel[2], s.rel[0]].map(([x, y]) => `${x + s.c[0]},${y + s.c[1]}`).join(' ')}
+              fill="none" stroke="#ffe7a8" strokeWidth={1.6} opacity={crack} />
+          )) : null}
+        </g>
+      ) : shards.map((s, i) => {
+        const T = tg[match[i]];
+        const t0 = s0 + 0.78 + (i % 5) * 0.045;
+        const e = ease(clamp((t - t0) / 1.25));
+        const mx = (s.c[0] + T.x) / 2, my = Math.min(s.c[1], T.y) - 200;
+        const x = (1 - e) * (1 - e) * s.c[0] + 2 * (1 - e) * e * mx + e * e * T.x;
+        const y = (1 - e) * (1 - e) * s.c[1] + 2 * (1 - e) * e * my + e * e * T.y;
+        const rot = e * (i % 2 ? 300 : -300), sc = 1 - 0.72 * e;
+        const land = clamp((t - t0 - 1.25) / 0.6);
+        return (
+          <g key={i}>
+            {e < 1 ? <polygon points={s.rel.map(([px_, py_]) => `${px_},${py_}`).join(' ')} fill="url(#starG)" stroke="#f4cf73" strokeWidth={2}
+              transform={`translate(${x},${y}) rotate(${rot}) scale(${sc})`} filter="url(#starGlow)" /> : null}
+            {land > 0 && land < 1 ? <circle cx={T.x} cy={T.y} r={8 + 46 * land} fill="none" stroke="#ffd98a" strokeWidth={3 * (1 - land)} opacity={1 - land} /> : null}
+          </g>
+        );
+      })}
+    </svg>
+  );
+};
+
 export const V2Billboards: React.FC<{t: number; cam: CamState}> = ({t, cam}) => {
   const sizeK = 1.55 * clamp(Math.sqrt(cam.zoom / 1.6), 0.85, 1.12);   // banners ~270-360 px wide
   const items: {y: number; el: React.ReactNode}[] = [];
@@ -152,7 +227,7 @@ export const V2Billboards: React.FC<{t: number; cam: CamState}> = ({t, cam}) => 
     items.push({y: q.y, el: <IconSprite key={'i' + i} name={ic.name} az={ic.az} x={q.x} y={q.y} s={(sizeK / 1.55) * q.s * (ic.size ?? 1)} t={t} from={ic.from} to={ic.to} />});
   });
   items.sort((a, b) => a.y - b.y);
-  return <AbsoluteFill><HomelandDots t={t} cam={cam} /><BalticChain t={t} cam={cam} />{items.map((x) => x.el)}</AbsoluteFill>;
+  return <AbsoluteFill><HomelandDots t={t} cam={cam} /><BalticChain t={t} cam={cam} />{items.map((x) => x.el)}<StarShatter t={t} cam={cam} /></AbsoluteFill>;
 };
 
 // ---------------- curved growing arrows (world space, inside the map SVG) ----------------

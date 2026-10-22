@@ -35,7 +35,7 @@ export type Marker = {city: string; label?: string; sub?: string; from: number; 
 export type Flag = {iso: string; t: number; to?: number; date?: string};
 export type Line = {pts: [number, number][]; from: number; dur: number; to?: number; color: string; width: number; dash?: boolean};
 export type Ring = {at: string; km: number[]; from: number; to?: number};
-export type Card = {kind: 'date' | 'chapter' | 'quote' | 'big' | 'title' | 'strike' | 'end' | 'callout'; text: string; sub?: string; from: number; to: number; num?: string; at?: [number, number]};
+export type Card = {kind: 'date' | 'chapter' | 'quote' | 'big' | 'title' | 'strike' | 'end' | 'callout'; text: string; sub?: string; from: number; to: number; num?: string; at?: [number, number]; pos?: 'tl' | 'tr'};
 export type Portrait = {img: string; name: string; sub?: string; caption?: string; captionFrom?: number; side: 'left' | 'right'; from: number; to: number};
 export type Step = {at: number; s0: number; s1: number; rate?: number};
 export type Clip = {src: string; from: number; to: number; steps: Step[]; kind: 'manim' | 'doll' | 'cauc'};
@@ -64,7 +64,7 @@ const cam = (t: number, v: any, dur = 2.2): CamKey => ({t, dur, ...v});
 
 // ======================= CHUNK 0 : HOOK =======================
 const c0 = {
-  flag: C(0, 'the red flag'), hours: C(0, 'Within hours'), fifteen: C(0, 'fifteen new nations'), strange: C(0, 'But here is'),
+  flag: C(0, 'the red flag'), hours: C(0, 'Within a day'), fifteen: C(0, 'fifteen new nations'), strange: C(0, 'But here is'),
   notBuilt: C(0, 'was not built'), patch: C(0, 'a patchwork'), fiftyThree: C(0, 'fifty-three'), tatar: C(0, 'Tatarstan had'),
   yetEst: C(0, 'yet Estonia'), tatarNot: C(0, 'and Tatarstan did not'), chech: C(0, 'Chechnya would'), why: C(0, 'So why fifteen'),
   twenty: C(0, 'twenty'), fifty: C(0, 'or fifty'), answer: C(0, 'The answer'), title: C(0, 'This is why'), end: ce(0),
@@ -74,9 +74,9 @@ const c1 = {
   s: cs(1), bols: C(1, 'When the Bolsheviks'), broke: C(1, 'briefly broken free'), lenin: C(1, "Lenin's solution"),
   stalin: C(1, 'Ironically, Stalin'), join: C(1, 'join Russia'), overruled: C(1, 'Lenin overruled him'),
   dec30: C(1, 'On December 30th'), rus: tok(1, 'republics, Russia, Ukraine', 1), ukr: tok(1, 'republics, Russia, Ukraine', 2),
-  blr: C(1, 'Belarus and Transcaucasia'), tsf: tok(1, 'Belarus and Transcaucasia', 2), treaty: C(1, 'signed a treaty'),
+  blr: C(1, 'Belarus and Transcaucasia'), tsf: tok(1, 'Belarus and Transcaucasia', 2), treaty: C(1, 'approved a treaty'),
   paper: C(1, 'On paper, it was'), reality: C(1, 'In reality'), top: C(1, 'At the top stood'), inside: C(1, 'Inside them sat'),
-  those: C(1, 'Inside those'), districts: C(1, 'smaller autonomous districts'), y1989: C(1, 'By 1989'),
+  those: C(1, 'Then came autonomous regions'), districts: C(1, 'smaller autonomous districts'), y1989: C(1, 'By 1989'),
   h15: C(1, 'fifteen union republics'), h20: C(1, 'twenty autonomous republics'), h8: C(1, 'eight autonomous regions'),
   h10: C(1, 'ten autonomous districts'), layer: C(1, 'Every layer'), capital: C(1, 'its own capital'),
   shell: C(1, 'But only the outer shell'), constit: C(1, 'The Soviet constitution guaranteed'), decades: C(1, 'For decades'),
@@ -86,24 +86,24 @@ const c1 = {
 const c2 = {
   s: cs(2), uzb: C(2, 'Uzbekistan and Turkmenistan'), tjk: C(2, 'Tajikistan in 1929'), y1936: C(2, 'Then, in 1936'),
   kaz: C(2, 'Kazakhstan and Kyrgyzstan'), tsf: C(2, 'the Transcaucasian republic'), eleven: C(2, 'That made eleven'),
-  asked: C(2, 'Other nations asked'), three: C(2, 'a nation needed three things'), first: C(2, 'First, it had'),
+  asked: C(2, 'When the draft constitution'), three: C(2, 'a nation needed three things'), first: C(2, 'First, it had'),
   afterAll: C(2, 'After all, Stalin argued'), second: C(2, 'Second, its namesake'), third: C(2, 'And third'),
   look: C(2, 'Now look at Tatarstan'), m36: C(2, 'three point six million'), m16: C(2, 'one point six million'),
   proud: C(2, 'A proud history'), deep: C(2, 'deep inside Russia'), rule1: C(2, "By Stalin's first rule"),
-  same: C(2, 'The same was true'), chuv: C(2, 'Chuvashia'), volga: C(2, 'along the Volga'), practice: C(2, 'In practice'),
+  same: C(2, 'Stalin himself used'), chuv: C(2, 'Chuvashia'), volga: C(2, 'of the Volga and Ural'), practice: C(2, 'In practice'),
   kazProm: C(2, 'Kazakhstan was promoted'), kazakhs: C(2, 'Kazakhs no longer'), principle: C(2, 'But the principle was set'), e: ce(2),
 };
 // ======================= CHUNK 3 : SIXTEEN BECOMES FIFTEEN =======================
 const c3 = {
   s: cs(3), moving: C(3, 'The map kept moving'), y1940: C(3, 'In 1940'), est: C(3, 'annexed Estonia'), lva: C(3, 'Latvia and Lithuania'),
-  mda: C(3, 'the Moldavian republic'), kf: C(3, 'Karelo-Finnish'), sixteen: C(3, 'That brought the total'),
+  mda: C(3, 'the Moldavian republic'), strip: C(3, 'joined with a strip'), kf: C(3, 'Karelo-Finnish'), sixteen: C(3, 'That brought the total'),
   finland: C(3, 'But Finland never fell'), y1956: C(3, 'So in 1956'), became: C(3, 'Sixteen became fifteen'),
   y1954: C(3, 'Two years earlier'), crimea: C(3, 'The Crimean peninsula'), transferred: C(3, 'was transferred'),
   detail: C(3, 'At the time'), nobody: C(3, 'Nobody imagined'), intl: C(3, 'international borders'), e: ce(3),
 };
 // ======================= CHUNK 4 : THE COLLAPSE =======================
 const c4 = {
-  s: cs(4), gorby: C(4, 'Mikhail Gorbachev'), sudden: C(4, 'Suddenly'), aug89: C(4, 'In August 1989'), hands: C(4, 'joined hands'),
+  s: cs(4), fifteen0: C(4, 'The fifteen union republics'), gorby: C(4, 'Mikhail Gorbachev'), sudden: C(4, 'Suddenly'), aug89: C(4, 'In August 1989'), hands: C(4, 'joined hands'),
   mar90: C(4, 'On March 11th, 1990'), lith: C(4, 'Lithuania declared'), law: C(4, 'Moscow responded'), refs: C(4, 'demanding referendums'),
   twoThirds: C(4, 'two-thirds majorities'), five: C(4, 'up to five years'), mar91: C(4, 'In March 1991'), six: C(4, 'Six republics refused'),
   aug91: C(4, 'Then, in August 1991'), coup: C(4, 'The coup collapsed'), weeks: C(4, 'Within weeks'), rar: C(4, 'republic after republic'),
@@ -116,7 +116,7 @@ const c5 = {
   s: cs(5), dolls: C(5, 'But what about the dolls inside'), tatar: C(5, 'Tatarstan declared'), sixty: C(5, 'sixty-one percent'),
   noBorder: C(5, 'But with no foreign border'), treaty: C(5, 'special treaty'), chech: C(5, 'Chechnya went further'),
   nov91: C(5, 'In November 1991'), wars: C(5, 'two devastating wars'), again: C(5, 'and again from 1999'), firmly: C(5, 'firmly under'),
-  abkh: C(5, 'Abkhazia, South Ossetia'), sos: tok(5, 'Abkhazia, South Ossetia', 1), nk: C(5, 'Nagorno-Karabakh'), tr: C(5, 'and Transnistria'),
+  abkh: C(5, 'Abkhazia, South Ossetia'), sos: tok(5, 'Abkhazia, South Ossetia', 1), nk: C(5, 'Nagorno-Karabakh'), tr: C(5, 'and Transnistria'), retook: C(5, 'in 2023 Azerbaijan'), dissolved: C(5, 'self-declared republic'),
   none: C(5, 'None of them'), why: C(5, 'Why?'), cis: C(5, 'formed their Commonwealth'), integrity: C(5, 'territorial integrity'),
   uti: C(5, 'uti possidetis juris'), means: C(5, 'which means'), inherit: C(5, 'inherit the borders'), legal: C(5, 'The fifteen union republics had'),
   units: C(5, 'The units inside them'), lines: C(5, 'So the lines drawn'), e: ce(5),
@@ -124,7 +124,7 @@ const c5 = {
 // ======================= CHUNK 6 : CONCLUSION =======================
 const c6 = {
   s: cs(6), lang: C(6, 'language, religion or history'), seams: C(6, 'It broke along the seams'), system: C(6, 'Stalin built a system'),
-  paper: C(6, 'only on paper'), edge: C(6, 'edge of the map'), never: C(6, 'He never imagined'), moment: C(6, 'When the moment came'),
+  paper: C(6, 'only on paper'), edge: C(6, 'edge of the map'), never: C(6, 'They never imagined'), moment: C(6, 'When the moment came'),
   outer: C(6, 'outermost dolls'), why: C(6, 'And that is why'), exactly: C(6, 'exactly fifteen countries'), e: ce(6),
 };
 export const T = {c0, c1, c2, c3, c4, c5, c6};
@@ -169,7 +169,7 @@ export const CAMERA: CamKey[] = [
   cam(c2.practice - 0.2, {lon: 44, lat: 53.5, w: 2600, tilt: 24}, 1.8),         // Moscow decides
   cam(c2.kazProm - 0.2, V.KAZ, 2.2), cam(c2.principle, V.OV, 2.4),
   // chunk 3
-  cam(c3.y1940 - 0.3, V.WEST40, 2.6), cam(c3.kf - 0.3, V.KARELIA, 2.2),
+  cam(c3.y1940 - 0.3, V.WEST40, 2.6), cam(c3.mda - 0.1, {lon: 28.7, lat: 47.3, w: 1200, tilt: 24}, 2.2), cam(c3.kf - 0.3, V.KARELIA, 2.2),
   cam(c3.sixteen + 0.6, {lon: 40, lat: 54, w: 5200, tilt: 12}, 2.2), cam(c3.y1956 - 0.3, {lon: 33, lat: 60, w: 2600, tilt: 22}, 2.0),
   cam(c3.became - 0.2, V.OV, 1.8),
   cam(c3.y1954 - 0.2, V.CRIMEA, 2.8), cam(c3.detail, {lon: 35, lat: 47, w: 1600, tilt: 26}, 2.4), cam(c3.nobody, V.OV, 2.6),
@@ -183,7 +183,7 @@ export const CAMERA: CamKey[] = [
   // chunk 5
   cam(c5.tatar - 0.4, V.VOLGA, 2.6), cam(c5.treaty - 0.2, {lon: 44, lat: 55.6, w: 1800, tilt: 28}, 2.0),
   cam(c5.chech + 2.0, V.CHECH, 0.01), cam(c5.wars + 0.5, {lon: 45.3, lat: 43.0, w: 900, tilt: 34}, 3.0),
-  cam(c5.abkh - 0.4, V.BREAK, 2.6), cam(c5.cis - 0.3, V.OV, 2.6),
+  cam(c5.abkh - 0.4, V.BREAK, 2.6), cam(c5.nk - 0.3, {lon: 46.9, lat: 40.0, w: 900, tilt: 30}, 2.2), cam(c5.none - 0.2, V.BREAK, 1.8), cam(c5.cis - 0.3, V.OV, 2.6),
   cam(c5.legal - 0.2, {x: 4060, y: 2860, w: 9000, tilt: 8, rotK: 0}, 4.0), cam(c5.lines - 0.2, V.OVW, 3.0),
   // chunk 6
   cam(c6.s, V.OV, 1.0), cam(c6.never, {x: 4060, y: 2860, w: 8200, tilt: 8, rotK: 0}, 10),
@@ -259,11 +259,19 @@ export const FILLS: Fill[] = [
   {id: 'rr:Chechnya', color: COL.RED, op: 0.9, from: c5.chech + 9.0, to: c5.abkh, pulse: true},
   {id: 'brk:Abkhazia', color: '#F3F0E8', op: 0.6, from: c5.abkh, to: c5.cis + 1, hatch: true},
   {id: 'brk:South Ossetia', color: '#F3F0E8', op: 0.6, from: c5.sos, to: c5.cis + 1, hatch: true},
-  {id: 'brk:Nagorno-Karabakh', color: '#F3F0E8', op: 0.6, from: c5.nk, to: c5.cis + 1, hatch: true},
+  {id: 'brk:Nagorno-Karabakh', color: '#F3F0E8', op: 0.6, from: c5.nk, to: c5.retook + 1.0, fo: 0.8, hatch: true},
+  {id: 'brk:Nagorno-Karabakh', color: COL.AZE, op: 0.86, from: c5.retook + 0.25, to: c5.cis + 1, fi: 1.0, pulse: true},
+  {id: 'brk:Transnistria', color: COL.UKR, op: 0.9, from: c3.strip - 0.2, to: c3.strip + 1.6, fo: 0.7},
+  {id: 'brk:Transnistria', color: COL.MDA, op: 0.92, from: c3.strip + 1.2, to: c3.kf + 0.4, fi: 0.8},
   {id: 'brk:Transnistria', color: '#F3F0E8', op: 0.6, from: c5.tr, to: c5.cis + 1, hatch: true},
 ];
 
 export const STROKES: Stroke[] = [
+  // v3: borders traced in light the moment each republic is born
+  ...([['rep:UZB', c2.uzb], ['rep:TKM', c2.uzb + 0.45], ['rep:TJK', c2.tjk], ['rep:KAZ', c2.kaz], ['rep:KGZ', c2.kaz + 0.45],
+       ['rep:GEO', c2.tsf + 0.6], ['rep:ARM', c2.tsf + 0.9], ['rep:AZE', c2.tsf + 1.2], ['rep:EST', c3.est], ['rep:LVA', c3.lva],
+       ['rep:LTU', c3.lva + 0.5], ['rep:MDA', c3.mda], ['shape:kfssr', c3.kf], ['brk:Transnistria', c3.strip]] as [string, number][])
+    .map(([id, t0]) => ({id, color: '#FFE9B0', width: 2.6, from: t0, to: t0 + 2.4, draw: 1.5, glow: true} as Stroke)),
   {id: 'shape:ussr_frontier', color: '#FFD98A', width: 3.2, from: c2.first, to: c2.second - 0.2, draw: 2.0, glow: true},
   {id: 'borders', color: '#FF8A3D', width: 2.6, from: c5.lines, to: c5.lines + 3.4, draw: 1.4, glow: true},
   {id: 'borders', color: '#FFF6E0', width: 1.6, from: c5.lines + 3.0, to: ce(5) + 1.0},
@@ -318,8 +326,8 @@ export const LABELS: Label[] = [
   {text: 'Abkhaz ASSR', at: 'brk:Abkhazia', size: 20, from: c1.layer + 0.8, to: c1.shell + 0.8, italic: true},
   {text: 'South Ossetian AO', at: 'brk:South Ossetia', size: 20, from: c1.layer + 1.2, to: c1.shell + 0.8, italic: true},
   {text: 'Nagorno-Karabakh AO', at: 'brk:Nagorno-Karabakh', size: 20, from: c1.layer + 1.6, to: c1.shell + 0.8, italic: true},
-  {text: 'UZBEK SSR', at: 'shape:uzb_1924', size: 26, from: c2.uzb + 0.3, to: c2.tjk, sub: '1924'},
-  {text: 'TURKMEN SSR', at: 'rep:TKM', size: 26, from: c2.uzb + 0.7, to: c2.kaz, sub: '1924'},
+  {text: 'UZBEK SSR', at: 'shape:uzb_1924', size: 26, from: c2.uzb + 0.3, to: c2.tjk, sub: 'created 1924 · joined 1925'},
+  {text: 'TURKMEN SSR', at: 'rep:TKM', size: 26, from: c2.uzb + 0.7, to: c2.kaz, sub: 'created 1924 · joined 1925'},
   {text: 'TAJIK SSR', at: 'rep:TJK', size: 24, from: c2.tjk + 0.3, to: c2.kaz, sub: '1929'},
   {text: 'KAZAKH SSR', at: 'rep:KAZ', size: 34, from: c2.kaz + 0.3, to: c2.eleven + 1.5, sub: '1936'},
   {text: 'KIRGHIZ SSR', at: 'rep:KGZ', size: 24, from: c2.kaz + 0.7, to: c2.eleven + 1.5, sub: '1936'},
@@ -342,7 +350,9 @@ export const LABELS: Label[] = [
   {text: 'CHECHNYA', at: 'rr:Chechnya', size: 30, from: c5.chech + 9.3, to: c5.abkh, sub: '1994–1996 · 1999–2009'},
   {text: 'ABKHAZIA', at: 'brk:Abkhazia', size: 22, from: c5.abkh + 0.2, to: c5.cis},
   {text: 'SOUTH OSSETIA', at: 'brk:South Ossetia', size: 20, from: c5.sos + 0.2, to: c5.cis},
-  {text: 'NAGORNO-KARABAKH', at: 'brk:Nagorno-Karabakh', size: 20, from: c5.nk + 0.2, to: c5.cis, sub: 'until 2023'},
+  {text: 'NAGORNO-KARABAKH', at: 'brk:Nagorno-Karabakh', size: 24, from: c5.nk + 0.2, to: c5.retook + 0.25, sub: 'self-declared republic'},
+  {text: 'NAGORNO-KARABAKH', at: 'brk:Nagorno-Karabakh', size: 24, from: c5.retook + 0.35, to: c5.cis, sub: 'Azerbaijan · since 2023'},
+  {text: 'LEFT BANK OF THE DNIESTER', at: 'brk:Transnistria', size: 18, from: c3.strip + 0.25, to: c3.kf - 0.1, sub: 'from the Ukrainian SSR'},
   {text: 'TRANSNISTRIA', at: 'brk:Transnistria', size: 20, from: c5.tr + 0.2, to: c5.cis},
 ];
 
@@ -395,7 +405,8 @@ export const CARDS: Card[] = [
   {kind: 'chapter', num: 'IV', text: 'THE COLLAPSE', from: cs(4) + 0.1, to: c4.gorby + 0.35},
   {kind: 'date', text: '23 AUGUST 1989', sub: 'THE BALTIC WAY · ~2 MILLION PEOPLE · 675 KM', from: c4.aug89, to: c4.mar90},
   {kind: 'date', text: '11 MARCH 1990', sub: 'LITHUANIA RESTORES INDEPENDENCE', from: c4.mar90, to: c4.law},
-  {kind: 'date', text: '17 MARCH 1991', sub: 'ALL-UNION REFERENDUM · SIX REPUBLICS BOYCOTT', from: c4.mar91, to: c4.aug91},
+  {kind: 'date', text: '17 MARCH 1991', sub: 'ALL-UNION REFERENDUM · SIX REPUBLICS BOYCOTT', from: c4.mar91, to: c4.aug91, pos: 'tr'},
+  {kind: 'date', text: 'SEPTEMBER 2023', sub: 'AZERBAIJAN RETAKES NAGORNO-KARABAKH · REPUBLIC DISSOLVED', from: c5.retook, to: c5.none - 0.1},
   {kind: 'date', text: '19–21 AUGUST 1991', sub: 'THE AUGUST COUP', from: c4.aug91, to: c4.weeks},
   {kind: 'date', text: '6 SEPTEMBER 1991', sub: 'MOSCOW RECOGNIZES THE BALTIC STATES', from: c4.sept, to: c4.dec1},
   {kind: 'date', text: '1 DECEMBER 1991', sub: 'UKRAINIAN INDEPENDENCE REFERENDUM', from: c4.dec1, to: c4.week},
@@ -478,6 +489,7 @@ const V2_SFX: Sfx[] = [
 ];
 const whooshes: Sfx[] = CAMERA.filter((k) => (k.dur ?? 2) > 1.5 && (k.dur ?? 2) <= 3.2 && k.t > 1).map((k, i) => ({f: `whoosh_${(i % 3) + 1}`, t: k.t - 0.15, v: 0.24}));
 export const SFX: Sfx[] = [
+  {f: 'stamp', t: c5.retook + 0.3, v: 0.32}, {f: 'whoosh_2', t: c4.fifteen0 + 0.55, v: 0.32}, {f: 'shimmer', t: c4.fifteen0 + 0.75, v: 0.34},
   ...whooshes,
   ...FLAGS.map((f) => ({f: 'flag_drop', t: f.t + 0.42, v: 0.38})),
   ...CARDS.filter((c) => c.kind === 'chapter').map((c) => ({f: 'boom', t: c.from, v: 0.45})),

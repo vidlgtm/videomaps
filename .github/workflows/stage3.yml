@@ -16,6 +16,9 @@ env:
   S1: https://github.com/${{ github.repository }}/releases/download/stage1
   A2: https://github.com/${{ github.repository }}/releases/download/assets2
   A3: https://github.com/${{ github.repository }}/releases/download/assets3
+  V3: https://github.com/${{ github.repository }}/releases/download/voice3
+  A4: https://github.com/${{ github.repository }}/releases/download/assets4
+  C3: https://github.com/${{ github.repository }}/releases/download/cauc3
   PARTS: ${{ inputs.parts || '20' }}
   TAG: ${{ inputs.tag || 'film_v2' }}
   FA: ${{ inputs.a || '0' }}
@@ -36,8 +39,18 @@ jobs:
         run: |
           set -e
           mkdir -p public/manim public/music public/sfx public/flags public/archive public/icons public/clips
-          for f in voice.wav caucasus.mp4 matryoshka.webm sfx.zip; do curl -sfL --retry 3 -o public/$f "$S1/$f"; done
-          for f in caucasus_labels.json matryoshka_timing.json; do curl -sfL --retry 3 -o src/data/$f "$S1/$f"; done
+          # v3: wait (up to ~5 h) for the v3 assets: assets4 (GitHub) and cauc3 (Kaggle GPU Blender render)
+          for u in "$A4/matryoshka.webm" "$A4/uhd.zip" "$A4/cutouts.zip" "$A4/icons.zip" "$C3/caucasus.mp4"; do
+            for i in $(seq 1 300); do curl -sfIL --retry 2 -o /dev/null "$u" && break; echo "waiting for $u ($i)"; sleep 60; done
+          done
+          curl -sfL --retry 3 -o public/voice.wav "$V3/voice.wav"
+          curl -sfL --retry 3 -o public/sfx.zip "$S1/sfx.zip"
+          curl -sfL --retry 3 -o public/caucasus.mp4 "$C3/caucasus.mp4"
+          curl -sfL --retry 3 -o src/data/caucasus_labels.json "$C3/caucasus_labels.json"
+          curl -sfL --retry 3 -o public/matryoshka.webm "$A4/matryoshka.webm"
+          curl -sfL --retry 3 -o src/data/matryoshka_timing.json "$A4/matryoshka_timing.json"
+          curl -sfL --retry 3 -o src/data/uhd_index.json "$A4/uhd_index.json"
+          curl -sfL --retry 3 -o /tmp/uhd.zip "$A4/uhd.zip" && (cd public && unzip -q -o /tmp/uhd.zip && rm -f uhd/index.json && ls uhd | wc -l)
           for c in c1_hook c2_origins c3_annex c4_collapse c5_resolution; do curl -sfL --retry 3 -o public/music/music_$c.mp3 "$S1/music_$c.mp3"; done
           (cd public/sfx && unzip -q -o ../sfx.zip && rm ../sfx.zip)
           for s in ThreeRules TatarstanEstonia Timeline SecessionLaw UtiPossidetis Hierarchy; do
@@ -50,7 +63,8 @@ jobs:
           ffmpeg -v error -y -i /tmp/globe_night.jpg -vf scale=4096:2048 -q:v 2 public/globe_night_4k.jpg
           (cd public && unzip -q -o /tmp/hd_tiles.zip && rm -f hd/index.json && ls hd | wc -l)
           (cd public/archive && unzip -q -o /tmp/archive.zip && ls | wc -l)
-          if curl -sfL --retry 3 -o /tmp/icons.zip "$A2/icons.zip"; then (cd public/icons && unzip -q -o /tmp/icons.zip); else echo "WARN: icons.zip not published"; fi
+          curl -sfL --retry 3 -o /tmp/cutouts.zip "$A4/cutouts.zip" && (cd public/archive && unzip -q -o /tmp/cutouts.zip && ls -la *_cut.png)
+          if curl -sfL --retry 3 -o /tmp/icons.zip "$A4/icons.zip"; then (cd public/icons && unzip -q -o /tmp/icons.zip); else echo "WARN: v3 icons missing"; exit 1; fi
           for f in article72.mp4 uti.mp4 caucasus2.mp4 caucasus2_labels.json; do curl -sfL --retry 3 -o public/clips/$f "$A2/$f" || echo "WARN: $f missing"; done
           mkdir -p /tmp/s2
           (cd /tmp/s2; python $GITHUB_WORKSPACE/production/pipeline/sfx2.py)
@@ -63,7 +77,7 @@ jobs:
           npm i --no-audit --no-fund --loglevel=error flag-icons@7.6.0 && cp -r node_modules/flag-icons/flags/4x3 public/flags/ && rm -rf node_modules
           for f in archive/sovflag.jpg archive/kazan.jpg archive/tallinn.jpg archive/grozny.jpg archive/const1936.jpg archive/stalin_cut.png \
                    clips/opening.mp4 clips/article72.mp4 clips/uti.mp4 archive/lenin_cut.png archive/gorbachev_cut.png icons/scroll_a270.png \
-                   basemap_v2.jpg hd/t_1_3.jpg sfx/bell_toll.wav sfx/wood_thunk.wav sfx/crowd_bed.wav; do test -s public/$f || { echo "MISSING $f"; exit 1; }; done
+                   basemap_v2.jpg hd/t_1_3.jpg uhd/u_768_3328.jpg sfx/bell_toll.wav sfx/wood_thunk.wav sfx/crowd_bed.wav; do test -s public/$f || { echo "MISSING $f"; exit 1; }; done
           du -sh public; ls public public/icons | head -40
       - id: m
         run: echo "matrix=$(python3 -c "print(list(range(int('${{ env.PARTS }}'))))")" >> $GITHUB_OUTPUT
@@ -130,7 +144,7 @@ jobs:
         run: |
           set -e
           PUB=/tmp/rpub; mkdir -p $PUB/music $PUB/sfx out/audio
-          curl -sfL --retry 3 -o $PUB/voice.wav "$S1/voice.wav"
+          curl -sfL --retry 3 -o $PUB/voice.wav "$V3/voice.wav"
           for c in c1_hook c2_origins c3_annex c4_collapse c5_resolution; do curl -sfL --retry 3 -o $PUB/music/music_$c.mp3 "$S1/music_$c.mp3"; done
           curl -sfL --retry 3 -o /tmp/sfx.zip "$S1/sfx.zip" && (cd $PUB/sfx && unzip -q -o /tmp/sfx.zip)
           mkdir -p /tmp/s2
