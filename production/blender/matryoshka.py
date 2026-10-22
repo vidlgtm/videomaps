@@ -134,15 +134,25 @@ def key(o, f, loc=None, rot=None):
 for d in dolls:
     for o in (d["top"], d["bot"]): key(o, 1, (0, 0, 0), (0, 0, 0))
 for k in range(LEVELS - 1):
-    F = 34 + k * 78; d, nx = dolls[k], dolls[k + 1]; hk = 2.0 * d["s"]; X = xs[k]
+    # v3 choreography - no interpenetration at any frame:
+    # 1) the lid lifts straight up until it clears the head of the seated inner doll,
+    # 2) it parks BEHIND its own base (out of the inner doll's column),
+    # 3) only then the inner doll rises until its base clears the rim, slides right at that height, and lands,
+    # 4) the lid comes back over the now-empty base and closes it.
+    F = 34 + k * 78; d = dolls[k]; s_ = d["s"]; hk = 2.0 * s_; X = xs[k]; wk = width0 * s_
+    lift = SC * hk - cut * s_ + 0.10 * hk
+    back = 1.08 * wk
+    rise = cut * s_ + 0.05 * hk
     key(d["top"], F, (X, 0, 0), (0, 0, 0))
-    key(d["top"], F + 22, (X, 0.08, 0.62 * hk), (math.radians(-10), 0, 0))
+    key(d["top"], F + 14, (X, 0, lift), (0, 0, 0))
+    key(d["top"], F + 30, (X, back, lift + 0.12 * hk), (math.radians(14), 0, 0))
+    key(d["top"], F + 54, (X, back, lift + 0.12 * hk), (math.radians(14), 0, 0))
+    key(d["top"], F + 64, (X, 0, lift), (0, 0, 0))
+    key(d["top"], F + 74, (X, 0, 0), (0, 0, 0))
     for j in range(k + 1, LEVELS):            # the inner doll carries all smaller dolls nested inside it
         for o in (dolls[j]["top"], dolls[j]["bot"]):
-            key(o, F + 16, (X, 0, 0)); key(o, F + 38, (X, 0, 0.52 * hk))
-            key(o, F + 52, (xs[k + 1], 0, 0.30 * hk)); key(o, F + 64, (xs[k + 1], 0, 0))
-    key(d["top"], F + 50, (X, 0.08, 0.62 * hk), (math.radians(-10), 0, 0))
-    key(d["top"], F + 66, (X, 0, 0), (0, 0, 0))
+            key(o, F + 26, (X, 0, 0)); key(o, F + 42, (X, 0, rise))
+            key(o, F + 54, (xs[k + 1], 0, rise)); key(o, F + 62, (xs[k + 1], 0, 0))
 # ---------- camera, lights, shadow catcher ----------
 cam = bpy.data.objects.new("Cam", bpy.data.cameras.new("Cam")); sc.collection.objects.link(cam); sc.camera = cam
 cam.data.lens = 50

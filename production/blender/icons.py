@@ -1,4 +1,4 @@
-"""Render TripoSR meshes as map icons (transparent PNG with a soft contact shadow), 4 azimuths each.
+"""Render TripoSR meshes as map icons (clean transparent PNG, object only), 4 azimuths each.
 usage: blender -b -P icons.py -- <triposr_out_dir> <names_csv> <out_dir>"""
 import bpy, sys, os, math
 from mathutils import Vector
@@ -11,7 +11,7 @@ os.makedirs(OUT, exist_ok=True)
 def setup_scene():
     bpy.ops.wm.read_factory_settings(use_empty=True)
     sc = bpy.context.scene
-    sc.render.engine = "CYCLES"; sc.cycles.device = "CPU"; sc.cycles.samples = 96
+    sc.render.engine = "CYCLES"; sc.cycles.device = "CPU"; sc.cycles.samples = 128
     sc.cycles.use_denoising = True
     sc.render.film_transparent = True
     sc.render.resolution_x = sc.render.resolution_y = 768
@@ -57,8 +57,7 @@ for i, name in enumerate(NAMES):
         hsv = nt.nodes.new("ShaderNodeHueSaturation"); hsv.inputs["Saturation"].default_value = 1.15; hsv.inputs["Value"].default_value = 1.05
         nt.links.new(at.outputs["Color"], hsv.inputs["Color"]); nt.links.new(hsv.outputs["Color"], bsdf.inputs["Base Color"])
     me.materials.clear(); me.materials.append(mat)
-    # shadow catcher ground
-    bpy.ops.mesh.primitive_plane_add(size=30, location=(0, 0, 0)); pl = bpy.context.active_object; pl.is_shadow_catcher = True
+    # v3: no baked ground shadow (it was clipped by the frame -> rectangular shadow); Remotion adds a soft contact shadow
     light("key", (3.5, -3.0, 5.0), 900, 3.0, (1.0, 0.96, 0.9))
     light("fill", (-4.0, -2.0, 2.5), 250, 4.0, (0.85, 0.9, 1.0))
     light("rim", (-1.0, 4.5, 3.5), 450, 2.0)
