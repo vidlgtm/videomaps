@@ -68,7 +68,7 @@ export const ICON_BOX: Record<string, [number, number, number, number]> = {
   ballot_a180: [0.225, 0.164, 0.734, 0.777], ballot_a270: [0.246, 0.202, 0.736, 0.737], kremlin_a180: [0.341, 0.22, 0.638, 0.74],
   kremlin_a270: [0.35, 0.163, 0.645, 0.702], scroll_a180: [0.354, 0.34, 0.674, 0.69], scroll_a270: [0.225, 0.397, 0.766, 0.599],
   swords_a180: [0.352, 0.142, 0.63, 0.79], swords_a270: [0.223, 0.221, 0.781, 0.688], tank_a180: [0.251, 0.339, 0.764, 0.668],
-  tank_a270: [0.219, 0.366, 0.76, 0.633], lodge_a180: [0.255, 0.21, 0.757, 0.773], lodge_a270: [0.23, 0.243, 0.77, 0.664],
+  tank_a270: [0.219, 0.366, 0.76, 0.633], swords_a90: [0.201, 0.197, 0.802, 0.729], lodge_a180: [0.255, 0.21, 0.757, 0.773], lodge_a270: [0.23, 0.243, 0.77, 0.664],
 };
 /** v4: icons are sized by their visible content (the old 190 px box left the tank ~110 px wide) */
 export const ICON_TARGET = 236;
@@ -203,10 +203,17 @@ export function layoutAt(t: number): Layout {
   if (t >= TITLE.from && t <= TITLE.to) add('title', 'title', 100, env(t, TITLE.from, TITLE.to, 0.6, 0.7), B(200, 320, 1720, 700));
   if (t >= CREDITS.from) add('credits', 'credits', 100, clamp((t - CREDITS.from) / 0.8), B(160, 800, 1760, 1034));
   if (t >= STAR.from - 0.1 && t <= STAR.from + 1.3) add('star', 'star', 100, 1, B(790, 285, 1130, 625));
+  // v5: the four dolls of the final line-up (measured on the 1080p frame) and the rows of the level list actually shown
+  const DOLLS: [number, number, number, number][] = [[404, 205, 698, 775], [762, 322, 990, 775], [1051, 414, 1234, 770], [1295, 487, 1442, 769]];
   CLIPS.forEach((c, i) => {
-    if (c.kind === 'doll' && t >= c.from && t <= c.to) add('doll:' + i, 'doll', 100, env(t, c.from, c.to, 0.5, 0.5), B(600, 40, 1320, 1080));
+    if (c.kind === 'doll' && t >= c.from && t <= c.to)
+      DOLLS.forEach((d, k) => add(`doll:${i}.${k}`, 'doll', 100, env(t, c.from, c.to, 0.5, 0.5), B(d[0] + (c.dx ?? 0), d[1], d[2] + (c.dx ?? 0), d[3])));
   });
-  if (DOLL_LABELS.some((d) => t >= d.from && t <= d.to)) add('dollL', 'doll', 100, 1, B(1920 - 110 - 440, 290, 1810, 560));
+  const rows = DOLL_LABELS.filter((d) => t >= d.from && t <= d.to);
+  if (rows.length) {
+    const W = rows.map((d) => 64 + tw(d.text, 30 - 2 * d.k, 0.8)), Wm = Math.max(...W);
+    rows.forEach((d, r) => add(`dollL:${r}`, 'dollL', 100, env(t, d.from, d.to, 0.5, 0.5), B(1810 - Wm, 300 + 72 * r, 1810 - Wm + W[r], 346 + 72 * r)));
+  }
   // map billboards
   const bk = bannerSizeK(cam.zoom);
   BANNERS.forEach((b, i) => {

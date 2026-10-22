@@ -224,9 +224,10 @@ const Billboards: React.FC<{t: number; cam: CamState; fps: number; dec: Dec}> = 
 };
 
 const HD: any = hd;
-/** 4 px per canvas px terrain tiles, faded in above zoom 1 (only tiles in view are mounted) */
+/** 4 px per canvas px terrain tiles, faded in from zoom 0.70 (v5: the basemap alone was soft at the near edge of tilted
+ *  views around zoom 1) - only tiles in view are mounted */
 const HdTiles: React.FC<{cam: CamState}> = ({cam}) => {
-  const o = clamp((cam.zoom - 1.0) / 0.18);
+  const o = clamp((cam.zoom - 0.70) / 0.12);
   if (o <= 0) return null;
   const pts = [[0, 0], [1920, 0], [0, 1080], [1920, 1080], [960, 0]].map(([x, y]) => unproject(cam, x, y));
   const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
@@ -265,7 +266,7 @@ const UhdTiles: React.FC<{cam: CamState}> = ({cam}) => {
 /** v4 sharpness fix: Chrome rasterizes a layer under a CSS perspective at its *layout* size and then stretches it,
  *  so the old `scale(zoom)` transform turned every close-up into an up-scaled blur (HD/UHD tiles and SVG included).
  *  Now the world is laid out at zoom*SS with CSS `zoom` and the 3D transform only rotates/tilts (scale 1/SS). */
-const SS = 1.3;
+const SS = 1.4;   // v5: covers the perspective magnification at the near (bottom) edge of the tilted views
 const worldTransform = (c: CamState, S: number) =>
   `translate(960px,540px) rotateX(${c.tilt}deg) rotateZ(${c.rot}deg) scale(${c.zoom / S}) translate(${-c.x * S}px,${-c.y * S}px)`;
 
@@ -286,8 +287,7 @@ export const MapStage: React.FC<{t: number; lite: boolean; fps: number}> = ({t, 
           </div>
         </div>
       </AbsoluteFill>
-      {/* atmosphere: soft haze toward the receding top edge when tilted */}
-      <AbsoluteFill style={{background: `linear-gradient(180deg, rgba(150,180,200,${0.32 * clamp(cam.tilt / 36)}) 0%, rgba(150,180,200,0) 38%)`}} />
+      {/* v5: no atmospheric haze layer - it washed the top of every tilted view in a whitish fog */}
       <Billboards t={t} cam={cam} fps={fps} dec={dec} />
       <V2Billboards t={t} cam={cam} dec={dec} />
     </AbsoluteFill>

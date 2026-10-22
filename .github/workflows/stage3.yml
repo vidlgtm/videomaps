@@ -20,6 +20,7 @@ env:
   V3: https://github.com/${{ github.repository }}/releases/download/voice4
   A4: https://github.com/${{ github.repository }}/releases/download/assets4
   C3: https://github.com/${{ github.repository }}/releases/download/cauc3
+  T5: https://github.com/${{ github.repository }}/releases/download/tiles5
   PARTS: ${{ inputs.parts || '20' }}
   TAG: ${{ inputs.tag || 'film_v2' }}
   FA: ${{ inputs.a || '0' }}
@@ -42,7 +43,7 @@ jobs:
           set -e
           mkdir -p public/manim public/music public/sfx public/flags public/archive public/icons public/clips
           # v3: wait (up to ~5 h) for the v3 assets: assets4 (GitHub) and cauc3 (Kaggle GPU Blender render)
-          for u in "$A4/matryoshka.webm" "$A4/uhd.zip" "$A4/cutouts.zip" "$A4/icons.zip" "$C3/caucasus.mp4"; do
+          for u in "$A4/matryoshka.webm" "$A4/uhd.zip" "$A4/cutouts.zip" "$A4/icons.zip" "$C3/caucasus.mp4" "$T5/uhd5.zip" "$T5/hd5.zip"; do
             for i in $(seq 1 300); do curl -sfIL --retry 2 -o /dev/null "$u" && break; echo "waiting for $u ($i)"; sleep 60; done
           done
           curl -sfL --retry 3 -o public/voice.wav "$V3/voice.wav"
@@ -51,8 +52,9 @@ jobs:
           curl -sfL --retry 3 -o src/data/caucasus_labels.json "$C3/caucasus_labels.json"
           curl -sfL --retry 3 -o public/matryoshka.webm "$A4/matryoshka.webm"
           curl -sfL --retry 3 -o src/data/matryoshka_timing.json "$A4/matryoshka_timing.json"
-          curl -sfL --retry 3 -o src/data/uhd_index.json "$A4/uhd_index.json"
+          # v5: src/data/uhd_index.json + hd_index.json are committed (assets3/assets4 tiles + the tiles5 additions)
           curl -sfL --retry 3 -o /tmp/uhd.zip "$A4/uhd.zip" && (cd public && unzip -q -o /tmp/uhd.zip && rm -f uhd/index.json && ls uhd | wc -l)
+          curl -sfL --retry 3 -o /tmp/uhd5.zip "$T5/uhd5.zip" && (cd public && unzip -q -o /tmp/uhd5.zip && ls uhd | wc -l)
           for c in c1_hook c2_origins c3_annex c4_collapse c5_resolution; do curl -sfL --retry 3 -o public/music/music_$c.mp3 "$S1/music_$c.mp3"; done
           (cd public/sfx && unzip -q -o ../sfx.zip && rm ../sfx.zip)
           for s in ThreeRules TatarstanEstonia Timeline SecessionLaw UtiPossidetis Hierarchy; do
@@ -64,6 +66,8 @@ jobs:
           mv /tmp/basemap_v2.jpg /tmp/basemap_v2_half.jpg public/
           ffmpeg -v error -y -i /tmp/globe_night.jpg -vf scale=4096:2048 -q:v 2 public/globe_night_4k.jpg
           (cd public && unzip -q -o /tmp/hd_tiles.zip && rm -f hd/index.json && ls hd | wc -l)
+          curl -sfL --retry 3 -o /tmp/hd5.zip "$T5/hd5.zip" && (cd public && unzip -q -o /tmp/hd5.zip && ls hd | wc -l)
+          python3 -c "import json,os,sys; u=json.load(open('src/data/uhd_index.json')); h=json.load(open('src/data/hd_index.json')); m=[f'uhd/u_{x}_{y}.jpg' for x,y in u['tiles'] if not os.path.getsize(f'public/uhd/u_{x}_{y}.jpg')]+[f'hd/t_{i}_{j}.jpg' for i,j in h['tiles'] if not os.path.getsize(f'public/hd/t_{i}_{j}.jpg')]; print('tiles ok', len(u['tiles']), len(h['tiles'])) if not m else sys.exit('MISSING TILES %s' % m)"
           (cd public/archive && unzip -q -o /tmp/archive.zip && ls | wc -l)
           curl -sfL --retry 3 -o /tmp/cutouts.zip "$A4/cutouts.zip" && (cd public/archive && unzip -q -o /tmp/cutouts.zip && ls -la *_cut.png)
           # v3: real signatures (Wikimedia Commons, public domain) for the Belovezha Accords card

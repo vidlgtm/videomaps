@@ -58,9 +58,11 @@ export const BANNERS: Banner[] = [
 ];
 
 // ---------------- 3D icons (TripoSR meshes rendered in Blender) ----------------
+// v5: compact objects (shield, scroll, ballot box) ~160 px on screen at their zoom, landmarks (Kremlin, tank) stay large;
+// the shield shows its front (a90, crossed swords) and the Kremlin its upright view (a270)
 export const ICONS: Icon[] = [
-  {name: 'swords', az: 270, at: [49.2, 42.5], from: h.wars - 0.1, to: h.why - 0.2, size: 1.0},
-  {name: 'kremlin', az: 180, at: [37.62, 55.75], from: h.endUp - 0.1, to: h.why + 0.2, size: 0.95},
+  {name: 'swords', az: 90, at: [49.2, 42.5], from: h.wars - 0.1, to: h.why - 0.2, size: 0.7},
+  {name: 'kremlin', az: 270, at: [37.62, 55.75], from: h.endUp - 0.1, to: h.why + 0.2, size: 0.95},
 ];
 
 export const DOT_SHOWS: DotShow[] = [
@@ -136,7 +138,7 @@ BANNERS.push(
   {at: [25.4, 57.45], img: 'archive/balticway.jpg', title: 'THE BALTIC WAY', sub: '23 August 1989', from: k4.aug89 + 0.4, to: k4.mar90 - 0.25},
   {at: [25.28, 54.69], img: 'archive/lithuania90.jpg', title: 'LITHUANIA', sub: 'Vilnius · 11 March 1990', from: k4.mar90 + 0.2, to: k4.law - 0.25},
   {at: MOSCOW, img: 'archive/tanks91.jpg', title: 'THE AUGUST COUP', sub: 'Moscow · 19–21 August 1991', from: k4.aug91 + 0.3, to: k4.weeks - 0.2},
-  {at: [23.85, 52.62], img: 'archive/viskuli.jpg', title: 'VISKULI', sub: 'Belovezha Forest · 8 Dec 1991', from: k4.week + 0.3, to: k4.dec21 - 0.25},
+  {at: [23.7, 52.52], img: 'archive/viskuli.jpg', title: 'VISKULI', sub: 'Belovezha Forest · 8 Dec 1991', from: k4.week + 0.3, to: k4.dec21 - 0.25},
   {at: [76.95, 43.25], img: 'archive/almaata.jpg', title: 'ALMA-ATA', sub: '21 December 1991', from: k4.dec21 + 0.3, to: k4.four - 0.1},
   {at: [49.12, 55.79], img: 'archive/kazan.jpg', title: 'TATARSTAN', sub: 'sovereignty declared 1990', from: k5.tatar + 0.3, to: k5.chech - 0.4},
   {at: [45.69, 43.32], img: 'archive/grozny.jpg', title: 'CHECHNYA', sub: 'Grozny · wars 1994–96 · 1999–2009', from: k5.chech + 9.5, to: k5.abkh - 0.35},
@@ -144,15 +146,15 @@ BANNERS.push(
   {at: [29.48, 46.83], img: 'archive/bender.jpg', title: 'TRANSNISTRIA', sub: 'Bender · 1992', from: k5.tr + 0.2, to: k5.nk - 0.25},
 );
 ICONS.push(
-  {name: 'scroll', az: 270, at: [44.5, 55.4], from: k1.treaty, to: k1.paper + 3.0, size: 1.1},
-  {name: 'kremlin', az: 180, at: MOSCOW, from: k2.practice + 0.1, to: k2.kazProm - 0.2, size: 1.1},
-  {name: 'ballot', az: 270, at: MOSCOW, from: k4.mar91 + 0.4, to: k4.aug91 - 0.2, size: 1.1},
+  {name: 'scroll', az: 270, at: [44.5, 55.4], from: k1.treaty, to: k1.paper + 3.0, size: 0.8},
+  {name: 'kremlin', az: 270, at: MOSCOW, from: k2.practice + 0.1, to: k2.kazProm - 0.2, size: 1.1},
+  {name: 'ballot', az: 270, at: MOSCOW, from: k4.mar91 + 0.4, to: k4.aug91 - 0.2, size: 0.8},
   {name: 'tank', az: 270, at: [39.5, 54.05], from: k4.aug91 + 0.7, to: k4.weeks - 0.2, size: 1.2},
-  {name: 'ballot', az: 270, at: [30.52, 50.45], from: k4.dec1 + 0.3, to: k4.week - 0.2, size: 1.1},
-  {name: 'scroll', az: 270, at: [52.3, 54.9], from: k5.treaty, to: k5.chech - 0.4, size: 1.1},
-  {name: 'swords', az: 270, at: [48.2, 42.9], from: k5.chech + 9.7, to: k5.abkh - 0.35, size: 1.2},
-  {name: 'swords', az: 270, at: [46.9, 40.35], from: k5.abkh + 0.8, to: k5.cis - 0.3, size: 1.1},
-  {name: 'scroll', az: 270, at: [76.95, 43.25], from: k5.cis + 0.2, to: k5.uti - 0.3, size: 1.1},
+  {name: 'ballot', az: 270, at: [30.52, 50.45], from: k4.dec1 + 0.3, to: k4.week - 0.2, size: 0.76},
+  {name: 'scroll', az: 270, at: [52.3, 54.9], from: k5.treaty, to: k5.chech - 0.4, size: 0.77},
+  {name: 'swords', az: 90, at: [48.2, 42.9], from: k5.chech + 9.7, to: k5.abkh - 0.35, size: 0.62},
+  {name: 'swords', az: 90, at: [46.9, 40.35], from: k5.abkh + 0.8, to: k5.cis - 0.3, size: 0.6},
+  {name: 'scroll', az: 270, at: [76.95, 43.25], from: k5.cis + 0.2, to: k5.uti - 0.3, size: 0.8},
 );
 DOT_SHOWS.push(
   {from: k1.h15 - 0.05, to: k1.layer - 0.3, layers: [0], stagger: 0}, {from: k1.h20 - 0.05, to: k1.layer - 0.3, layers: [1], stagger: 0},

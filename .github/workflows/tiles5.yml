@@ -1,0 +1,34 @@
+name: tiles5
+# v5: terrain tiles the camera path still needed (exact screen-coverage audit, tools/uhd_need.ts):
+# 5 HD cells (terrain2 recipe, hd5.py) + 4 UHD tiles (terrain3) -> release tiles5 (uhd5.zip, hd5.zip, QA sheets)
+on: { workflow_dispatch: {} }
+permissions: { contents: write }
+env:
+  UHD_TILES: '[[0,3328],[256,2304],[1024,4864],[1280,4864]]'
+  HD_CELLS: '[[2,0],[1,1],[5,2],[0,1],[4,1]]'
+jobs:
+  tiles:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: pip install -q numpy scipy pillow requests pyshp
+      - name: UHD tiles (terrain3)
+        run: python -u production/pipeline/terrain3.py
+      - name: HD cells (terrain2 recipe)
+        run: python -u production/pipeline/hd5.py
+      - name: QA sheets + release
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          curl -sfL --retry 3 -o /tmp/hd_tiles.zip "https://github.com/${{ github.repository }}/releases/download/assets3/hd_tiles.zip"
+          curl -sfL --retry 3 -o /tmp/uhd.zip "https://github.com/${{ github.repository }}/releases/download/assets4/uhd.zip"
+          python -u production/pipeline/tiles5_sheet.py
+          test $(ls out/terrain3/uhd/u_*.jpg | wc -l) -eq 4
+          test $(ls out/hd5/hd/t_*.jpg | wc -l) -eq 5
+          (cd out/terrain3 && zip -q -r ../uhd5.zip uhd -x 'uhd/index.json')
+          (cd out/hd5 && zip -q -r ../hd5.zip hd)
+          ls -la out
+          gh release view tiles5 -R ${{ github.repository }} > /dev/null 2>&1 || gh release create tiles5 -R ${{ github.repository }} -t tiles5 -n "v5 terrain additions (screen-coverage audit)"
+          gh release upload tiles5 out/uhd5.zip out/hd5.zip out/hd5_sheet.jpg out/uhd5_sheet.jpg --clobber -R ${{ github.repository }}

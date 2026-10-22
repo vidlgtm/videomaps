@@ -10,7 +10,10 @@ const open = new Map<string, Iv>(), done: Iv[] = [];
 const ignore = (a: Item, b: Item) => {
   if (a.kind === 'name' || b.kind === 'name') return true;                 // names are auto-placed, decluttered at render time
   if (a.id.replace(/^\w+:/, '') === b.id.replace(/^\w+:/, '') && a.kind === b.kind) return true;   // flag + its date, cut-out + its plate
-  if (a.prio === 100 && b.prio === 100) return a.kind === 'doll' || b.kind === 'doll' || a.kind === 'end' || b.kind === 'end';
+  if (a.prio === 100 && b.prio === 100) {
+    if ([a.kind, b.kind].includes('doll') && [a.kind, b.kind].includes('dollL')) return false;   // v5: the doll list vs the dolls
+    return a.kind === 'doll' || b.kind === 'doll' || a.kind === 'end' || b.kind === 'end';
+  }
   return false;
 };
 for (let f = 0; f < N; f += STEP) {

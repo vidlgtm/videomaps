@@ -38,7 +38,7 @@ export type Ring = {at: string; km: number[]; from: number; to?: number};
 export type Card = {kind: 'date' | 'chapter' | 'quote' | 'big' | 'title' | 'strike' | 'end' | 'callout'; text: string; sub?: string; from: number; to: number; num?: string; at?: [number, number]; pos?: 'tl' | 'tr'};
 export type Portrait = {img: string; name: string; sub?: string; caption?: string; captionFrom?: number; side: 'left' | 'right'; from: number; to: number};
 export type Step = {at: number; s0: number; s1: number; rate?: number};
-export type Clip = {src: string; from: number; to: number; steps: Step[]; kind: 'manim' | 'doll' | 'cauc'};
+export type Clip = {src: string; from: number; to: number; steps: Step[]; kind: 'manim' | 'doll' | 'cauc'; dx?: number};
 export type Sfx = {f: string; t: number; v?: number};
 
 // ---------- camera views ----------
@@ -370,7 +370,7 @@ export const MARKERS: Marker[] = [
   {city: 'Stepanakert', from: c1.capital + 0.4, to: c1.shell + 0.8},
   {city: 'Kazan', from: c2.look + 0.5, to: c2.practice + 0.5},
   {city: 'Moscow', label: 'Coup attempt', sub: '19–21 August 1991', from: c4.aug91 + 0.6, to: c4.weeks, pulse: true, color: COL.RED},
-  {city: 'Viskuli', label: 'Viskuli hunting lodge', sub: 'Belovezha Forest', from: c4.lodge - 0.4, to: c4.dec21, pulse: true},
+  {city: 'Viskuli', label: 'Viskuli hunting lodge', sub: 'Belovezha Forest', from: c4.lodge - 0.4, to: c4.dec21, pulse: true, side: 'l'},
   {city: 'Almaty', label: 'Alma-Ata', sub: '21 December 1991', from: c4.dec21 + 0.4, to: c4.four, pulse: true},
   {city: 'Kazan', from: c5.tatar + 0.4, to: c5.chech},
   {city: 'Grozny', from: c5.chech + 9.2, to: c5.abkh},
@@ -430,11 +430,13 @@ export const PORTRAITS: Portrait[] = [];   // v2: archival cut-outs (v2.ts CUTOU
 
 // ======================= VIDEO CLIPS =======================
 const MAN = (s: string) => `manim/${s}.webm`;
+/** v5: the chapter-I line-up is shifted left so the four-level list (right: 110) keeps a clear gap from the smallest doll */
+export const DOLL_DX = -210;
 export const CLIPS: Clip[] = [
   // matryoshka (Hunyuan3D-2 mesh, Blender): idle, then three openings synced to the narration
   {kind: 'doll', src: 'matryoshka.webm', from: c1.reality - 0.2, to: c1.y1989 + 0.4, steps: [
     {at: c1.reality - 0.2, s0: 0, s1: 34 / 30}, {at: c1.inside, s0: 34 / 30, s1: 112 / 30},
-    {at: c1.those, s0: 112 / 30, s1: 190 / 30}, {at: c1.districts, s0: 190 / 30, s1: 330 / 30}]},
+    {at: c1.those, s0: 112 / 30, s1: 190 / 30}, {at: c1.districts, s0: 190 / 30, s1: 330 / 30}], dx: DOLL_DX},
   {kind: 'doll', src: 'matryoshka.webm', from: c5.dolls + 1.45, to: c5.tatar + 0.5, steps: [{at: c5.dolls + 1.45, s0: 320 / 30, s1: 330 / 30}]},
   {kind: 'cauc', src: 'caucasus.mp4', from: c5.chech - 0.3, to: c5.chech + 9.6, steps: [{at: c5.chech - 0.3, s0: 0, s1: 9.9}]},
   // v2: Manim documents (Article 72, uti possidetis) and the Blender flag-lowering callback at the resignation

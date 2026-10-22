@@ -17,7 +17,7 @@ const ClipView: React.FC<{c: Clip; t: number}> = ({c, t}) => {
   const o = env(t, c.from, c.to, c.kind === 'cauc' ? 0.7 : 0.45, 0.6);
   const transparent = c.kind !== 'cauc';
   return (
-    <AbsoluteFill style={{opacity: o}}>
+    <AbsoluteFill style={{opacity: o, transform: c.dx ? `translateX(${c.dx}px)` : undefined}}>
       {c.steps.map((s, i) => {
         const next = i + 1 < c.steps.length ? c.steps[i + 1].at : c.to;
         const from = Math.round(s.at * FPS), dur = Math.max(1, Math.round(next * FPS) - from);

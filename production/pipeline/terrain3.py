@@ -30,6 +30,8 @@ for lon, lat, w, tilt in VIEWS:
         for j in range(int(y0 // T3), int(y1 // T3) + 1):
             tiles.add((i * T3, j * T3))
 tiles = sorted(tiles)
+if os.environ.get("UHD_TILES"):            # v5: explicit list from the screen-coverage audit (tools/uhd_need.ts)
+    tiles = sorted(tuple(t) for t in json.loads(os.environ["UHD_TILES"]))
 print(f"UHD tiles: {len(tiles)}", flush=True)
 
 
@@ -162,6 +164,7 @@ for lon, lat, w, tilt in VIEWS:
     p = f"{OUT3}/uhd/u_{tx}_{ty}.jpg"
     if os.path.exists(p):
         im = Image.open(p); im.thumbnail((640, 640)); th.append(im)
-sheet = Image.new("RGB", (640 * min(3, len(th)), 640 * math.ceil(len(th) / 3)), (20, 20, 20))
-for n, im in enumerate(th): sheet.paste(im, ((n % 3) * 640, (n // 3) * 640))
-sheet.save(f"{OUT3}/uhd_sheet.jpg", quality=88)
+if th:
+    sheet = Image.new("RGB", (640 * min(3, len(th)), 640 * math.ceil(len(th) / 3)), (20, 20, 20))
+    for n, im in enumerate(th): sheet.paste(im, ((n % 3) * 640, (n // 3) * 640))
+    sheet.save(f"{OUT3}/uhd_sheet.jpg", quality=88)
