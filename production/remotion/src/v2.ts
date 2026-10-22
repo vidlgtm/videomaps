@@ -133,7 +133,7 @@ BANNERS.push(
   {at: MOSCOW, img: 'archive/redarmy.jpg', title: 'THE RED ARMY', sub: 'Moscow', from: cs(1) + 3.75, to: k1.broke - 0.4},
   {at: [34.8, 63.6], img: 'archive/gulag.jpg', title: 'THE GULAG', sub: 'White Sea Canal · 1930s', from: k1.any + 0.1, to: k1.words + 2.4},
   {at: [49.12, 55.79], img: 'archive/kazan.jpg', title: 'TATARSTAN', sub: '3.6 million people (1989)', from: k2.look + 0.25, to: k2.same - 0.3},
-  {at: [24.75, 59.44], img: 'archive/tallinn.jpg', title: 'ESTONIA', sub: '1.6 million people (1989)', from: k2.m16 - 0.2, to: k2.deep - 0.3},
+  {at: [24.9, 59.1], img: 'archive/tallinn.jpg', title: 'ESTONIA', sub: '1.6 million people (1989)', from: k2.m16 - 0.2, to: k2.deep - 0.3},
   {at: [29.5, 60.6], img: 'archive/winterwar.jpg', title: 'THE WINTER WAR', sub: 'Soviet-Finnish war · 1939–40', from: k3.kf + 0.3, to: k3.sixteen - 0.2, size: 0.92},
   {at: [25.4, 57.45], img: 'archive/balticway.jpg', title: 'THE BALTIC WAY', sub: '23 August 1989', from: k4.aug89 + 0.4, to: k4.mar90 - 0.25},
   {at: [25.28, 54.69], img: 'archive/lithuania90.jpg', title: 'LITHUANIA', sub: 'Vilnius · 11 March 1990', from: k4.mar90 + 0.2, to: k4.law - 0.25},
@@ -143,7 +143,7 @@ BANNERS.push(
   {at: [49.12, 55.79], img: 'archive/kazan.jpg', title: 'TATARSTAN', sub: 'sovereignty declared 1990', from: k5.tatar + 0.3, to: k5.chech - 0.4},
   {at: [45.69, 43.32], img: 'archive/grozny.jpg', title: 'CHECHNYA', sub: 'Grozny · wars 1994–96 · 1999–2009', from: k5.chech + 9.5, to: k5.abkh - 0.35},
   {at: [41.02, 43.0], img: 'archive/sukhumi.jpg', title: 'ABKHAZIA', sub: 'Sukhumi · parliament burned 1993', from: k5.abkh + 0.3, to: k5.nk - 0.25},
-  {at: [29.48, 46.83], img: 'archive/bender.jpg', title: 'TRANSNISTRIA', sub: 'Bender · 1992', from: k5.tr + 0.2, to: k5.nk - 0.25},
+  {at: [29.6, 46.6], img: 'archive/bender.jpg', title: 'TRANSNISTRIA', sub: 'Bender · 1992', from: k5.tr + 0.2, to: k5.nk - 0.25},
 );
 ICONS.push(
   {name: 'scroll', az: 270, at: [44.5, 55.4], from: k1.treaty, to: k1.paper + 3.0, size: 0.8},
@@ -152,7 +152,7 @@ ICONS.push(
   {name: 'tank', az: 270, at: [39.5, 54.05], from: k4.aug91 + 0.7, to: k4.weeks - 0.2, size: 1.2},
   {name: 'ballot', az: 270, at: [30.52, 50.45], from: k4.dec1 + 0.3, to: k4.week - 0.2, size: 0.76},
   {name: 'scroll', az: 270, at: [52.3, 54.9], from: k5.treaty, to: k5.chech - 0.4, size: 0.77},
-  {name: 'swords', az: 90, at: [48.2, 42.9], from: k5.chech + 9.7, to: k5.abkh - 0.35, size: 0.62},
+  {name: 'swords', az: 90, at: [47.35, 42.65], from: k5.chech + 9.7, to: k5.abkh - 0.35, size: 0.62},
   {name: 'swords', az: 90, at: [46.9, 40.35], from: k5.abkh + 0.8, to: k5.cis - 0.3, size: 0.6},
   {name: 'scroll', az: 270, at: [76.95, 43.25], from: k5.cis + 0.2, to: k5.uti - 0.3, size: 0.8},
 );

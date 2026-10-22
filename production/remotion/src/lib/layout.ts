@@ -76,8 +76,12 @@ export function iconLayout(name: string, az: number, x: number, y: number, s: nu
   const bb = ICON_BOX[`${name}_a${az}`] ?? [0.25, 0.2, 0.75, 0.75];
   const cw = bb[2] - bb[0], ch = bb[3] - bb[1];
   const size = (ICON_TARGET * s) / Math.max(cw, ch * 1.08);      // full PNG square in px
-  const left = x - ((bb[0] + bb[2]) / 2) * size, top = y - bb[3] * size + 0.012 * size;
-  return {size, left, top, cx: x, cw: cw * size, content: B(left + bb[0] * size, top + bb[1] * size, left + bb[2] * size, top + bb[3] * size)};
+  const left = x - ((bb[0] + bb[2]) / 2) * size;
+  // v5: an icon whose base sits near/just below the bottom edge is lifted smoothly (<= 48 px, smoothstep over a 120 px band,
+  // so it never stalls against the map during a pan) and is not cut by the frame
+  const top0 = y - bb[3] * size + 0.012 * size, u = Math.min(1, Math.max(0, (top0 + bb[3] * size - 1020) / 120));
+  const top = top0 - 48 * u * u * (3 - 2 * u);
+  return {size, left, top, cx: x, by: y - (top0 - top), cw: cw * size, content: B(left + bb[0] * size, top + bb[1] * size, left + bb[2] * size, top + bb[3] * size)};
 }
 
 const ASPECT: Record<string, number> = {'archive/const1936.jpg': 1280 / 2106, 'archive/const1936_a13.jpg': 1280 / 2106,

@@ -111,11 +111,11 @@ const IconSprite: React.FC<{name: string; az: number; x: number; y: number; s: n
     const sw = L.cw * 0.86;
     return (
       <div style={{position: 'absolute', left: 0, top: 0, opacity: o}}>
-        <div style={{position: 'absolute', left: x - sw / 2, top: y - sw * 0.07, width: sw, height: sw * 0.14, borderRadius: '50%',
+        <div style={{position: 'absolute', left: x - sw / 2, top: L.by - sw * 0.07, width: sw, height: sw * 0.14, borderRadius: '50%',
           background: 'radial-gradient(ellipse at center, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.25) 45%, rgba(0,0,0,0) 72%)',
           transform: `scale(${Math.max(0, k)})`}} />
         <div style={{position: 'absolute', left: L.left, top: L.top + bob, width: L.size, height: L.size,
-          transformOrigin: `${((x - L.left) / L.size) * 100}% ${((y - L.top) / L.size) * 100}%`, transform: `scale(${Math.max(0, k)})`}}>
+          transformOrigin: `${((x - L.left) / L.size) * 100}% ${((L.by - L.top) / L.size) * 100}%`, transform: `scale(${Math.max(0, k)})`}}>
           <Img src={staticFile(`icons/${name}_a${az}.png`)} style={{position: 'absolute', left: 0, top: 0, width: L.size, height: L.size,
             filter: 'drop-shadow(0 5px 7px rgba(0,0,0,0.38))'}} />
         </div>
