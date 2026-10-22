@@ -11,6 +11,7 @@ argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 arg = lambda k, d=None: argv[argv.index(k) + 1] if k in argv else d
 MD, OUT = arg("--model", "out/model"), arg("--out", "frames")
 START, END = int(arg("--start", 1)), int(arg("--end", 330))
+GPU = arg("--gpu")                            # OPTIX | CUDA | None (CPU)
 FRAMES, LEVELS, SC = 330, 4, 0.79
 SEAM_Y_IMG = 905                      # painted seam row in the reference image
 meta = json.load(open(f"{MD}/meta.json"))
@@ -188,6 +189,19 @@ sc.frame_start, sc.frame_end = 1, FRAMES
 sc.render.fps = 30; sc.render.resolution_x, sc.render.resolution_y = 1920, 1080
 sc.render.film_transparent = True
 sc.render.engine = "CYCLES"; sc.cycles.device = "CPU"
+if GPU:                                       # Kaggle: OptiX first, CUDA fallback, all cards
+    cp = bpy.context.preferences.addons["cycles"].preferences
+    for typ in dict.fromkeys([GPU.upper(), "OPTIX", "CUDA"]):
+        try:
+            cp.compute_device_type = typ; cp.refresh_devices()
+            if any(d.type == typ for d in cp.devices): break
+        except Exception as e: print("gpu backend", typ, "unavailable:", e, flush=True)
+    for d in cp.devices: d.use = d.type == cp.compute_device_type
+    print("GPU devices:", cp.compute_device_type, [d.name for d in cp.devices if d.use], flush=True)
+    if any(d.use for d in cp.devices):
+        sc.cycles.device = "GPU"
+        try: sc.cycles.denoising_use_gpu = True
+        except Exception: pass
 sc.cycles.samples = 48; sc.cycles.use_adaptive_sampling = True; sc.cycles.adaptive_threshold = 0.03
 sc.cycles.use_denoising = True; sc.render.use_persistent_data = True
 sc.view_settings.view_transform = "AgX"
