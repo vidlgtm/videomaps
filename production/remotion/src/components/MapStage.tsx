@@ -1,7 +1,10 @@
 import React from 'react';
 import {AbsoluteFill, Img, staticFile, spring} from 'remotion';
 import geo from '../data/geo.json';
-import {px, project, cssTransform, meridian, KM_PER_PX, WORLD_W, WORLD_H, PERSP, CamState} from '../lib/proj';
+import {px, project, KM_PER_PX, WORLD_W, WORLD_H, PERSP, CamState} from '../lib/proj';
+import {cameraAt as camAt, unproject} from '../lib/camera';
+import {PATHS, anchor} from '../lib/paths';
+import {flagLayout, frameLayout, declutter, Layout} from '../lib/layout';
 import {env, clamp, ease, lerp, prog, easeOut} from '../lib/anim';
 import {CAMERA, CamKey, FILLS, STROKES, LABELS, MARKERS, FLAGS, FLAG_HIDE, LINES, RINGS, ISO15, FLAG_CODE, COL} from '../script';
 import {FONTS} from '../fonts';
@@ -10,75 +13,16 @@ import uhd from '../data/uhd_index.json';
 import {V2Billboards, ArrowsSvg} from './V2';
 
 const G: any = geo;
-type P = {d: string; label: [number, number]; bbox?: number[]};
-export const PATHS: Record<string, P> = {};
-G.republics.forEach((r: any) => (PATHS['rep:' + r.id] = r));
-Object.entries(G.shapes).forEach(([k, v]: any) => (PATHS['shape:' + k] = v));
-G.rus_republics.forEach((r: any) => (PATHS['rr:' + r.id] = r));
-G.breakaway.forEach((r: any) => (PATHS['brk:' + r.id] = r));
-G.rivers.forEach((r: any) => (PATHS['river:' + r.id] = r));
-PATHS['frontier'] = G.shapes.ussr_frontier;
-export const anchor = (id: string | [number, number]): [number, number] =>
-  Array.isArray(id) ? px(id[0], id[1]) : (PATHS[id]?.label as [number, number]) ?? [0, 0];
+export {PATHS, anchor};
+export const cameraAt = camAt;
+type Dec = (id: string) => number;
 
-// ---------------- camera ----------------
-function keyState(k: CamKey): CamState {
-  const [x, y] = k.x !== undefined ? [k.x, k.y as number] : px(k.lon as number, k.lat as number);
-  const zoom = 1920 / (k.w / KM_PER_PX);
-  const rot = k.lon !== undefined ? (k.rotK ?? 0.72) * meridian(k.lon) : 0;
-  return {x, y, zoom, tilt: k.tilt ?? 0, rot};
-}
-const STATES = CAMERA.map(keyState);
-function stateAt(t: number, upto = CAMERA.length - 1): CamState {
-  let i = upto;
-  while (i > 0 && CAMERA[i].t > t) i--;
-  const k = CAMERA[i], to = STATES[i], dur = k.dur ?? 2.2;
-  const drift = (s: CamState, since: number) => ({...s, zoom: s.zoom * (1 + Math.min(0.07, 0.0045 * Math.max(0, since)))});
-  if (i === 0) return drift(to, t - k.t);
-  const from = stateAt(k.t, i - 1);
-  const p = clamp((t - k.t) / dur);
-  if (p >= 1) return drift(to, t - k.t - dur);
-  const e = ease(p);
-  let zoom = Math.exp(lerp(Math.log(from.zoom), Math.log(to.zoom), e));
-  const dist = Math.hypot(to.x - from.x, to.y - from.y) * Math.min(from.zoom, to.zoom);
-  if (dist > 1500) zoom *= 1 - 0.32 * Math.sin(Math.PI * e) * clamp((dist - 1500) / 3000);
-  return {x: lerp(from.x, to.x, e), y: lerp(from.y, to.y, e), zoom, tilt: lerp(from.tilt, to.tilt, e), rot: lerp(from.rot, to.rot, e)};
-}
-/** inverse of project(): screen px -> world px on the map plane */
-function unproject(c: CamState, sx: number, sy: number): [number, number] {
-  const D = Math.PI / 180, r = c.rot * D, tl = c.tilt * D, a = sy - 540;
-  const Y1 = (a * PERSP) / (PERSP * Math.cos(tl) + a * Math.sin(tl));
-  const k = PERSP / (PERSP - Y1 * Math.sin(tl));
-  const X1 = (sx - 960) / k;
-  const X0 = X1 * Math.cos(r) + Y1 * Math.sin(r), Y0 = -X1 * Math.sin(r) + Y1 * Math.cos(r);
-  return [X0 / c.zoom + c.x, Y0 / c.zoom + c.y];
-}
-/** keep the camera inside the basemap canvas: shift, and zoom in if the view is larger than the canvas */
-function clampCam(c: CamState): CamState {
-  let s = {...c};
-  const M = 6;
-  for (let it = 0; it < 6; it++) {
-    const pts = [[-M, -M], [1920 + M, -M], [-M, 1080 + M], [1920 + M, 1080 + M], [960, -M], [960, 1080 + M], [-M, 540], [1920 + M, 540]]
-      .map(([x, y]) => unproject(s, x, y));
-    const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
-    const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
-    const spanX = maxX - minX, spanY = maxY - minY;
-    if (spanX > WORLD_W || spanY > WORLD_H) { s = {...s, zoom: s.zoom * Math.max(spanX / WORLD_W, spanY / WORLD_H) * 1.01}; continue; }
-    let dx = 0, dy = 0;
-    if (minX < 0) dx = -minX; else if (maxX > WORLD_W) dx = WORLD_W - maxX;
-    if (minY < 0) dy = -minY; else if (maxY > WORLD_H) dy = WORLD_H - maxY;
-    if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) break;
-    s = {...s, x: s.x + dx, y: s.y + dy};
-  }
-  return s;
-}
-export const cameraAt = (t: number) => clampCam(stateAt(t));
 
 // ---------------- world layers ----------------
 const pulseK = (t: number) => 0.72 + 0.28 * Math.sin((2 * Math.PI * t) / 1.7);
 const HATCH_COLORS = Array.from(new Set(FILLS.filter((f) => f.hatch).map((f) => f.color)));
 
-const WorldSvg: React.FC<{t: number; cam: CamState}> = ({t, cam}) => {
+const WorldSvg: React.FC<{t: number; cam: CamState; L: Layout; dec: Dec}> = ({t, cam, L, dec}) => {
   const z = cam.zoom;
   const fills = FILLS.map((f, i) => {
     const p = PATHS[f.id];
@@ -146,9 +90,11 @@ const WorldSvg: React.FC<{t: number; cam: CamState}> = ({t, cam}) => {
     );
   });
   const labels = LABELS.map((l, i) => {
-    const o = env(t, l.from, l.to, 0.6, 0.6);
-    if (o <= 0) return null;
-    const [x, y] = anchor(l.at);
+    const o = env(t, l.from, l.to, 0.6, 0.6) * dec('label:' + i);
+    if (o <= 0.004) return null;
+    const [ax, ay] = anchor(l.at);
+    let [x, y] = [ax, ay];
+    if (L.labelDy[i]) { const q = project(cam, ax, ay); [x, y] = unproject(cam, q.x, q.y + L.labelDy[i]); }
     const fs = l.size / z;
     return (
       <g key={'t' + i} opacity={o} transform={`translate(${x},${y}) rotate(${-cam.rot})`}>
@@ -164,6 +110,22 @@ const WorldSvg: React.FC<{t: number; cam: CamState}> = ({t, cam}) => {
             {l.sub}
           </text>
         ) : null}
+      </g>
+    );
+  });
+  // v4: country names (era-correct), engraved serif caps; neighbours in muted italics
+  const names = L.names.map((n) => {
+    const o = n.o * dec(n.id);
+    if (o <= 0.004) return null;
+    const fw = n.fs / (z * n.q.s);
+    return (
+      <g key={n.id} opacity={o} transform={`translate(${n.wx},${n.wy}) rotate(${-cam.rot})`}>
+        <text textAnchor="middle" fontFamily={n.ctx ? FONTS.serif : FONTS.head} fontSize={fw} fontWeight={n.ctx ? 600 : 600}
+          fontStyle={n.ctx ? 'italic' : 'normal'} letterSpacing={`${(n.ctx ? 0.18 : 0.28) * fw}`} y={fw * 0.36}
+          fill={n.ctx ? '#EFE7D3' : '#FBF3DF'} stroke={n.ctx ? 'rgba(18,24,30,0.45)' : 'rgba(24,16,8,0.62)'} strokeWidth={fw * (n.ctx ? 0.07 : 0.1)}
+          paintOrder="stroke" style={{filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))'}}>{n.text}</text>
+        {n.sub ? <text textAnchor="middle" fontFamily={FONTS.head} fontSize={fw * 0.55} fontWeight={700} letterSpacing={`${0.4 * fw * 0.55}`}
+          y={fw * 1.0} fill="#F2E3B8" stroke="rgba(24,16,8,0.6)" strokeWidth={fw * 0.06} paintOrder="stroke">{n.sub}</text> : null}
       </g>
     );
   });
@@ -183,15 +145,13 @@ const WorldSvg: React.FC<{t: number; cam: CamState}> = ({t, cam}) => {
       {rings}
       {lines}
       <ArrowsSvg t={t} z={z} />
+      {names}
       {labels}
     </svg>
   );
 };
 
 // ---------------- billboards (screen space) ----------------
-const OFF: Record<string, [number, number]> = {EST: [-26, -40], LVA: [-52, -6], LTU: [-40, 30], BLR: [-6, 14], MDA: [-30, 26],
-  UKR: [0, 0], GEO: [-34, -10], ARM: [-26, 34], AZE: [30, 26], KGZ: [16, -8], TJK: [-6, 22], TKM: [0, 6], UZB: [6, -6], KAZ: [0, 0], RUS: [0, 0]};
-
 const Flag: React.FC<{iso: string; x: number; y: number; ax: number; ay: number; size: number; drop: number; o: number; date?: string; dateO: number; t: number}> =
   ({iso, x, y, ax, ay, size, drop, o, date, dateO, t}) => {
     const w = 60 * size, h = 45 * size, pole = 72 * size;
@@ -221,27 +181,16 @@ const Flag: React.FC<{iso: string; x: number; y: number; ax: number; ay: number;
     );
   };
 
-const Billboards: React.FC<{t: number; cam: CamState; fps: number}> = ({t, cam, fps}) => {
-  const sizeK = clamp(Math.sqrt(cam.zoom / 0.24), 0.85, 1.6);
-  const hidden = FLAG_HIDE.some(([a, b]) => t > a && t < b);
-  const hideO = FLAG_HIDE.reduce((m, [a, b]) => Math.min(m, 1 - env(t, a, b, 0.6, 0.8)), 1);
-  // latest active entry per iso wins
-  const active: Record<string, any> = {};
-  FLAGS.forEach((f) => { if (t >= f.t - 0.05 && t <= (f.to ?? 1e9)) active[f.iso] = f; });
-  const flags = Object.values(active).map((f: any) => {
-    const [wx, wy] = anchor('rep:' + f.iso);
-    const q = project(cam, wx, wy);
-    if (q.x < -200 || q.x > 2120 || q.y < -100 || q.y > 1300) return null;
-    const ov = cam.zoom < 0.42 ? OFF[f.iso] ?? [0, 0] : [0, 0];
-    const k = clamp((0.42 - cam.zoom) / 0.1);
-    const x = q.x + ov[0] * k * sizeK, y = q.y + ov[1] * k * sizeK;
-    const drop = spring({frame: Math.max(0, (t - f.t) * fps), fps, config: {damping: 11, mass: 0.55, stiffness: 120}});
-    const o = env(t, f.t - 0.05, f.to ?? 1e9, 0.15, 0.6) * (hidden ? hideO : 1);
-    const dateO = env(t, f.t + 0.3, f.t + 3.2, 0.3, 0.6);
-    return <Flag key={f.iso} iso={f.iso} x={x} y={y} ax={q.x} ay={q.y} size={sizeK * q.s} drop={drop} o={o} date={f.date} dateO={dateO} t={t} />;
+const Billboards: React.FC<{t: number; cam: CamState; fps: number; dec: Dec}> = ({t, cam, fps, dec}) => {
+  const flags = flagLayout(t, cam).map((g) => {
+    const drop = spring({frame: Math.max(0, (t - g.f.t) * fps), fps, config: {damping: 11, mass: 0.55, stiffness: 120}});
+    const o = g.o * dec('flag:' + g.iso);
+    if (o <= 0.004) return null;
+    return <Flag key={g.iso} iso={g.iso} x={g.x} y={g.y} ax={g.ax} ay={g.ay} size={g.size} drop={drop} o={o} date={g.f.date}
+      dateO={g.dateO * dec('fdate:' + g.iso)} t={t} />;
   });
   const markers = MARKERS.map((m, i) => {
-    const o = env(t, m.from, m.to, 0.4, 0.5);
+    const o = env(t, m.from, m.to, 0.4, 0.5) * dec('mlab:' + i);
     if (o <= 0) return null;
     const c = G.cities[m.city];
     if (!c) return null;
@@ -255,7 +204,7 @@ const Billboards: React.FC<{t: number; cam: CamState; fps: number}> = ({t, cam, 
           borderRadius: '50%', border: `2px solid ${col}`, opacity: 1 - pr}} /> : null}
         <div style={{position: 'absolute', left: -6, top: -6, width: 12, height: 12, borderRadius: '50%', background: col,
           border: '2px solid #10161c', boxShadow: `0 0 10px ${col}`}} />
-        {m.label || m.sub ? (
+        {m.dot ? null : m.label || m.sub ? (
           <div style={{position: 'absolute', whiteSpace: 'nowrap', top: side === 'b' ? 12 : side === 't' ? -54 : -14,
             left: side === 'r' ? 14 : undefined, right: side === 'l' ? 14 : undefined,
             transform: side === 't' || side === 'b' ? 'translateX(-50%)' : undefined, textAlign: side === 'l' ? 'right' : 'left'}}>
@@ -313,22 +262,34 @@ const UhdTiles: React.FC<{cam: CamState}> = ({cam}) => {
   );
 };
 
+/** v4 sharpness fix: Chrome rasterizes a layer under a CSS perspective at its *layout* size and then stretches it,
+ *  so the old `scale(zoom)` transform turned every close-up into an up-scaled blur (HD/UHD tiles and SVG included).
+ *  Now the world is laid out at zoom*SS with CSS `zoom` and the 3D transform only rotates/tilts (scale 1/SS). */
+const SS = 1.3;
+const worldTransform = (c: CamState, S: number) =>
+  `translate(960px,540px) rotateX(${c.tilt}deg) rotateZ(${c.rot}deg) scale(${c.zoom / S}) translate(${-c.x * S}px,${-c.y * S}px)`;
+
 export const MapStage: React.FC<{t: number; lite: boolean; fps: number}> = ({t, lite, fps}) => {
-  const cam = cameraAt(t);
+  const L = frameLayout(Math.round(t * fps)).L;
+  const dec = declutter(t);
+  const cam = L.cam;
+  const S = cam.zoom * SS;
   return (
     <AbsoluteFill style={{background: '#0c1822', overflow: 'hidden'}}>
       <AbsoluteFill style={{perspective: PERSP, perspectiveOrigin: '960px 540px'}}>
-        <div style={{position: 'absolute', left: 0, top: 0, width: WORLD_W, height: WORLD_H, transformOrigin: '0 0', transform: cssTransform(cam)}}>
-          <Img src={staticFile(lite ? 'basemap_v2_half.jpg' : 'basemap_v2.jpg')} style={{position: 'absolute', left: 0, top: 0, width: WORLD_W, height: WORLD_H}} />
-          {!lite ? <HdTiles cam={cam} /> : null}
-          {!lite ? <UhdTiles cam={cam} /> : null}
-          <WorldSvg t={t} cam={cam} />
+        <div style={{position: 'absolute', left: 0, top: 0, width: WORLD_W, height: WORLD_H, transformOrigin: '0 0', transform: worldTransform(cam, S)}}>
+          <div style={{position: 'absolute', left: 0, top: 0, width: WORLD_W, height: WORLD_H, zoom: S}}>
+            <Img src={staticFile(lite ? 'basemap_v2_half.jpg' : 'basemap_v2.jpg')} style={{position: 'absolute', left: 0, top: 0, width: WORLD_W, height: WORLD_H}} />
+            {!lite ? <HdTiles cam={cam} /> : null}
+            {!lite ? <UhdTiles cam={cam} /> : null}
+            <WorldSvg t={t} cam={cam} L={L} dec={dec} />
+          </div>
         </div>
       </AbsoluteFill>
       {/* atmosphere: soft haze toward the receding top edge when tilted */}
       <AbsoluteFill style={{background: `linear-gradient(180deg, rgba(150,180,200,${0.32 * clamp(cam.tilt / 36)}) 0%, rgba(150,180,200,0) 38%)`}} />
-      <Billboards t={t} cam={cam} fps={fps} />
-      <V2Billboards t={t} cam={cam} />
+      <Billboards t={t} cam={cam} fps={fps} dec={dec} />
+      <V2Billboards t={t} cam={cam} dec={dec} />
     </AbsoluteFill>
   );
 };

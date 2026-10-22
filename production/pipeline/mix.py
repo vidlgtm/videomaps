@@ -50,9 +50,9 @@ for e in d['events']:
     src, s0, dur = e['src'], e['from'] * SPF, e['dur'] * SPF
     is_voice = src == 'voice.wav'
     a = decode(PUB + src, 1) if is_voice else cache.setdefault(src, decode(PUB + src, 2))
-    n = min(dur, len(a), N - s0)
     if src.startswith('music/') and len(a) < dur:
         a = fit(a, dur, src)
+    n = min(dur, len(a), N - s0)          # v4: after fit() - the stretched cue now plays to the end of its slot
     seg = a[:n]
     if e['vols'] is not None:   # per-frame volume -> per-sample, linearly interpolated (smoother than frame steps)
         v = np.asarray(e['vols'], np.float32)

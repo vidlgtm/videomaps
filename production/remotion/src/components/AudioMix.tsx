@@ -5,11 +5,14 @@ import {speechAt} from '../lib/cues';
 import {clamp} from '../lib/anim';
 
 const FPS = 30;
+// v4: speech presence over +-1 s, so the bed stays put through normal sentence pauses (no pumping) and only
+// breathes up (+5 dB max) in real beats such as the title
 const duck = (t: number) => {
   let s = 0;
-  for (let k = -4; k <= 4; k++) s += speechAt(t + k * 0.12);
-  return s / 9;
+  for (let k = -8; k <= 8; k++) s += speechAt(t + k * 0.125);
+  return s / 17;
 };
+const eqp = (x: number) => Math.sin((Math.PI / 2) * clamp(x));   // equal-power fade shape
 export const AudioMix: React.FC = () => (
   <>
     <Audio src={staticFile('voice.wav')} volume={1} />
@@ -20,8 +23,8 @@ export const AudioMix: React.FC = () => (
         <Sequence key={'m' + i} from={from} durationInFrames={dur} layout="none">
           <Audio src={staticFile(m.src)} volume={(f) => {
             const t = m.from + f / FPS;
-            const fade = Math.min(clamp(f / (1.5 * FPS)), clamp((dur - f) / (1.8 * FPS)));
-            return g * (1 + 1.6 * (1 - duck(t))) * fade;
+            const fade = Math.min(eqp(f / ((m.xin ?? 1.5) * FPS)), eqp((dur - f) / ((m.xout ?? 1.8) * FPS)));
+            return g * (1 + 0.8 * Math.pow(1 - duck(t), 1.5)) * fade;
           }} />
         </Sequence>
       );

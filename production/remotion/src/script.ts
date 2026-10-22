@@ -31,8 +31,8 @@ export type CamKey = {t: number; lon?: number; lat?: number; x?: number; y?: num
 export type Fill = {id: string; color: string; op?: number; from: number; to?: number; fi?: number; fo?: number; pulse?: boolean; hatch?: boolean};
 export type Stroke = {id: string; color: string; width: number; from: number; to?: number; draw?: number; dash?: boolean; glow?: boolean; op?: number};
 export type Label = {text: string; at: string | [number, number]; size: number; from: number; to?: number; color?: string; italic?: boolean; spacing?: number; sub?: string};
-export type Marker = {city: string; label?: string; sub?: string; from: number; to?: number; color?: string; pulse?: boolean; side?: 'r' | 'l' | 't' | 'b'};
-export type Flag = {iso: string; t: number; to?: number; date?: string};
+export type Marker = {city: string; label?: string; sub?: string; from: number; to?: number; color?: string; pulse?: boolean; side?: 'r' | 'l' | 't' | 'b'; dot?: boolean};
+export type Flag = {iso: string; t: number; to?: number; date?: string; at?: [number, number]; atUntil?: number};
 export type Line = {pts: [number, number][]; from: number; dur: number; to?: number; color: string; width: number; dash?: boolean};
 export type Ring = {at: string; km: number[]; from: number; to?: number};
 export type Card = {kind: 'date' | 'chapter' | 'quote' | 'big' | 'title' | 'strike' | 'end' | 'callout'; text: string; sub?: string; from: number; to: number; num?: string; at?: [number, number]; pos?: 'tl' | 'tr'};
@@ -318,11 +318,11 @@ export const LABELS: Label[] = [
   {text: 'Black Sea', at: [34.2, 43.1], size: 30, from: h.hours + 0.9, to: h.tatar - 0.4, italic: true},
   {text: 'Caspian Sea', at: [50.6, 41.6], size: 28, from: h.hours + 1.1, to: h.tatar - 0.4, italic: true},
   {text: 'Baltic Sea', at: [19.4, 57.4], size: 26, from: h.hours + 1.3, to: h.tatar - 0.4, italic: true},
-  ...['RUS', 'KAZ', 'UKR', 'UZB', 'TKM', 'BLR'].map((i) => ({text: NAME[i].toUpperCase(), at: `rep:${i}`, size: i === 'RUS' ? 52 : 24, from: h.strange + 0.2, to: h.patch + 0.2} as Label)),
+  ...['RUS', 'KAZ', 'UKR', 'UZB', 'TKM', 'BLR'].map((i) => ({text: NAME[i].toUpperCase(), at: i === 'UZB' ? [66.6, 40.9] : i === 'TKM' ? [57.0, 39.9] : `rep:${i}`, size: i === 'RUS' ? 52 : 24, from: h.strange + 0.2, to: h.patch + 0.2} as Label)),
   {text: 'USSR', at: 'shape:ussr_1938', size: 64, from: c1.dec30, to: c1.reality, spacing: 0.4, sub: '30 December 1922'},
-  {text: 'GEORGIA', at: 'rep:GEO', size: 26, from: c1.layer + 0.3, to: c1.shell + 0.8},
+  {text: 'GEORGIA', at: [42.61, 42.39], size: 26, from: c1.layer + 0.3, to: c1.shell + 0.8},
   {text: 'ARMENIA', at: 'rep:ARM', size: 22, from: c1.layer + 0.3, to: c1.shell + 0.8},
-  {text: 'AZERBAIJAN', at: 'rep:AZE', size: 24, from: c1.layer + 0.3, to: c1.shell + 0.8},
+  {text: 'AZERBAIJAN', at: [48.5, 40.9], size: 24, from: c1.layer + 0.3, to: c1.shell + 0.8},
   {text: 'Abkhaz ASSR', at: 'brk:Abkhazia', size: 20, from: c1.layer + 0.8, to: c1.shell + 0.8, italic: true},
   {text: 'South Ossetian AO', at: 'brk:South Ossetia', size: 20, from: c1.layer + 1.2, to: c1.shell + 0.8, italic: true},
   {text: 'Nagorno-Karabakh AO', at: 'brk:Nagorno-Karabakh', size: 20, from: c1.layer + 1.6, to: c1.shell + 0.8, italic: true},
@@ -340,8 +340,8 @@ export const LABELS: Label[] = [
   {text: 'LATVIA', at: 'rep:LVA', size: 22, from: c3.lva + 0.3, to: c3.kf, sub: '1940'},
   {text: 'LITHUANIA', at: 'rep:LTU', size: 22, from: c3.lva + 0.8, to: c3.kf, sub: '1940'},
   {text: 'MOLDAVIAN SSR', at: 'rep:MDA', size: 22, from: c3.mda + 0.3, to: c3.kf, sub: '1940'},
-  {text: 'KARELO-FINNISH SSR', at: 'shape:kfssr', size: 28, from: c3.kf + 0.3, to: c3.became, sub: '1940–1956'},
-  {text: 'FINLAND', at: [26.0, 63.0], size: 30, from: c3.kf + 0.8, to: c3.y1956, color: '#E8E2D4'},
+  {text: 'KARELO-FINNISH SSR', at: [36.0, 63.9], size: 28, from: c3.kf + 0.3, to: c3.became, sub: '1940–1956'},
+  {text: 'FINLAND', at: [25.2, 64.4], size: 30, from: c3.kf + 0.8, to: c3.y1956, color: '#E8E2D4'},
   {text: 'KARELIAN ASSR', at: 'shape:kfssr', size: 26, from: c3.became + 0.4, to: c3.y1954, sub: 'inside Russia, 1956'},
   {text: 'CRIMEA', at: 'shape:crimea', size: 34, from: c3.crimea, to: c3.detail + 1.5},
   {text: 'LITHUANIA', at: 'rep:LTU', size: 26, from: c4.mar90 + 0.4, to: c4.law},
@@ -357,16 +357,16 @@ export const LABELS: Label[] = [
 ];
 
 export const MARKERS: Marker[] = [
-  {city: 'Moscow', label: 'Moscow', from: h.endUp - 0.1, to: h.why + 0.2},
+  {city: 'Moscow', label: 'Moscow', from: h.endUp - 0.1, to: h.why + 0.2, side: 'b'},
   {city: 'Kyiv', label: 'Ukraine', sub: '1917–1921', from: c1.broke - 0.6, to: c1.lenin + 0.5},
   {city: 'Tbilisi', label: 'Georgia', sub: '1918–1921', from: c1.broke - 0.3, to: c1.lenin + 0.5},
   {city: 'Yerevan', label: 'Armenia', sub: '1918–1920', from: c1.broke, to: c1.lenin + 0.5, side: 'l'},
   {city: 'Baku', label: 'Azerbaijan', sub: '1918–1920', from: c1.broke + 0.3, to: c1.lenin + 0.5},
-  {city: 'Moscow', label: 'Russian SFSR', from: c1.rus, to: c1.reality},
+  {city: 'Moscow', label: 'Russian SFSR', from: c1.rus, to: c1.reality, side: 'l'},
   {city: 'Kharkiv', label: 'Ukrainian SSR', sub: 'capital Kharkiv', from: c1.ukr, to: c1.reality},
   {city: 'Minsk', label: 'Byelorussian SSR', from: c1.blr, to: c1.reality, side: 'l'},
   {city: 'Tbilisi', label: 'Transcaucasian SFSR', from: c1.tsf, to: c1.reality},
-  {city: 'Sukhumi', from: c1.capital, to: c1.shell + 0.8}, {city: 'Tskhinvali', from: c1.capital + 0.2, to: c1.shell + 0.8},
+  {city: 'Sukhumi', from: c1.capital, to: c1.shell + 0.8, dot: true}, {city: 'Tskhinvali', from: c1.capital + 0.2, to: c1.shell + 0.8, dot: true},
   {city: 'Stepanakert', from: c1.capital + 0.4, to: c1.shell + 0.8},
   {city: 'Kazan', from: c2.look + 0.5, to: c2.practice + 0.5},
   {city: 'Moscow', label: 'Coup attempt', sub: '19–21 August 1991', from: c4.aug91 + 0.6, to: c4.weeks, pulse: true, color: COL.RED},
@@ -385,7 +385,7 @@ export const FLAGS: Flag[] = [
   ...ISO15.map((i, k) => ({iso: i, t: h.fifteen + k * 0.13, to: h.strange + 0.3} as Flag)),
   {iso: 'EST', t: h.became - 0.1, to: h.chech - 0.3},
   // 1990-1991
-  {iso: 'LTU', t: c4.lith + 0.2, to: END, date: '11 Mar 1990'},
+  {iso: 'LTU', t: c4.lith + 0.2, to: END, date: '11 Mar 1990', at: [22.21, 55.54], atUntil: c4.law + 0.3},
   ...ORDER.map(([i, d], k) => ({iso: i, t: c4.rar + 0.2 + k * 0.32, to: END, date: d} as Flag)),
   {iso: 'KAZ', t: c4.dec21 + 0.6, to: END, date: '16 Dec 1991'},
   {iso: 'RUS', t: c4.resigned + 0.5, to: END, date: 'successor state'},
@@ -397,22 +397,22 @@ export const CARDS: Card[] = [
   {kind: 'chapter', num: 'I', text: 'THE NESTING DOLL', from: cs(1) + 0.1, to: cs(1) + 3.6},
   {kind: 'date', text: '30 DECEMBER 1922', sub: 'TREATY ON THE CREATION OF THE USSR', from: c1.dec30, to: c1.paper},
   {kind: 'chapter', num: 'II', text: "STALIN'S THREE RULES", from: cs(2) + 0.1, to: cs(2) + 3.6},
-  {kind: 'date', text: '5 DECEMBER 1936', sub: 'THE "STALIN CONSTITUTION"', from: c2.y1936, to: c2.eleven},
+  {kind: 'date', text: '5 DECEMBER 1936', sub: 'THE "STALIN CONSTITUTION"', from: c2.y1936, to: c2.eleven, pos: 'tr'},
   {kind: 'chapter', num: 'III', text: 'SIXTEEN BECOMES FIFTEEN', from: cs(3) + 0.1, to: cs(3) + 3.6},
   {kind: 'date', text: '1940', sub: 'ANNEXATIONS IN THE WEST', from: c3.y1940, to: c3.kf},
   {kind: 'date', text: '16 JULY 1956', sub: 'KARELO-FINNISH SSR DOWNGRADED', from: c3.y1956, to: c3.became + 1.0},
   {kind: 'date', text: '19 FEBRUARY 1954', sub: 'CRIMEA TRANSFERRED TO THE UKRAINIAN SSR', from: c3.y1954 + 0.3, to: c3.detail + 1.0},
   {kind: 'chapter', num: 'IV', text: 'THE COLLAPSE', from: cs(4) + 0.1, to: c4.gorby + 0.35},
-  {kind: 'date', text: '23 AUGUST 1989', sub: 'THE BALTIC WAY · ~2 MILLION PEOPLE · 675 KM', from: c4.aug89, to: c4.mar90},
+  {kind: 'date', text: '23 AUGUST 1989', sub: 'THE BALTIC WAY · ~2 MILLION PEOPLE · 675 KM', from: c4.aug89, to: c4.mar90, pos: 'tr'},
   {kind: 'date', text: '11 MARCH 1990', sub: 'LITHUANIA RESTORES INDEPENDENCE', from: c4.mar90, to: c4.law},
   {kind: 'date', text: '17 MARCH 1991', sub: 'ALL-UNION REFERENDUM · SIX REPUBLICS BOYCOTT', from: c4.mar91, to: c4.aug91, pos: 'tr'},
-  {kind: 'date', text: 'SEPTEMBER 2023', sub: 'AZERBAIJAN RETAKES NAGORNO-KARABAKH · REPUBLIC DISSOLVED', from: c5.retook, to: c5.none - 0.1},
+  {kind: 'date', text: 'SEPTEMBER 2023', sub: 'AZERBAIJAN RETAKES NAGORNO-KARABAKH · REPUBLIC DISSOLVED', from: c5.retook, to: c5.none - 0.1, pos: 'tr'},
   {kind: 'date', text: '19–21 AUGUST 1991', sub: 'THE AUGUST COUP', from: c4.aug91, to: c4.weeks},
   {kind: 'date', text: '6 SEPTEMBER 1991', sub: 'MOSCOW RECOGNIZES THE BALTIC STATES', from: c4.sept, to: c4.dec1},
   {kind: 'date', text: '1 DECEMBER 1991', sub: 'UKRAINIAN INDEPENDENCE REFERENDUM', from: c4.dec1, to: c4.week},
   {kind: 'date', text: '8 DECEMBER 1991', sub: 'BELOVEZHA ACCORDS', from: c4.week, to: c4.dec21},
-  {kind: 'date', text: '21 DECEMBER 1991', sub: 'ALMA-ATA PROTOCOL · 11 REPUBLICS', from: c4.dec21, to: c4.four},
-  {kind: 'date', text: '25 DECEMBER 1991', sub: 'GORBACHEV RESIGNS', from: c4.four, to: c4.shells + 1},
+  {kind: 'date', text: '21 DECEMBER 1991', sub: 'ALMA-ATA PROTOCOL · 11 REPUBLICS', from: c4.dec21, to: c4.four, pos: 'tr'},
+  {kind: 'date', text: '25 DECEMBER 1991', sub: 'GORBACHEV RESIGNS', from: c4.four, to: c4.shells + 1, pos: 'tr'},
   {kind: 'chapter', num: 'V', text: 'THE DOLLS INSIDE', from: c4.e + 1.25, to: c5.dolls + 1.75},
   {kind: 'date', text: '30 AUGUST 1990', sub: 'TATARSTAN DECLARES SOVEREIGNTY', from: c5.tatar, to: c5.sixty},
   {kind: 'date', text: '21 MARCH 1992', sub: 'REFERENDUM · 61.4% FOR SOVEREIGN STATUS', from: c5.sixty, to: c5.treaty},
@@ -454,11 +454,13 @@ export const FLAGPOLE = {from: -10, lower: -9.8, lowered: -9.6, raise: -9.4, to:
 
 // ======================= MUSIC & SFX =======================
 export const MUSIC = [
-  {src: 'music/music_c1_hook.mp3', from: 0, to: cs(1) + 1.5, lufs: -9.5},
-  {src: 'music/music_c2_origins.mp3', from: cs(1) - 0.3, to: ce(2) + 1.6, lufs: -11.3},
-  {src: 'music/music_c3_annex.mp3', from: cs(3) - 0.4, to: ce(3) + 1.6, lufs: -15.3},
-  {src: 'music/music_c4_collapse.mp3', from: cs(4) - 0.4, to: ce(4) + 1.6, lufs: -11.8},
-  {src: 'music/music_c5_resolution.mp3', from: cs(5) - 0.4, to: END, lufs: -9.5},
+  // v4: one continuous bed - each chapter cue crossfades into the next over ~5 s *under the voice* (equal power),
+  // never fading through silence at a chunk join
+  {src: 'music/music_c1_hook.mp3', from: 0, to: cs(1) + 3.0, lufs: -9.5, xin: 1.5, xout: 4.5},
+  {src: 'music/music_c2_origins.mp3', from: cs(1) - 1.5, to: ce(2) + 2.5, lufs: -11.3, xin: 4.5, xout: 5.0},
+  {src: 'music/music_c3_annex.mp3', from: ce(2) - 2.5, to: ce(3) + 2.5, lufs: -15.3, xin: 5.0, xout: 5.0},
+  {src: 'music/music_c4_collapse.mp3', from: ce(3) - 2.5, to: ce(4) + 2.5, lufs: -11.8, xin: 5.0, xout: 5.0},
+  {src: 'music/music_c5_resolution.mp3', from: ce(4) - 2.5, to: END, lufs: -9.5, xin: 5.0, xout: 3.5},
 ];
 // v2 hook Foley (sfx2.py: bell_toll, bell_small, wind_bed, cloth_flap, wood_thunk, war_rumble, forge_hiss, swell)
 const HOOK_SFX: Sfx[] = [

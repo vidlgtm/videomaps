@@ -5,6 +5,7 @@ import {AbsoluteFill, Img, staticFile, spring} from 'remotion';
 import {project, px, CamState, KM_PER_PX} from '../lib/proj';
 import {clamp, env, ease, easeOut, prog, lerp} from '../lib/anim';
 import {FONTS} from '../fonts';
+import {iconLayout, bannerSizeK} from '../lib/layout';
 import {BANNERS, ICONS, DOTS, DOT_COL, DOT_SHOWS, DOCS, CUTOUTS, NUMERALS, ARROWS, TITLE, TAGS, CHAIN, CREDITS, Banner, STAR, STAR_TARGETS, DEPTH_IDS, LIGHTS, CITY_LIGHTS} from '../v2';
 import * as echarts from 'echarts';
 
@@ -100,19 +101,24 @@ export const BannerOnPole: React.FC<{b: Banner; x: number; y: number; s: number;
 };
 
 // ---------------- 3D icon sprite (pops out of the map) ----------------
-const IconSprite: React.FC<{name: string; az: number; x: number; y: number; s: number; t: number; from: number; to: number}> =
-  ({name, az, x, y, s, t, from, to}) => {
+const IconSprite: React.FC<{name: string; az: number; x: number; y: number; s: number; t: number; from: number; to: number; dk?: number}> =
+  ({name, az, x, y, s, t, from, to, dk = 1}) => {
     const k = sp(t, from, {damping: 8, mass: 0.6, stiffness: 150});
-    const o = clamp((t - from) / 0.08) * clamp((to - t) / 0.4);
-    if (o <= 0) return null;
-    const size = 190 * s;
+    const o = clamp((t - from) / 0.08) * clamp((to - t) / 0.4) * dk;
+    if (o <= 0.004) return null;
+    const L = iconLayout(name, az, x, y, s);     // v4: sized by visible content, base on the anchor
     const bob = Math.sin((t - from) * 2.2) * 3 * s;
+    const sw = L.cw * 0.86;
     return (
-      <div style={{position: 'absolute', left: x - size / 2, top: y - size * 0.86 + bob, width: size, height: size, opacity: o,
-        transformOrigin: '50% 86%', transform: `scale(${Math.max(0, k)})`}}>
-        <div style={{position: 'absolute', left: size * 0.24, top: size * 0.86 - size * 0.055, width: size * 0.52, height: size * 0.11, borderRadius: '50%',
-          background: 'radial-gradient(ellipse at center, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.28) 45%, rgba(0,0,0,0) 72%)'}} />
-        <Img src={staticFile(`icons/${name}_a${az}.png`)} style={{position: 'absolute', left: 0, top: 0, width: size, height: size, filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.35))'}} />
+      <div style={{position: 'absolute', left: 0, top: 0, opacity: o}}>
+        <div style={{position: 'absolute', left: x - sw / 2, top: y - sw * 0.07, width: sw, height: sw * 0.14, borderRadius: '50%',
+          background: 'radial-gradient(ellipse at center, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.25) 45%, rgba(0,0,0,0) 72%)',
+          transform: `scale(${Math.max(0, k)})`}} />
+        <div style={{position: 'absolute', left: L.left, top: L.top + bob, width: L.size, height: L.size,
+          transformOrigin: `${((x - L.left) / L.size) * 100}% ${((y - L.top) / L.size) * 100}%`, transform: `scale(${Math.max(0, k)})`}}>
+          <Img src={staticFile(`icons/${name}_a${az}.png`)} style={{position: 'absolute', left: 0, top: 0, width: L.size, height: L.size,
+            filter: 'drop-shadow(0 5px 7px rgba(0,0,0,0.38))'}} />
+        </div>
       </div>
     );
   };
@@ -250,22 +256,24 @@ const CityLights: React.FC<{t: number; cam: CamState}> = ({t, cam}) => {
   );
 };
 
-export const V2Billboards: React.FC<{t: number; cam: CamState}> = ({t, cam}) => {
-  const sizeK = 1.55 * clamp(Math.sqrt(cam.zoom / 1.6), 0.85, 1.12);   // banners ~270-360 px wide
+export const V2Billboards: React.FC<{t: number; cam: CamState; dec?: (id: string) => number}> = ({t, cam, dec = () => 1}) => {
+  const sizeK = bannerSizeK(cam.zoom);   // banners ~270-360 px wide
   const items: {y: number; el: React.ReactNode}[] = [];
   BANNERS.forEach((b, i) => {
     if (t < b.from || t > b.to) return;
     const [wx, wy] = px(b.at[0], b.at[1]);
     const q = project(cam, wx, wy);
     if (!onScreen(q)) return;
-    items.push({y: q.y, el: <BannerOnPole key={'b' + i} b={b} x={q.x} y={q.y} s={sizeK * q.s} t={t} />});
+    const dk = dec('banner:' + i);
+    if (dk <= 0.004) return;
+    items.push({y: q.y, el: <div key={'b' + i} style={{position: 'absolute', left: 0, top: 0, opacity: dk}}><BannerOnPole b={b} x={q.x} y={q.y} s={sizeK * q.s} t={t} /></div>});
   });
   ICONS.forEach((ic, i) => {
     if (t < ic.from || t > ic.to) return;
     const [wx, wy] = px(ic.at[0], ic.at[1]);
     const q = project(cam, wx, wy);
     if (!onScreen(q)) return;
-    items.push({y: q.y, el: <IconSprite key={'i' + i} name={ic.name} az={ic.az} x={q.x} y={q.y} s={(sizeK / 1.55) * q.s * (ic.size ?? 1)} t={t} from={ic.from} to={ic.to} />});
+    items.push({y: q.y, el: <IconSprite key={'i' + i} name={ic.name} az={ic.az} x={q.x} y={q.y} s={(sizeK / 1.55) * q.s * (ic.size ?? 1)} t={t} from={ic.from} to={ic.to} dk={dec('icon:' + i)} />});
   });
   items.sort((a, b) => a.y - b.y);
   return <AbsoluteFill><HomelandDots t={t} cam={cam} /><BalticChain t={t} cam={cam} />{items.map((x) => x.el)}<StarShatter t={t} cam={cam} /><CityLights t={t} cam={cam} /></AbsoluteFill>;

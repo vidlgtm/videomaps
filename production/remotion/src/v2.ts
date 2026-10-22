@@ -1,5 +1,5 @@
 // v2 visual score additions: banners on poles, 3D icons, homeland dots, documents, cut-outs, numerals, arrows, opening.
-import {cue as C, cs} from './lib/cues';
+import {cue as C, cs, ce} from './lib/cues';
 
 export type Banner = {at: [number, number]; img: string; title: string; sub?: string; from: number; to: number; size?: number; lean?: number};
 export type Icon = {name: string; az: number; at: [number, number]; from: number; to: number; size?: number};
@@ -59,7 +59,7 @@ export const BANNERS: Banner[] = [
 
 // ---------------- 3D icons (TripoSR meshes rendered in Blender) ----------------
 export const ICONS: Icon[] = [
-  {name: 'swords', az: 270, at: [48.3, 42.35], from: h.wars - 0.1, to: h.why - 0.2, size: 1.35},
+  {name: 'swords', az: 270, at: [49.2, 42.5], from: h.wars - 0.1, to: h.why - 0.2, size: 1.0},
   {name: 'kremlin', az: 180, at: [37.62, 55.75], from: h.endUp - 0.1, to: h.why + 0.2, size: 0.95},
 ];
 
@@ -132,7 +132,7 @@ BANNERS.push(
   {at: [34.8, 63.6], img: 'archive/gulag.jpg', title: 'THE GULAG', sub: 'White Sea Canal · 1930s', from: k1.any + 0.1, to: k1.words + 2.4},
   {at: [49.12, 55.79], img: 'archive/kazan.jpg', title: 'TATARSTAN', sub: '3.6 million people (1989)', from: k2.look + 0.25, to: k2.same - 0.3},
   {at: [24.75, 59.44], img: 'archive/tallinn.jpg', title: 'ESTONIA', sub: '1.6 million people (1989)', from: k2.m16 - 0.2, to: k2.deep - 0.3},
-  {at: [34.35, 61.79], img: 'archive/winterwar.jpg', title: 'THE WINTER WAR', sub: 'Soviet-Finnish war · 1939–40', from: k3.kf + 0.3, to: k3.sixteen - 0.2},
+  {at: [29.5, 60.6], img: 'archive/winterwar.jpg', title: 'THE WINTER WAR', sub: 'Soviet-Finnish war · 1939–40', from: k3.kf + 0.3, to: k3.sixteen - 0.2, size: 0.92},
   {at: [25.4, 57.45], img: 'archive/balticway.jpg', title: 'THE BALTIC WAY', sub: '23 August 1989', from: k4.aug89 + 0.4, to: k4.mar90 - 0.25},
   {at: [25.28, 54.69], img: 'archive/lithuania90.jpg', title: 'LITHUANIA', sub: 'Vilnius · 11 March 1990', from: k4.mar90 + 0.2, to: k4.law - 0.25},
   {at: MOSCOW, img: 'archive/tanks91.jpg', title: 'THE AUGUST COUP', sub: 'Moscow · 19–21 August 1991', from: k4.aug91 + 0.3, to: k4.weeks - 0.2},
@@ -144,14 +144,14 @@ BANNERS.push(
   {at: [29.48, 46.83], img: 'archive/bender.jpg', title: 'TRANSNISTRIA', sub: 'Bender · 1992', from: k5.tr + 0.2, to: k5.nk - 0.25},
 );
 ICONS.push(
-  {name: 'scroll', az: 270, at: [39.6, 55.2], from: k1.treaty, to: k1.paper + 3.0, size: 1.1},
+  {name: 'scroll', az: 270, at: [44.5, 55.4], from: k1.treaty, to: k1.paper + 3.0, size: 1.1},
   {name: 'kremlin', az: 180, at: MOSCOW, from: k2.practice + 0.1, to: k2.kazProm - 0.2, size: 1.1},
   {name: 'ballot', az: 270, at: MOSCOW, from: k4.mar91 + 0.4, to: k4.aug91 - 0.2, size: 1.1},
   {name: 'tank', az: 270, at: [39.5, 54.05], from: k4.aug91 + 0.7, to: k4.weeks - 0.2, size: 1.2},
   {name: 'ballot', az: 270, at: [30.52, 50.45], from: k4.dec1 + 0.3, to: k4.week - 0.2, size: 1.1},
   {name: 'scroll', az: 270, at: [52.3, 54.9], from: k5.treaty, to: k5.chech - 0.4, size: 1.1},
-  {name: 'swords', az: 270, at: [47.65, 42.1], from: k5.chech + 9.7, to: k5.abkh - 0.35, size: 1.35},
-  {name: 'swords', az: 270, at: [46.75, 39.82], from: k5.abkh + 0.8, to: k5.cis - 0.3, size: 1.1},
+  {name: 'swords', az: 270, at: [48.2, 42.9], from: k5.chech + 9.7, to: k5.abkh - 0.35, size: 1.2},
+  {name: 'swords', az: 270, at: [46.9, 40.35], from: k5.abkh + 0.8, to: k5.cis - 0.3, size: 1.1},
   {name: 'scroll', az: 270, at: [76.95, 43.25], from: k5.cis + 0.2, to: k5.uti - 0.3, size: 1.1},
 );
 DOT_SHOWS.push(
@@ -161,7 +161,7 @@ DOT_SHOWS.push(
 DOCS.push(
   {img: 'archive/treaty1922.jpg', from: k1.treaty - 0.2, to: k1.paper + 3.2, side: 'r', cap: 'TREATY ON THE CREATION OF THE USSR · 1922'},
   {img: 'archive/const1936_a17.jpg', from: k1.constit, to: k1.any - 0.3, side: 'r', cap: 'ARTICLE 17 · “THE RIGHT FREELY TO SECEDE”'},
-  {img: 'archive/const1936.jpg', from: k2.y1936 + 0.2, to: k2.kaz + 4.5, side: 'r', cap: 'THE 1936 CONSTITUTION'},
+  {img: 'archive/const1936.jpg', from: k2.y1936 + 0.2, to: k2.kaz + 4.5, side: 'l', cap: 'THE 1936 CONSTITUTION'},
   {img: 'archive/const1936_a13.jpg', from: k2.eleven + 0.1, to: k2.three - 0.3, side: 'r', cap: 'ARTICLE 13 · ELEVEN UNION REPUBLICS'},
   {img: 'archive/crimea1954.jpg', from: k3.y1954 + 0.6, to: k3.detail + 2.6, side: 'r', cap: '1954 · CRIMEA TRANSFERRED TO THE UKRAINIAN SSR'},
   {img: 'archive/belovezha.jpg', from: k4.lodge + 1.6, to: k4.dec21 - 0.25, side: 'r', cap: 'THE BELOVEZHA ACCORDS · 8 DECEMBER 1991',
@@ -204,7 +204,7 @@ export const CHAIN: Chain = {pts: [[24.75, 59.44], [24.42, 58.9], [24.5, 58.38],
   [24.36, 55.73], [24.76, 55.25], [25.28, 54.69]], from: k4.aug89 + 1.0, dur: 6.5, to: k4.mar90 - 0.2};
 
 // archival credits (CC licences require attribution) — shown under the end card
-export const CREDITS = {from: cs(6) + 36.4, lines: [
+export const CREDITS = {from: ce(6) + 0.1, lines: [
   'Archival images via Wikimedia Commons — Public domain: Lenin (1920) · Stalin · Red Army in Moscow · Treaty on the Creation of the USSR (1922) · White Sea Canal · USSR Constitution (1936) · Winter War · Transfer of Crimea (1954) · Gorbachev (1987)',
   'CC BY-SA 4.0: Kazan Kremlin — Fendes · Baltic Way — Laimonis Stīpnieks · Alma-Ata, 21 Dec 1991 — EgemenMedia   |   CC BY 4.0: Lithuania, 11 Mar 1990 — Paulius Lileikis (Lithuanian Central State Archive) · Bender 1992 — unknown author',
   'CC BY-SA 3.0: Belovezha & Viskuli, 8 Dec 1991 — Yuriy Ivanov / RIA Novosti · Grozny 1995 — Mikhail Evstafiev · Tallinn — Ivar Leidus (CC BY-SA 3.0 EE)   |   CC BY-SA 2.0: Moscow, 20 Aug 1991 — Tove Knutsen · Sukhumi — Clay Gilliland',
@@ -214,8 +214,8 @@ export const CREDITS = {from: cs(6) + 36.4, lines: [
 // ---- v3 additions ----
 // conclusion: "Lenin and Stalin built a system ..." - both founders on screen
 CUTOUTS.push(
-  {img: 'archive/lenin_cut.png', name: 'VLADIMIR LENIN', sub: 'Soviet leader · 1917–1924', from: C(6, 'Lenin and Stalin built') - 0.15, to: C(6, 'and in practice') - 0.1, side: 'l'},
-  {img: 'archive/stalin_cut.png', name: 'JOSEPH STALIN', sub: 'General Secretary · 1922–1952', from: C(6, 'Stalin built a system') - 0.1, to: C(6, 'and in practice') - 0.1, side: 'r'},
+  {img: 'archive/lenin_cut.png', name: 'VLADIMIR LENIN', sub: 'Soviet leader · 1917–1924', from: C(6, 'Lenin and Stalin built') - 0.15, to: C(6, 'only on paper') - 0.55, side: 'l'},
+  {img: 'archive/stalin_cut.png', name: 'JOSEPH STALIN', sub: 'General Secretary · 1922–1952', from: C(6, 'Stalin built a system') - 0.1, to: C(6, 'only on paper') - 0.55, side: 'r'},
 );
 /** climax: the Soviet star shatters into 15 shards, each lands on its republic's capital */
 export const STAR = {from: C(4, 'The fifteen union republics') - 0.15};

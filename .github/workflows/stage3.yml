@@ -10,19 +10,21 @@ on:
       tag: { description: 'release tag', default: 'film_v2' }
       a: { description: 'first frame', default: '0' }
       b: { description: 'last frame (-1 = end of film)', default: '-1' }
+      stills: { description: 'verification stills only: seconds, space separated', default: '' }
 permissions:
   contents: write
 env:
   S1: https://github.com/${{ github.repository }}/releases/download/stage1
   A2: https://github.com/${{ github.repository }}/releases/download/assets2
   A3: https://github.com/${{ github.repository }}/releases/download/assets3
-  V3: https://github.com/${{ github.repository }}/releases/download/voice3
+  V3: https://github.com/${{ github.repository }}/releases/download/voice4
   A4: https://github.com/${{ github.repository }}/releases/download/assets4
   C3: https://github.com/${{ github.repository }}/releases/download/cauc3
   PARTS: ${{ inputs.parts || '20' }}
   TAG: ${{ inputs.tag || 'film_v2' }}
   FA: ${{ inputs.a || '0' }}
   FB: ${{ inputs.b || '-1' }}
+  STILLS: ${{ inputs.stills || '' }}
 jobs:
   prep:
     runs-on: ubuntu-24.04
@@ -129,8 +131,15 @@ jobs:
       - run: sudo rm -f /etc/apt/sources.list.d/microsoft*; sudo apt-get update -qq || true; sudo apt-get install -y -qq ffmpeg > /dev/null && pip install -q numpy pillow
       - name: Render chunk (3 browsers x concurrency 1) + self-check
         working-directory: production/remotion
+        env: { GH_TOKEN: "${{ github.token }}" }
         run: |
           npm i --no-audit --no-fund --loglevel=error
+          if [ -n "$STILLS" ]; then
+            mkdir -p out/stills && node scripts/stills4.mjs out/stills $STILLS && ls -la out/stills
+            gh release delete "$TAG" -y --cleanup-tag 2>/dev/null || true
+            gh release create "$TAG" out/stills/*.jpg --title "$TAG" --notes "verification stills"
+            exit 0
+          fi
           npx remotion bundle src/index.ts --out-dir=build --log=error > /dev/null 2>&1 && npx remotion still build Main /tmp/probe.jpg --frame=0 --scale=0.1 --gl=swangle --log=error > /dev/null 2>&1 \
             && export SERVE=build || export SERVE=src/index.ts
           echo "serve: $SERVE"
@@ -151,6 +160,7 @@ jobs:
           if-no-files-found: ignore
 
   audio:
+    if: ${{ !inputs.stills }}
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     steps:
@@ -191,6 +201,7 @@ jobs:
           retention-days: 5
 
   final:
+    if: ${{ !inputs.stills }}
     needs: [render, audio]
     runs-on: ubuntu-24.04
     timeout-minutes: 360

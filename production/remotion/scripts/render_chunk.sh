@@ -10,7 +10,7 @@ mkdir -p out/sub out/qa out/ref
 N=$((B - A + 1)); SZ=$(( (N + W - 1) / W ))
 
 render_sub() { # i a b
-  npx remotion render "$SERVE" Main out/sub/s_$1.mp4 --frames=$2-$3 --muted --codec=h264 --crf=18 --gl=swangle \
+  npx remotion render "$SERVE" Main out/sub/s_$1.mp4 --frames=$2-$3 --muted --codec=h264 --crf=18 --jpeg-quality=95 --gl=swangle \
     --concurrency=1 --timeout=600000 --log=error > out/sub/log_$1.txt 2>&1 || { echo "render sub $1 failed"; tail -20 out/sub/log_$1.txt; }
 }
 stills_sub() { # i a b
