@@ -22,6 +22,26 @@ def write_wav(name, x):
     subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'f32le', '-ar', str(SR), '-ac', str(ch), '-i', '-',
                     '-c:a', 'pcm_f32le', OUT + name], input=x.tobytes(), check=True)
 
+
+def fit(a, dur, src):
+    """v3: music shorter than its slot (the corrected narration is longer) -> gentle tempo stretch (pitch kept,
+    the musical ending stays at the end); for big gaps a crossfaded loop of the second part"""
+    L = len(a); r = L / dur
+    if r >= 0.82:
+        raw = subprocess.run(['ffmpeg', '-v', 'error', '-i', PUB + src, '-af', f'atempo={r:.6f}', '-f', 'f32le', '-ac', '2',
+                              '-ar', str(SR), '-'], capture_output=True, check=True).stdout
+        b = np.frombuffer(raw, dtype=np.float32).reshape(-1, 2)
+        if len(b) < dur: b = np.concatenate([b, np.zeros((dur - len(b), 2), np.float32)])
+        print(f'FIT {src}: {L / SR:.2f}s -> tempo x{r:.4f} -> {len(b) / SR:.2f}s (slot {dur / SR:.2f}s)')
+        return b
+    xf = 3 * SR; out = a.copy(); seg = a[L // 3:]
+    while len(out) < dur:
+        w = np.linspace(0, 1, xf, dtype=np.float32)[:, None]
+        out[-xf:] = out[-xf:] * (1 - w) + seg[:xf] * w
+        out = np.concatenate([out, seg[xf:]])
+    print(f'FIT {src}: {L / SR:.2f}s looped to {len(out) / SR:.2f}s (slot {dur / SR:.2f}s)')
+    return out
+
 voice = np.zeros(N, np.float32)
 music = np.zeros((N, 2), np.float32)
 sfx = np.zeros((N, 2), np.float32)
@@ -32,7 +52,7 @@ for e in d['events']:
     a = decode(PUB + src, 1) if is_voice else cache.setdefault(src, decode(PUB + src, 2))
     n = min(dur, len(a), N - s0)
     if src.startswith('music/') and len(a) < dur:
-        print(f'WARN {src}: media {len(a) / SR:.2f}s shorter than its slot {dur / SR:.2f}s')
+        a = fit(a, dur, src)
     seg = a[:n]
     if e['vols'] is not None:   # per-frame volume -> per-sample, linearly interpolated (smoother than frame steps)
         v = np.asarray(e['vols'], np.float32)
