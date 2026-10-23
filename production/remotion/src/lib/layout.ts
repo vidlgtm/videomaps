@@ -67,7 +67,7 @@ export function flagLayout(t: number, cam: CamState): FlagL[] {
 
 /** alpha bounding boxes of the Blender icon renders (fractions of the 768 px square) */
 export const ICON_BOX: Record<string, [number, number, number, number]> = {
-  ...(iconBoxGen as unknown as Record<string, [number, number, number, number]>),   // measured at prep (pipeline/measure_assets.py)
+  ...(iconBoxGen as unknown as Record<string, [number, number, number, number]>),   // measured at prep (pipeline/measure_assets.py); 'as unknown' because real measurements are number[] (06 T39)
   ballot_a180: [0.225, 0.164, 0.734, 0.777], ballot_a270: [0.246, 0.202, 0.736, 0.737], kremlin_a180: [0.341, 0.22, 0.638, 0.74],
   kremlin_a270: [0.35, 0.163, 0.645, 0.702], scroll_a180: [0.354, 0.34, 0.674, 0.69], scroll_a270: [0.225, 0.397, 0.766, 0.599],
   swords_a180: [0.352, 0.142, 0.63, 0.79], swords_a270: [0.223, 0.221, 0.781, 0.688], tank_a180: [0.251, 0.339, 0.764, 0.668],
