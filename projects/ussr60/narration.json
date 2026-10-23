@@ -1,0 +1,42 @@
+{
+  "title": "Why the Soviet Union Broke Into Exactly 15 Countries",
+  "voice": "Platform TTS; American English documentary narration",
+  "timing": {"lead": 1.2, "title_gap": 1.6, "gap": 0.85, "tail": 3.4},
+  "paragraphs": [
+    {
+      "id": "01",
+      "scene": "Hook: fifteen states",
+      "text": "On December twenty-fifth, nineteen ninety-one, the red flag fell over the Kremlin. By the next day, the Soviet Union was gone: fifteen states. Why exactly fifteen? The answer was in its map."
+    },
+    {
+      "id": "02",
+      "scene": "1922: the union and its layers",
+      "text": "In nineteen twenty-two, four republics formed the Union: Russia, Ukraine, Belarus, Transcaucasia. The treaty let each leave; smaller autonomous republics had no exit."
+    },
+    {
+      "id": "03",
+      "scene": "1936: the three tests",
+      "text": "In nineteen thirty-six, Stalin set three tests: an external border, a compact titular majority, and over one million people. Tatarstan had more people than Estonia, but no foreign border."
+    },
+    {
+      "id": "04",
+      "scene": "1940–1956: sixteen, then fifteen",
+      "text": "The Baltic republics were annexed in nineteen forty. Karelo-Finnish made sixteen; its nineteen fifty-six demotion restored fifteen, with the constitutional right to secede."
+    },
+    {
+      "id": "05",
+      "scene": "1991: the outer shells leave",
+      "text": "In nineteen ninety-one, fifteen union republics became independent states on Soviet borders. Smaller units had no matching exit. The founders drew the seams that split the Union."
+    }
+  ],
+  "sources": [
+    "Accepted v5 source narration and staging: engine/reference/ussr15/narration.txt, script.ts, v2.ts, and names.ts (chapters 1–5).",
+    "1922 founding republics and treaty right to leave: Declaration and Treaty of Union, 30 December 1922, Michigan State University Seventeen Moments in Soviet History: https://soviethistory.msu.edu/1921/transcaucasia/transcaucasia-texts/formation-of-the-ussr/ ; treaty text: https://en.wikisource.org/wiki/Treaty_on_the_Creation_of_the_Union_of_Soviet_Socialist_Republics",
+    "Union-republic secession clause: 1936 Constitution of the USSR, Article 17: https://www.departments.bucknell.edu/russian/const/36cons01.html",
+    "Stalin's three criteria for promotion to union-republic status, 25 November 1936: https://soviethistory.msu.edu/1936/stalin-constitution/stalin-constitution-texts/stalin-on-the-draft-constitution/",
+    "1989 population comparison for Tatarstan and Estonia: https://realnoevremya.com/articles/6385-population-of-tatarstan-surpasses-4-million-people ; https://countrystudies.us/estonia/8.htm",
+    "Karelo-Finnish SSR status, 1940–1956, including the 1956 reversion: https://www.archontology.org/nations/rus/karelia/01_polity2.php",
+    "Alma-Ata Declaration, 21 December 1991, including the signatories and recognition of existing borders: https://eccis.org/en/page/178",
+    "Declaration No. 142-N of the Soviet of Republics, 26 December 1991: https://ru.wikisource.org/wiki/%D0%94%D0%B5%D0%BA%D0%BB%D0%B0%D1%80%D0%B0%D1%86%D0%B8%D1%8F_%D0%A1%D0%BE%D0%B2%D0%B5%D1%82%D0%B0_%D0%A0%D0%B5%D1%81%D0%BF%D1%83%D0%B1%D0%BB%D0%B8%D0%BA_%D0%92%D0%A1_%D0%A1%D0%A1%D0%A1%D0%A0_%D0%BE%D1%82_December_26,_1991_%E2%84%96_142-%D0%9D"
+  ]
+}
