@@ -1,0 +1,26 @@
+{
+  "name": "south_caucasus_borders",
+  "slug": "SOUTHCAUCASUSBORDERS",
+  "title": "Why the South Caucasus Has So Many Complicated Borders",
+  "scenes": 7,
+  "music": [
+    "music_c1_hook.mp3",
+    "music_c5_resolution.mp3"
+  ],
+  "icons": [
+    {
+      "name": "treaty_scroll",
+      "ref": "icons_ref/treaty_scroll.png"
+    }
+  ],
+  "docs": [],
+  "archive": [],
+  "cutouts": [],
+  "upscale": [],
+  "clips": [],
+  "extra_flags": {
+    "ru": "https://upload.wikimedia.org/wikipedia/commons/f/f3/Flag_of_Russia.svg",
+    "ir": "https://upload.wikimedia.org/wikipedia/commons/c/ca/Flag_of_Iran.svg",
+    "tr": "https://upload.wikimedia.org/wikipedia/commons/b/b4/Flag_of_Turkey.svg"
+  }
+}

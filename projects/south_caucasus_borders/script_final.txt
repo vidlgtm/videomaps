@@ -1,0 +1,47 @@
+TITLE: Why the South Caucasus Has So Many Complicated Borders
+LENGTH (information only): 567 words, about 4 min | CHAPTERS: 5 | MUSIC: c1 opening, c2 imperial contest, c3 treaties, c4 Soviet lines, c5 closing
+
+[01] HOOK
+Three countries fit into the South Caucasus, a corner of the map smaller than many empires once claimed. Yet its borders split valleys, surround enclaves, and turn one river into a national frontier. The region looks like a puzzle. The key is that its lines were drawn in different eras, for different purposes.
+VISUAL: A sweeping move from the Black Sea to the Caspian; Georgia, Armenia, and Azerbaijan appear, followed by border lines emerging like layers of aged parchment.
+
+[02] A MOUNTAIN CROSSROADS
+The Greater Caucasus rises between the Black Sea and the Caspian. South of its crest, the lands now called Georgia, Armenia, and Azerbaijan formed no single political unit. Kingdoms, principalities, and khanates shifted under the influence of neighboring powers. Mountain ridges could divide communities, but valleys and roads connected them. A border drawn across this terrain could never be just a neat line between empty spaces.
+VISUAL: The camera follows the Greater Caucasus before descending into mountain passes; historical city and khanate names appear without implying modern national borders.
+
+[03] TWO TREATIES, A NEW FRONTIER
+In the early nineteenth century, the Russian Empire pushed south while Qajar Iran fought to hold its Caucasian territories. The Treaty of Gulistan, signed in eighteen thirteen after war, confirmed Russian control over a wide stretch of the eastern Caucasus and recognized its authority over Georgia. A second war ended with the Treaty of Turkmenchay in eighteen twenty-eight. Iran ceded the Erivan and Nakhchivan khanates, among other territories. The Aras River became a major imperial boundary. On the map, the change is striking: the Aras now separated Russian-ruled lands to the north from Iran to the south. But this was not yet the border map of three independent countries.
+VISUAL: An animated map compares spheres of control before and after the treaties; an archival seal marks the Aras River frontier, while historical entities retain their period names.
+
+[04] WHEN EMPIRE BROKE APART
+The Russian Empire collapsed in nineteen seventeen. In the upheaval that followed, independent republics emerged in the South Caucasus, but their borders and territorial claims were contested. Armenia and Azerbaijan both claimed areas such as Karabakh; Georgia also faced disputes along its frontiers. These were not simple arguments over lines on a map: they involved local populations, rival governments, war, and outside powers. Then Soviet rule spread across the region. Decisions made by Soviet authorities transformed disputed imperial districts into internal administrative borders.
+VISUAL: The imperial map fractures into three short-lived republics; disputed areas glow without being colored as settled territory. An on-map caption asks: "Who drew this line—and when?"
+
+[05] LINES INSIDE THE SOVIET UNION
+In nineteen twenty-one, the Treaty of Kars set the border between Turkey and the South Caucasus republics, an international frontier that still stands. The same treaty designated Nakhchivan an autonomous territory under Azerbaijan’s protection. In nineteen twenty-three, Nagorno-Karabakh became an autonomous region within Soviet Azerbaijan. Unlike the Kars frontier, that decision drew a line inside one state, not between states. For decades, such internal lines appeared on administrative maps while the region belonged to one union. When that union dissolved, internal boundaries became borders between independent states. The old map had not suddenly changed; its lines had changed meaning.
+VISUAL: The Treaty of Kars document opens onto a map; the Turkish frontier is highlighted as an international border, and Nakhchivan is outlined as an autonomous territory under Azerbaijan. Then Nagorno-Karabakh is marked as an autonomous region within Soviet Azerbaijan, with its boundary drawn as a dashed internal line. Later, the internal boundary changes into an international border.
+
+[06] WHY THE MAP STILL FEELS COMPLICATED
+That is why the South Caucasus can look like a patchwork. Imperial conquest, treaty-making, short-lived independence, and Soviet administration left different layers behind. Nakhchivan is separated from the rest of Azerbaijan by Armenian territory. The Aras still marks much of the frontier between Iran and its northern neighbors. And the borders between Armenia, Azerbaijan, and Georgia reflect decisions made in a landscape where geography, political power, and competing claims met. The puzzle is not one map drawn all at once. It is several maps, made one over another.
+VISUAL: Each historical layer slides over the previous one; Nakhchivan, the Aras River, and present-day borders appear in clear colors, with flags dropping onto the relevant countries. Present-day borders follow internationally recognized lines: Nagorno-Karabakh within Azerbaijan; Abkhazia and South Ossetia within Georgia, marked as disputed.
+
+[07] CLOSING
+Look closely at the South Caucasus and every line asks a different question: Who controlled this land? Which treaty set the boundary? Was it an international border—or an internal Soviet one? The answer changes with the year. And once you see the layers, the region’s complicated borders stop looking random. They become a record of how empires receded, states formed, and administrative lines outlived the system that created them.
+VISUAL: The camera gently pulls back from the details to the full region; the caption "Who drew this line—and when?" returns as historical layers fade in sequence, leaving present-day borders and country names.
+
+CREATIVE TOUCHES: 1) Transparent map layers stack up to embody accumulated history (paragraphs 1, 6). 2) A treaty seal transforms into a border line (paragraph 3). 3) An administrative boundary changes from a dashed line into an international border as the union dissolves (paragraph 5). 4) A recurring on-map question: “Who drew this line—and when?” (paragraphs 4, 7).
+
+SOURCES:
+- Treaty of Gulistan and Russian expansion in Transcaucasia: https://www.britannica.com/topic/Treaty-of-Golestan
+- Treaty of Turkmenchay and the Aras frontier: https://www.britannica.com/topic/Treaty-of-Turkmenchay
+- Russian penetration and Treaty of Gulistan in the Caucasus: https://www.britannica.com/place/history-of-Transcaucasia-602396
+- Nakhchivan, Nagorno-Karabakh, and the Soviet-era republics: https://www.britannica.com/place/Armenia/Modern-Armenia
+- Regional geography and present-day borders: https://www.britannica.com/place/Armenia
+- Border arrangements of the Treaty of Kars (primary treaty text / reference): https://en.wikisource.org/wiki/Treaty_of_Kars
+- Treaty of Gulistan (24 Oct 1813; territories ceded): https://en.wikipedia.org/wiki/Treaty_of_Gulistan
+- Treaty of Turkmenchay (1828; Aras boundary; Erivan and Nakhchivan khanates): https://en.wikipedia.org/wiki/Treaty_of_Turkmenchay
+- Treaty of Kars (13 Oct 1921; Article V on Nakhchivan): https://en.wikipedia.org/wiki/Treaty_of_Kars
+- Nagorno-Karabakh Autonomous Oblast (established 7 July 1923): https://en.wikipedia.org/wiki/Nagorno-Karabakh_Autonomous_Oblast
+- Independence of the three republics in May 1918 and Sovietization: https://en.wikipedia.org/wiki/Soviet_invasion_of_Georgia
+
+RUN PLAN: Film length is free; seven numbered paragraphs become seven narration takes and scenes. Open on a regional map; move chronologically from imperial expansion to Soviet administrative borders and independence; retain borders and country labels throughout; verify scene stills before full render.
