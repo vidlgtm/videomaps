@@ -2,7 +2,7 @@
 import {TOTAL} from './lib/cues';
 import {OFF} from './types';
 import type {CamKey, Fill, Stroke, Label, Marker, Flag, Line, Ring, Card, Portrait, Clip, Sfx, Music, GlobeSpec} from './types';
-import {P, CHAIN, ICONS, BANNERS} from './v2';
+import {P, CHAIN, ICONS, BANNERS, CREDITS} from './v2';
 export type {CamKey, Fill, Stroke, Label, Marker, Flag, Line, Ring, Card, Portrait, Step, Clip, Sfx, Music} from './types';
 
 export const END = TOTAL;
@@ -115,7 +115,6 @@ export const LABELS: Label[] = [
   {text: 'TATARSTAN', at: 'rr:Tatarstan', size: 30, from: p2.tatar + 0.15, to: p2.noFrontier + 0.5},
   {text: 'ESTONIAN SSR', at: 'rep:EST', size: 23, from: p2.estonia + 0.2, to: p2.e + 0.5},
   {text: 'KARELO-FINNISH SSR', at: 'shape:kfssr', size: 25, from: p3.karelo + 0.2, to: p3.demotion + 0.35},
-  ...ISO15.map((iso) => ({text: NAME[iso].toUpperCase(), at: `rep:${iso}`, size: 21, from: p4.fifteen, to: END + 1} as Label)),
 ];
 export const MARKERS: Marker[] = [
   {city: 'Moscow', label: 'Kremlin', sub: '25 DECEMBER 1991', from: p0.fell - 0.2, to: p0.nextDay + 0.3, side: 'r'},
@@ -127,7 +126,7 @@ export const MARKERS: Marker[] = [
 
 // ---------- flags: all fifteen drop onto their countries in the hook and return in the finale ----------
 const openingFlags: Flag[] = ISO15.map((iso, k) => ({iso, t: p0.fifteen + k * 0.12, to: p0.e + 0.45}));
-const finaleFlags: Flag[] = ISO15.map((iso, k) => ({iso, t: p4.fifteen + k * 0.08, to: END + 1}));
+const finaleFlags: Flag[] = ISO15.map((iso, k) => ({iso, t: p4.fifteen + k * 0.08, to: CREDITS.from - 0.2}));
 export const FLAGS: Flag[] = [...openingFlags, ...finaleFlags];
 export const FLAG_HIDE: [number, number][] = [[p1.s - 0.15, p4.s - 0.2]];
 
