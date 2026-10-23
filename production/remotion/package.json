@@ -1,5 +1,5 @@
 {
-  "name": "ussr15-film",
+  "name": "mapfilm-engine",
   "private": true,
   "version": "1.0.0",
   "scripts": {
@@ -9,7 +9,6 @@
   "dependencies": {
     "@react-three/fiber": "8.17.10",
     "@remotion/cli": "4.0.537",
-    "@remotion/google-fonts": "4.0.537",
     "@remotion/three": "4.0.537",
     "echarts": "5.5.1",
     "flag-icons": "7.6.0",

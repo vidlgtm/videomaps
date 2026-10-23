@@ -1,5 +1,6 @@
 """Render TripoSR meshes as map icons (clean transparent PNG, object only), 4 azimuths each.
-usage: blender -b -P icons.py -- <triposr_out_dir> <names_csv> <out_dir>"""
+usage: blender -b -P icons.py -- <triposr_out_dir> <names_csv> <out_dir>   (env CYCLES_GPU=OPTIX on a GPU machine)
+meshes: <triposr_out_dir>/<k>/mesh.obj, k = 0..n-1 in the order of <names_csv>; renders: <out_dir>/<name>_a{0,90,180,270}.png"""
 import bpy, sys, os, math
 from mathutils import Vector
 
@@ -12,6 +13,17 @@ def setup_scene():
     bpy.ops.wm.read_factory_settings(use_empty=True)
     sc = bpy.context.scene
     sc.render.engine = "CYCLES"; sc.cycles.device = "CPU"; sc.cycles.samples = 128
+    gpu = os.environ.get("CYCLES_GPU")           # Kaggle T4: CYCLES_GPU=OPTIX (about 30x the GitHub CPU speed)
+    if gpu:
+        cp = bpy.context.preferences.addons["cycles"].preferences
+        for typ in dict.fromkeys([gpu.upper(), "OPTIX", "CUDA"]):
+            try:
+                cp.compute_device_type = typ; cp.refresh_devices()
+                if any(d.type == typ for d in cp.devices): break
+            except Exception as e: print("gpu backend", typ, "unavailable:", e, flush=True)
+        for d in cp.devices: d.use = d.type == cp.compute_device_type
+        sc.cycles.device = "GPU"; sc.cycles.samples = 256
+        print("GPU devices:", cp.compute_device_type, [d.name for d in cp.devices if d.use], flush=True)
     sc.cycles.use_denoising = True
     sc.render.film_transparent = True
     sc.render.resolution_x = sc.render.resolution_y = 768

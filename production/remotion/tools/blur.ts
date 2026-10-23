@@ -5,7 +5,7 @@
 // usage: npx -y tsx tools/blur.ts [step_s] [threshold]
 import {cameraAt, unproject} from '../src/lib/camera';
 import {px} from '../src/lib/proj';
-import {CLIPS, T} from '../src/script';
+import {CLIPS, END} from '../src/script';
 import {OPENING} from '../src/v2';
 import hd from '../src/data/hd_index.json';
 import uhd from '../src/data/uhd_index.json';
@@ -17,7 +17,6 @@ const hdSet = new Set(HD.tiles.map(([i, j]: number[]) => `${i},${j}`));
 const uhdSet = new Set(UHD.tiles.map(([x, y]: number[]) => `${x},${y}`));
 const clamp = (v: number, a = 0, b = 1) => Math.min(b, Math.max(a, v));
 const step = Number(process.argv[2] ?? 1 / 6), thr = Number(process.argv[3] ?? 1.5);
-const END = (T as any).end ?? (T as any).END ?? 580;
 
 function inv2(J: number[][]) { const d = J[0][0] * J[1][1] - J[0][1] * J[1][0]; return [[J[1][1] / d, -J[0][1] / d], [-J[1][0] / d, J[0][0] / d]]; }
 function maxSing(M: number[][]) {   // largest singular value of a 2x2

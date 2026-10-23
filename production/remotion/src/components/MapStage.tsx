@@ -6,7 +6,7 @@ import {cameraAt as camAt, unproject} from '../lib/camera';
 import {PATHS, anchor} from '../lib/paths';
 import {flagLayout, frameLayout, declutter, Layout} from '../lib/layout';
 import {env, clamp, ease, lerp, prog, easeOut} from '../lib/anim';
-import {CAMERA, CamKey, FILLS, STROKES, LABELS, MARKERS, FLAGS, FLAG_HIDE, LINES, RINGS, ISO15, FLAG_CODE, COL} from '../script';
+import {CAMERA, CamKey, FILLS, STROKES, LABELS, MARKERS, FLAGS, FLAG_HIDE, LINES, RINGS, ISO15, FLAG_CODE, FLAG_ASPECT, COL} from '../script';
 import {FONTS} from '../fonts';
 import hd from '../data/hd_index.json';
 import uhd from '../data/uhd_index.json';
@@ -154,7 +154,7 @@ const WorldSvg: React.FC<{t: number; cam: CamState; L: Layout; dec: Dec}> = ({t,
 // ---------------- billboards (screen space) ----------------
 const Flag: React.FC<{iso: string; x: number; y: number; ax: number; ay: number; size: number; drop: number; o: number; date?: string; dateO: number; t: number}> =
   ({iso, x, y, ax, ay, size, drop, o, date, dateO, t}) => {
-    const w = 60 * size, h = 45 * size, pole = 72 * size;
+    const w = 60 * size, h = w / (FLAG_ASPECT[FLAG_CODE[iso]] ?? 4 / 3), pole = 72 * size;   // kit: true flag proportions (e.g. su = 2:1)
     const fall = (1 - drop) * -320;
     const wave = Math.sin(t * 3.1 + x * 0.05) * 2.2;
     const dl = Math.hypot(x - ax, y - ay), leader = dl > 3, lo = clamp((dl - 3) / 12);   // leader fades in with the displacement

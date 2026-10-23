@@ -4,7 +4,7 @@
 // usage: npx -y tsx tools/uhd_need.ts [out.json]   (prints counts; writes the *missing* tile list)
 import fs from 'fs';
 import {cameraAt, unproject} from '../src/lib/camera';
-import {CLIPS} from '../src/script';
+import {CLIPS, END} from '../src/script';
 import {OPENING} from '../src/v2';
 import hd from '../src/data/hd_index.json';
 import uhd from '../src/data/uhd_index.json';
@@ -12,7 +12,6 @@ import uhd from '../src/data/uhd_index.json';
 const HD: any = hd, UHD: any = uhd, TL = 256;
 const hdSet = new Set(HD.tiles.map(([i, j]: number[]) => `${i},${j}`));
 const have = new Set(UHD.tiles.map(([x, y]: number[]) => `${x},${y}`));
-const END = 580.2;
 const HD_Z0 = Number(process.env.HD_Z0 ?? 0.70), UHD_Z0 = Number(process.env.UHD_Z0 ?? 1.7);
 const clamp = (v: number, a = 0, b = 1) => Math.min(b, Math.max(a, v));
 const opaque = (t: number) => CLIPS.some((c) => c.kind === 'cauc' && t >= c.from + 0.7 && t <= c.to - 0.6);

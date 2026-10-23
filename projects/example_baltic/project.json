@@ -1,0 +1,14 @@
+{
+  "name": "example_baltic",
+  "slug": "BALTICWAY",
+  "title": "The Baltic Way",
+  "scenes": 5,
+  "music": ["music_c1_hook.mp3", "music_c5_resolution.mp3"],
+  "icons": [{"name": "scroll", "ref": "icons_ref/scroll.png"}],
+  "docs": ["pact1939"],
+  "archive": ["balticway"],
+  "cutouts": [],
+  "upscale": [],
+  "clips": [],
+  "extra_flags": {"su": "https://upload.wikimedia.org/wikipedia/commons/a/a9/Flag_of_the_Soviet_Union.svg"}
+}

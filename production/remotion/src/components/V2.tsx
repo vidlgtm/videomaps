@@ -402,7 +402,7 @@ const SMOKE = Array.from({length: 9}, (_, i) => ({x: hash(i, 1) * 1920, y: 300 +
 
 const TitleSmoke: React.FC<{t: number}> = ({t}) => {
   const o = env(t, TITLE.from, TITLE.to, 0.6, 0.7);
-  if (o <= 0) return null;
+  if (o <= 0 || !TITLE.lines.length) return null;
   const tt = t - TITLE.from;
   return (
     <AbsoluteFill style={{opacity: o}}>
@@ -415,8 +415,8 @@ const TitleSmoke: React.FC<{t: number}> = ({t}) => {
       <div style={{position: 'absolute', left: 0, top: 330, width: 1920, textAlign: 'center'}}>
         {TITLE.lines.map((l, i) => {
           const k = easeOut(prog(t, l.from, 0.9));
-          if (t < l.from) return <div key={i} style={{height: i === 2 ? 118 : 92}} />;
-          const big = i === 2;
+          const big = i === TITLE.lines.length - 1;
+          if (t < l.from) return <div key={i} style={{height: big ? 118 : 92}} />;
           const parts = l.hi ? l.text.split(l.hi) : [l.text];
           const hk = l.hiAt !== undefined ? sp(t, l.hiAt, {damping: 9, mass: 0.5, stiffness: 160}) : 1;
           return (
@@ -431,7 +431,7 @@ const TitleSmoke: React.FC<{t: number}> = ({t}) => {
           );
         })}
       </div>
-      <div style={{position: 'absolute', left: 760, width: 400, top: 650, height: 2, opacity: clamp((t - TITLE.lines[2].from) / 0.8),
+      <div style={{position: 'absolute', left: 760, width: 400, top: 650, height: 2, opacity: clamp((t - TITLE.lines[TITLE.lines.length - 1].from) / 0.8),
         background: 'linear-gradient(90deg, rgba(226,191,106,0), rgba(226,191,106,0.9), rgba(226,191,106,0))'}} />
     </AbsoluteFill>
   );

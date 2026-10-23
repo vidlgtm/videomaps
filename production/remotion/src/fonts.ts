@@ -1,8 +1,19 @@
-import {loadFont as cinzel} from '@remotion/google-fonts/Cinzel';
-import {loadFont as inter} from '@remotion/google-fonts/Inter';
-import {loadFont as cormorant} from '@remotion/google-fonts/CormorantGaramond';
-const a = cinzel('normal', {weights: ['400', '600', '700', '800'], subsets: ['latin']});
-const b = inter('normal', {weights: ['400', '500', '600', '700', '800'], subsets: ['latin']});
-const c = cormorant('italic', {weights: ['500', '600'], subsets: ['latin']});
-const c2 = cormorant('normal', {weights: ['500', '700'], subsets: ['latin']});
-export const FONTS = {head: a.fontFamily, body: b.fontFamily, serif: c.fontFamily || c2.fontFamily};
+// Kit fonts are bundled (repo fonts/ -> public/fonts/ at prep) and loaded locally, so a render never depends on
+// Google Fonts being reachable. Families and weights are exactly those of our films: Cinzel (titles, country names),
+// Inter (UI, dates, captions), Cormorant Garamond (italic serif: neighbour names, quotes, places).
+import {continueRender, delayRender, staticFile} from 'remotion';
+
+const FACES: [string, string, string, string][] = [
+  ['Cinzel', 'fonts/Cinzel.ttf', 'normal', '400 900'],
+  ['Inter', 'fonts/Inter.ttf', 'normal', '100 900'],
+  ['Cormorant Garamond', 'fonts/CormorantGaramond.ttf', 'normal', '300 700'],
+  ['Cormorant Garamond', 'fonts/CormorantGaramond-Italic.ttf', 'italic', '300 700'],
+];
+if (typeof document !== 'undefined' && typeof FontFace !== 'undefined') {
+  const handle = delayRender('kit fonts');
+  Promise.all(FACES.map(([family, file, style, weight]) =>
+    new FontFace(family, `url(${staticFile(file)})`, {style, weight}).load().then((f) => (document as any).fonts.add(f))))
+    .then(() => continueRender(handle))
+    .catch((e) => { console.error('font load failed', e); continueRender(handle); });
+}
+export const FONTS = {head: 'Cinzel', body: 'Inter', serif: 'Cormorant Garamond'};

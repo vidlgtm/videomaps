@@ -1,0 +1,430 @@
+name: film
+# ONE project -> ONE film (or verification stills), entirely on GitHub runners. Jobs:
+#   base (terrain basemap + HD tiles + globes; built once per repo -> release "base")
+#   voice (platform-TTS takes in projects/<P>/vo or Kokoro fallback -> matched narration + word timeline + SRT)
+#   plan (type-check, exact tile needs of the camera path) -> tiles (UHD Sentinel-2 + extra HD cells)
+#   icons (TripoSR + Blender, or the Kaggle result in release gpu-<P>) | docs (Manim parchments) | archive (depth, cut-outs)
+#   prep (all assets + quality gate: overlaps, sharpness) -> render (parallel chunks, 3 browsers x 1, self-check) + audio
+#   (offline mix, -14 LUFS master) -> final (frame-exact assembly, 1080p + 720p + SRT + QA sheets -> release TAG)
+on:
+  workflow_dispatch:
+    inputs:
+      project: { description: 'project folder name (projects/<name>)', default: 'example_baltic' }
+      tag: { description: 'release tag for the result', default: 'kit_test_v1' }
+      parts: { description: 'parallel render chunks', default: '12' }
+      stills: { description: 'verification stills only: seconds, space separated (empty = full film)', default: '' }
+      tts: { description: 'auto = platform takes if present, else Kokoro | kokoro = force Kokoro', default: 'auto' }
+      cpu_icons: { description: 'emergency only, with the user OK: 1 = 3D icons on GitHub CPU instead of Kaggle', default: '0' }
+permissions:
+  contents: write
+env:
+  PROJECT: ${{ inputs.project || 'example_baltic' }}
+  TAG: ${{ inputs.tag || 'kit_test_v1' }}
+  PARTS: ${{ inputs.parts || '12' }}
+  STILLS: ${{ inputs.stills || '' }}
+  CPU_ICONS: ${{ inputs.cpu_icons || '0' }}
+  BASE: https://github.com/${{ github.repository }}/releases/download/base
+jobs:
+  base:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - name: tag guard (result tags start with kit_; our production releases are never touched)
+        run: case "$TAG" in kit_*) echo "tag $TAG ok";; *) echo "::error::tag '$TAG' must start with kit_"; exit 1;; esac
+      - uses: actions/checkout@v4
+      - id: chk
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          if gh release view base -R ${{ github.repository }} --json assets -q '.assets[].name' 2>/dev/null | grep -q '^hd_tiles.zip$'; then
+            echo "have=1" >> $GITHUB_OUTPUT; echo "base terrain release exists"; else echo "have=0" >> $GITHUB_OUTPUT; fi
+      - if: steps.chk.outputs.have == '0'
+        uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - if: steps.chk.outputs.have == '0'
+        name: terrain2 (NASA Blue Marble + AWS terrain + Natural Earth, exact canvas of geo.json)
+        run: pip install -q numpy scipy "pillow==11.2.1" requests pyshp && python -u production/pipeline/terrain2.py
+      - if: steps.chk.outputs.have == '0'
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          cd out/terrain && cp hd/index.json hd_index.json && zip -q -r hd_tiles.zip hd -x 'hd/index.json'
+          gh release create base -R ${{ github.repository }} --title "base terrain" --notes "terrain2: basemap, HD tiles, day/night globes" \
+            basemap_v2.jpg basemap_v2_half.jpg globe_night.jpg globe_day.jpg hd_tiles.zip hd_index.json terrain_sheet.jpg \
+            || gh release upload base -R ${{ github.repository }} --clobber basemap_v2.jpg basemap_v2_half.jpg globe_night.jpg globe_day.jpg hd_tiles.zip hd_index.json terrain_sheet.jpg
+
+  voice:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: |
+          sudo rm -f /etc/apt/sources.list.d/microsoft*; sudo apt-get update -q || true
+          sudo apt-get install -y -q ffmpeg rubberband-cli espeak-ng > /dev/null
+          pip install -q torch==2.5.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cpu
+          pip install -q soundfile num2words "numpy<2.3" scipy pyloudnorm pyworld
+      - name: Fallback TTS (Kokoro-82M) only when the project has no platform takes
+        run: |
+          if [ "${{ inputs.tts }}" = "kokoro" ] || ! ls projects/$PROJECT/vo/vo_* > /dev/null 2>&1; then
+            rm -rf projects/$PROJECT/vo
+            pip install -q "kokoro>=0.9.4" && python -u production/pipeline/tts_kokoro.py
+          else echo "platform takes: $(ls projects/$PROJECT/vo)"; fi
+      - run: python -u production/pipeline/voice_master.py
+      - uses: actions/upload-artifact@v4
+        with: { name: voice, path: out/align, retention-days: 5 }
+
+  plan:
+    needs: [base, voice]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    outputs:
+      uhd: ${{ steps.need.outputs.uhd }}
+      hd: ${{ steps.need.outputs.hd }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: voice, path: out/align }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - id: need
+        run: |
+          set -e
+          bash production/ci/use_project.sh $PROJECT
+          cp out/align/timeline.json production/remotion/src/data/timeline.json
+          curl -sfL --retry 3 -o production/remotion/src/data/hd_index.json "$BASE/hd_index.json"
+          cd production/remotion && npm ci --no-audit --no-fund --loglevel=error
+          npx tsc --noEmit -p .
+          node -e "const t=require('./src/data/timeline.json'); console.log('FILM LENGTH', t.total.toFixed(2), 's,', t.words.length, 'words')"
+          npx -y tsx tools/uhd_need.ts /tmp/need.json | tee /tmp/need.txt
+          echo "uhd=$(python3 -c "import json; print(json.dumps(json.load(open('/tmp/need.json'))['uhd']))")" >> $GITHUB_OUTPUT
+          echo "hd=$(python3 -c "import json; print(json.dumps(json.load(open('/tmp/need.json'))['hd']))")" >> $GITHUB_OUTPUT
+
+  tiles:
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - name: UHD (Sentinel-2 cloudless 2016 + terrarium z10) and extra HD cells for exactly what the camera shows
+        env: { UHD: "${{ needs.plan.outputs.uhd }}", HD: "${{ needs.plan.outputs.hd }}" }
+        run: |
+          set -e
+          pip install -q numpy scipy "pillow==11.2.1" requests pyshp
+          curl -sfL --retry 3 -o production/remotion/src/data/hd_index.json "$BASE/hd_index.json"
+          mkdir -p out/terrain3/uhd out/hd5/hd out/tiles
+          if [ "$UHD" != "[]" ] && [ -n "$UHD" ]; then UHD_TILES="$UHD" python -u production/pipeline/terrain3.py; fi
+          if [ "$HD" != "[]" ] && [ -n "$HD" ]; then HD_CELLS="$HD" python -u production/pipeline/hd5.py; fi
+          rm -f out/terrain3/uhd/index.json; cp -r out/terrain3/uhd out/tiles/uhd; cp -r out/hd5/hd out/tiles/hd
+          ls out/tiles/uhd | wc -l; ls out/tiles/hd | wc -l
+      - uses: actions/upload-artifact@v4
+        with: { name: tiles, path: out/tiles, retention-days: 5, if-no-files-found: warn }
+
+  icons:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - id: list
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          mkdir -p out/icons
+          python3 -c "import json; j=json.load(open('projects/$PROJECT/project.json')); print(','.join(i['name'] for i in j.get('icons', [])))" > /tmp/names
+          echo "names=$(cat /tmp/names)" >> $GITHUB_OUTPUT
+          if [ -s /tmp/names ] && gh release download gpu-$PROJECT -R ${{ github.repository }} -p icons.zip -D /tmp 2>/dev/null; then
+            (cd out/icons && unzip -q -o /tmp/icons.zip); echo "kaggle=1" >> $GITHUB_OUTPUT; echo "icons from the Kaggle release gpu-$PROJECT"
+          elif [ -s /tmp/names ] && [ "$CPU_ICONS" != "1" ]; then
+            echo "::error::3D icons must come from Kaggle: icons.zip is missing in release gpu-$PROJECT (run the icons3d kernel first; cpu_icons=1 only with the user's OK)"; exit 1
+          else echo "kaggle=0" >> $GITHUB_OUTPUT; fi
+      - if: steps.list.outputs.names != '' && steps.list.outputs.kaggle == '0'
+        name: TripoSR image-to-3D (CPU) + Blender Cycles renders at 4 azimuths
+        run: |
+          set -e
+          git clone -q --depth 1 https://github.com/VAST-AI-Research/TripoSR $HOME/TripoSR
+          pip install -q torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          pip install -q setuptools wheel cmake ninja pybind11 scikit-build scikit-build-core onnxruntime
+          pip install -q --no-build-isolation git+https://github.com/tatsy/torchmcubes.git
+          grep -v torchmcubes $HOME/TripoSR/requirements.txt > req.txt && pip install -q -r req.txt
+          REFS=$(python3 -c "import json; j=json.load(open('projects/$PROJECT/project.json')); print(' '.join('$GITHUB_WORKSPACE/projects/$PROJECT/' + i['ref'] for i in j['icons']))")
+          (cd $HOME/TripoSR && python run.py $REFS --device cpu --mc-resolution 256 --output-dir $GITHUB_WORKSPACE/out/icons3d --model-save-format obj)
+          bash production/ci/install_blender.sh
+          $HOME/blender/blender -b --python-exit-code 1 -P production/blender/icons.py -- out/icons3d ${{ steps.list.outputs.names }} out/icons 2>&1 | grep -E "rendered|Error|missing|Traceback" | tail -40
+      - run: ls -la out/icons
+      - uses: actions/upload-artifact@v4
+        with: { name: icons, path: out/icons, retention-days: 5, if-no-files-found: warn }
+
+  docs:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - name: Manim parchment documents (projects/<P>/manim/*.json)
+        run: |
+          set -e
+          mkdir -p out/docs
+          if ls projects/$PROJECT/manim/*.json > /dev/null 2>&1; then
+            sudo apt-get update -qq && sudo apt-get install -y -qq libcairo2-dev libpango1.0-dev pkg-config ffmpeg fontconfig > /dev/null
+            mkdir -p ~/.local/share/fonts && cp fonts/*.ttf ~/.local/share/fonts/ && fc-cache -f > /dev/null
+            pip install -q "manim==0.22.0" "pillow==11.2.1" scipy
+            for j in projects/$PROJECT/manim/*.json; do
+              n=$(basename $j .json)
+              (cd production/manim && DOC_JSON=$GITHUB_WORKSPACE/$j manim render -qh --fps 30 -r 1920,1080 doc_scene.py Doc -o $n 2>&1 | tail -3)
+              cp "$(find production/manim/media -name "$n.mp4" | head -1)" out/docs/$n.mp4
+            done
+          fi
+          ls -la out/docs
+      - uses: actions/upload-artifact@v4
+        with: { name: docs, path: out/docs, retention-days: 5, if-no-files-found: warn }
+
+  archive:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - name: depth maps, cut-outs, optional super-resolution
+        run: |
+          set -e
+          mkdir -p out/archive
+          if python3 -c "import json,sys; j=json.load(open('projects/$PROJECT/project.json')); sys.exit(0 if (j.get('archive') or j.get('cutouts') or j.get('upscale')) else 1)"; then
+            pip install -q torch torchvision --index-url https://download.pytorch.org/whl/cpu
+            pip install -q "transformers>=4.45" "rembg[cpu]" spandrel "pillow==11.2.1" requests numpy scipy
+            python -u production/pipeline/archive_prep.py
+          fi
+      - uses: actions/upload-artifact@v4
+        with: { name: archive, path: out/archive, retention-days: 5, if-no-files-found: warn }
+
+  prep:
+    needs: [base, voice, plan, tiles, icons, docs, archive]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    outputs:
+      matrix: ${{ steps.m.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { path: art }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: sudo rm -f /etc/apt/sources.list.d/microsoft*; sudo apt-get update -qq || true; sudo apt-get install -y -qq ffmpeg unzip > /dev/null && pip install -q numpy scipy pillow
+      - name: Assemble every asset of the film into public/ (fails on anything missing)
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          set -e
+          bash production/ci/use_project.sh $PROJECT
+          R=production/remotion; PUB=$R/public; PJ=projects/$PROJECT
+          mkdir -p $PUB/music $PUB/sfx $PUB/flags/4x3 $PUB/archive $PUB/icons $PUB/clips $PUB/hd $PUB/uhd $PUB/fonts $PUB/manim
+          cp art/voice/voice.wav $PUB/ && cp art/voice/timeline.json $R/src/data/timeline.json
+          for f in basemap_v2.jpg basemap_v2_half.jpg globe_night.jpg globe_day.jpg hd_tiles.zip hd_index.json; do curl -sfL --retry 3 -o /tmp/$f "$BASE/$f"; done
+          mv /tmp/basemap_v2.jpg /tmp/basemap_v2_half.jpg $PUB/
+          ffmpeg -v error -y -i /tmp/globe_night.jpg -vf scale=4096:2048 -q:v 2 $PUB/globe_night_4k.jpg
+          ffmpeg -v error -y -i /tmp/globe_day.jpg -vf scale=4096:2048 -q:v 2 $PUB/globe_day_4k.jpg
+          (cd $PUB && unzip -q -o /tmp/hd_tiles.zip)
+          [ -d art/tiles/uhd ] && cp art/tiles/uhd/*.jpg $PUB/uhd/ 2>/dev/null || true
+          [ -d art/tiles/hd ] && cp art/tiles/hd/*.jpg $PUB/hd/ 2>/dev/null || true
+          python3 - <<'PY'
+          import json, os, glob
+          R = 'production/remotion'
+          h = json.load(open('/tmp/hd_index.json'))
+          have = {tuple(t) for t in h['tiles']}
+          for f in glob.glob(f'{R}/public/hd/t_*.jpg'):
+              i, j = map(int, os.path.basename(f)[2:-4].split('_')); have.add((i, j))
+          h['tiles'] = sorted([list(t) for t in have]); json.dump(h, open(f'{R}/src/data/hd_index.json', 'w'))
+          u = sorted([list(map(int, os.path.basename(f)[2:-4].split('_'))) for f in glob.glob(f'{R}/public/uhd/u_*.jpg') if os.path.getsize(f)])
+          json.dump({'tile': 256, 'k': 8, 'tiles': u}, open(f'{R}/src/data/uhd_index.json', 'w'))
+          print('HD tiles', len(h['tiles']), 'UHD tiles', len(u))
+          PY
+          cp assets/music/*.mp3 $PUB/music/
+          cp assets/sfx/*.wav $PUB/sfx/
+          (mkdir -p /tmp/s2 && cd /tmp/s2 && python $GITHUB_WORKSPACE/production/pipeline/sfx2.py > /dev/null && cp out/sfx/*.wav $GITHUB_WORKSPACE/$PUB/sfx/)
+          cp fonts/*.ttf $PUB/fonts/
+          (cd /tmp && npm i --no-audit --no-fund --loglevel=error flag-icons@7.6.0 && cp -r node_modules/flag-icons/flags/4x3/. $GITHUB_WORKSPACE/$PUB/flags/4x3/)
+          python3 - <<'PY'
+          import json, os, subprocess
+          P = os.environ['PROJECT']; PUB = 'production/remotion/public'
+          for code, url in json.load(open(f'projects/{P}/project.json')).get('extra_flags', {}).items():
+              subprocess.run(['curl', '-sfL', '--retry', '3', '-A', 'MapFilmKit/1.0 (GitHub Actions)', '-o', f'{PUB}/flags/4x3/{code}.svg', url], check=True)
+              subprocess.run(['cp', f'{PUB}/flags/4x3/{code}.svg', f'{PUB}/flags/{code}.svg'], check=True)
+              print('extra flag', code)
+          PY
+          [ -d $PJ/archive ] && cp $PJ/archive/* $PUB/archive/ 2>/dev/null || true
+          cp art/archive/* $PUB/archive/ 2>/dev/null || true
+          python3 - <<'PY'
+          import json, os, numpy as np
+          from PIL import Image, ImageFilter
+          P = os.environ['PROJECT']; A = 'production/remotion/public/archive'
+          for i in json.load(open(f'projects/{P}/project.json')).get('archive', []):
+              im = Image.open(f'{A}/{i}.jpg').convert('RGB')
+              if im.width > 1100: im = im.resize((1100, round(im.height * 1100 / im.width)), Image.LANCZOS)
+              d = np.asarray(Image.open(f'{A}/{i}_depth.png').convert('L').resize(im.size, Image.BICUBIC)).astype(np.float32)
+              lo, hi = np.percentile(d, 3), np.percentile(d, 97)
+              n = np.clip((d - lo) / max(hi - lo, 1.0), 0, 1)
+              a = np.clip((n - 0.55) / 0.25, 0, 1); a = a * a * (3 - 2 * a)
+              m = Image.fromarray((a * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(1.6))
+              out = im.copy(); out.putalpha(m); out.save(f'{A}/{i}_fg.png', optimize=True)
+              print('depth layer', i, im.size)
+          PY
+          cp art/icons/*.png $PUB/icons/ 2>/dev/null || true
+          cp art/docs/*.mp4 $PUB/clips/ 2>/dev/null || true
+          for c in $(python3 -c "import json; print(' '.join(json.load(open('$PJ/project.json')).get('clips', [])))"); do
+            for i in $(seq 1 300); do curl -sfL --retry 2 -o $PUB/clips/$c "https://github.com/${{ github.repository }}/releases/download/clips-$PROJECT/$c" && break; echo "waiting for clip $c ($i)"; sleep 60; done
+          done
+          (cd $R && python ../pipeline/measure_assets.py)
+          python3 - <<'PY'
+          import json, os, re, sys
+          P = os.environ['PROJECT']; R = 'production/remotion'; PUB = f'{R}/public'
+          pj = json.load(open(f'projects/{P}/project.json')); miss = []
+          for f in ['voice.wav', 'basemap_v2.jpg', 'globe_night_4k.jpg', 'globe_day_4k.jpg', 'fonts/Cinzel.ttf', 'fonts/Inter.ttf']:
+              if not os.path.exists(f'{PUB}/{f}') or not os.path.getsize(f'{PUB}/{f}'): miss.append(f)
+          for i in pj.get('icons', []):
+              for az in (0, 90, 180, 270):
+                  if not os.path.exists(f"{PUB}/icons/{i['name']}_a{az}.png"): miss.append(f"icons/{i['name']}_a{az}.png")
+          for d in pj.get('docs', []):
+              if not os.path.exists(f'{PUB}/clips/{d}.mp4'): miss.append(f'clips/{d}.mp4')
+          for a in pj.get('archive', []):
+              for s in ('.jpg', '_fg.png'):
+                  if not os.path.exists(f'{PUB}/archive/{a}{s}'): miss.append(f'archive/{a}{s}')
+          for c in pj.get('cutouts', []):
+              if not os.path.exists(f'{PUB}/archive/{c}_cut.png'): miss.append(f'archive/{c}_cut.png')
+          src = open(f'{R}/src/script.ts').read() + open(f'{R}/src/v2.ts').read()
+          for m in re.findall(r"'((?:music|clips|archive|manim|icons)/[^']+\.(?:mp3|mp4|webm|jpg|png))'", src):
+              if not os.path.exists(f'{PUB}/{m}'): miss.append(m)
+          for m in set(re.findall(r"\{f: '([a-z0-9_]+)'", src)):
+              if not os.path.exists(f'{PUB}/sfx/{m}.wav'): miss.append(f'sfx/{m}.wav')
+          print('MISSING:', miss) if miss else print('all referenced assets present')
+          sys.exit(1 if miss else 0)
+          PY
+          du -sh $PUB
+      - name: Quality gate (type-check + overlap audit + sharpness audit; fails on overlaps or blurry map intervals)
+        working-directory: production/remotion
+        run: |
+          npm ci --no-audit --no-fund --loglevel=error
+          npx tsc --noEmit -p .
+          npx -y tsx tools/overlaps.ts | tee out_overlaps.txt
+          npx -y tsx tools/blur.ts 0.25 1.5 | tee out_blur.txt
+          if grep -q "BOTH VISIBLE" out_overlaps.txt; then echo "GATE FAILED: overlapping elements (see above)"; exit 1; fi
+          if [ "$(grep -A1 '^BLURRY' out_blur.txt | tail -n 1 | tr -d ' ')" != "none" ]; then echo "GATE FAILED: blurry map intervals (see above)"; exit 1; fi
+          rm -rf node_modules
+      - id: m
+        run: echo "matrix=$(python3 -c "print(list(range(int('${{ env.PARTS }}'))))")" >> $GITHUB_OUTPUT
+      - uses: actions/upload-artifact@v4
+        with:
+          name: film-assets
+          path: |
+            production/remotion/public
+            production/remotion/src
+          retention-days: 5
+
+  render:
+    needs: prep
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        part: ${{ fromJson(needs.prep.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: film-assets, path: production/remotion }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: sudo rm -f /etc/apt/sources.list.d/microsoft*; sudo apt-get update -qq || true; sudo apt-get install -y -qq ffmpeg > /dev/null && pip install -q numpy pillow
+      - name: Render chunk (3 browsers x concurrency 1) + self-check, or verification stills
+        working-directory: production/remotion
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          npm ci --no-audit --no-fund --loglevel=error
+          if [ -n "$STILLS" ]; then
+            [ "${{ matrix.part }}" = "0" ] || exit 0
+            mkdir -p out/stills && node scripts/stills4.mjs out/stills $STILLS && ls -la out/stills
+            gh release delete "$TAG" -y --cleanup-tag 2>/dev/null || true
+            gh release create "$TAG" out/stills/*.jpg --title "$TAG" --notes "verification stills ($PROJECT)"
+            exit 0
+          fi
+          npx remotion bundle src/index.ts --out-dir=build --log=error > /dev/null 2>&1 && npx remotion still build Main /tmp/probe.jpg --frame=0 --scale=0.1 --gl=swangle --log=error > /dev/null 2>&1 \
+            && export SERVE=build || export SERVE=src/index.ts
+          TOTAL=$(node -e "const t=require('./src/data/timeline.json'); console.log(Math.ceil(t.total*30))")
+          FA=0; FB=$(( TOTAL - 1 ))
+          CNT=$(( FB - FA + 1 )); N=$PARTS; P=${{ matrix.part }}; SZ=$(( (CNT + N - 1) / N ))
+          A=$(( FA + P * SZ )); B=$(( A + SZ - 1 )); [ $B -gt $FB ] && B=$FB
+          if [ $A -gt $FB ]; then echo "part $P empty"; exit 0; fi
+          PART=$(printf %02d $P) WORKERS=3 bash scripts/render_chunk.sh $A $B out/part_$(printf %02d $P).mp4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 'part-${{ matrix.part }}'
+          path: |
+            production/remotion/out/part_*.mp4
+            production/remotion/out/qa/
+          retention-days: 5
+          if-no-files-found: ignore
+
+  audio:
+    needs: prep
+    if: ${{ !inputs.stills }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: film-assets, path: production/remotion }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: sudo rm -f /etc/apt/sources.list.d/microsoft*; sudo apt-get update -qq || true; sudo apt-get install -y -qq ffmpeg > /dev/null && pip install -q numpy scipy
+      - name: Offline mix of the exact AudioMix events + master (-14 LUFS, -1.5 dBTP)
+        working-directory: production/remotion
+        run: |
+          set -e
+          mkdir -p out/audio
+          npm ci --no-audit --no-fund --loglevel=error
+          node scripts/build_audio.mjs && EVENTS_OUT=out/audio_events.json node out/audio_events.cjs
+          python ../pipeline/mix.py out/audio_events.json public out/audio
+          python ../pipeline/master.py out/audio | tee out/audio/audio_report.txt
+          TOTAL=$(node -e "const t=require('./src/data/timeline.json'); console.log(Math.ceil(t.total*30))")
+          E=$(python3 -c "print($TOTAL/30)")
+          ffmpeg -v error -y -i out/audio/mix_final.wav -af "atrim=start=0:end=$E,asetpts=PTS-STARTPTS" -c:a pcm_s24le out/audio/mix_range.wav
+          echo $TOTAL > out/audio/frames.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: audio-master
+          path: |
+            production/remotion/out/audio/mix_range.wav
+            production/remotion/out/audio/audio_report.txt
+            production/remotion/out/audio/frames.txt
+          retention-days: 5
+
+  final:
+    if: ${{ !inputs.stills }}
+    needs: [render, audio]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { pattern: 'part-*', path: parts, merge-multiple: true }
+      - uses: actions/download-artifact@v4
+        with: { name: audio-master, path: audio }
+      - uses: actions/download-artifact@v4
+        with: { name: voice, path: voice }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: sudo rm -f /etc/apt/sources.list.d/microsoft*; sudo apt-get update -qq || true; sudo apt-get install -y -qq ffmpeg > /dev/null && pip install -q pillow
+      - name: Assemble (frame-exact), QA, publish
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          SLUG=$(python3 -c "import json; print(json.load(open('projects/$PROJECT/project.json'))['slug'])")
+          TITLE=$(python3 -c "import json; print(json.load(open('projects/$PROJECT/project.json'))['title'])")
+          cp voice/subtitles.srt ${SLUG}_subtitles.srt
+          FILM_SLUG="$SLUG" FILM_TITLE="$TITLE" EXTRA_ASSETS="${SLUG}_subtitles.srt" bash production/pipeline/assemble.sh parts audio/mix_range.wav $(cat audio/frames.txt) "$TAG"

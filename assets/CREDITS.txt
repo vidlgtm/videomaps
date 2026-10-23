@@ -1,0 +1,27 @@
+ASSET CREDITS AND LICENCES (FULL_PRODUCTION_KIT)
+
+music/music_c1_hook.mp3, music_c2_origins.mp3, music_c3_annex.mp3, music_c4_collapse.mp3, music_c5_resolution.mp3
+  Original score generated for our film "Why the Soviet Union Broke Into Exactly 15 Countries"
+  (engine/production/pipeline/music.py). Not from YouTube Audio Library or any stock library.
+  Measured loudness: -9.5, -11.3, -15.3, -11.8, -9.5 LUFS (used by the mixer through MUSIC[].lufs).
+sfx/*.wav (14 files)
+  Synthesized from scratch by engine/production/pipeline/sfx.py (no third-party samples).
+  8 more are generated at build time by engine/production/pipeline/sfx2.py.
+icons_ref/*.png
+  Reference images used as TripoSR input for the 3D icons of our film (ballot, kremlin, lodge, scroll, swords,
+  tank, matryoshka).
+style_refs/*.jpg
+  Frames of our film v5, rendered by this engine (verification stills).
+voice_reference/narrator_reference.mp3
+  Paragraph 01 of the example project, spoken with the platform voice used for our narration (the reference
+  for choosing the same voice and for the Kokoro fallback's "auto" gender match).
+../fonts/
+  Cinzel, Inter, Cormorant Garamond (+ Italic), Great Vibes - SIL Open Font License 1.1 (OFL_*.txt), from
+  github.com/google/fonts.
+Example project archive photo (engine/projects/example_baltic/archive/balticway.jpg)
+  "Baltic Way in Latvia between Cesis and Valmiera", Laimonis Stipnieks, CC BY-SA 4.0, Wikimedia Commons
+  (see archive/credits.json). Credit it on screen or in the description when used.
+Map imagery (built by the workflows)
+  NASA Blue Marble NG and Black Marble (public domain), AWS terrain tiles (terrarium), EOX Sentinel-2 cloudless 2016
+  (CC BY 4.0: "Sentinel-2 cloudless - https://s2maps.eu by EOX IT Services GmbH (Contains modified Copernicus
+  Sentinel data 2016)"), Natural Earth (public domain).

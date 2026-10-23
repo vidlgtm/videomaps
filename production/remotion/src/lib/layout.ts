@@ -6,9 +6,11 @@ import {project, px, CamState} from './proj';
 import {clamp, env, ease} from './anim';
 import {cameraAt, unproject} from './camera';
 import {PATHS, CITIES, anchor} from './paths';
-import {FLAGS, FLAG_HIDE, MARKERS, LABELS, CARDS, CLIPS, DOLL_LABELS, FILLS, T} from '../script';
+import {FLAGS, FLAG_HIDE, MARKERS, LABELS, CARDS, CLIPS, DOLL_LABELS, FILLS} from '../script';
 import {BANNERS, ICONS, DOCS, CUTOUTS, NUMERALS, TAGS, TITLE, CREDITS, STAR} from '../v2';
-import {SOV, MODERN, SHAPE_NAME, CTX_NAME} from '../names';
+import {nameFor, ctxNamesOn, CTX_NAME} from '../names';
+import aspectGen from '../data/aspect.json';
+import iconBoxGen from '../data/icon_boxes.json';
 
 export type Box = {x0: number; y0: number; x1: number; y1: number};
 export type Item = Box & {id: string; kind: string; prio: number; o: number; rank?: number};
@@ -65,6 +67,7 @@ export function flagLayout(t: number, cam: CamState): FlagL[] {
 
 /** alpha bounding boxes of the Blender icon renders (fractions of the 768 px square) */
 export const ICON_BOX: Record<string, [number, number, number, number]> = {
+  ...(iconBoxGen as Record<string, [number, number, number, number]>),   // measured at prep (pipeline/measure_assets.py)
   ballot_a180: [0.225, 0.164, 0.734, 0.777], ballot_a270: [0.246, 0.202, 0.736, 0.737], kremlin_a180: [0.341, 0.22, 0.638, 0.74],
   kremlin_a270: [0.35, 0.163, 0.645, 0.702], scroll_a180: [0.354, 0.34, 0.674, 0.69], scroll_a270: [0.225, 0.397, 0.766, 0.599],
   swords_a180: [0.352, 0.142, 0.63, 0.79], swords_a270: [0.223, 0.221, 0.781, 0.688], tank_a180: [0.251, 0.339, 0.764, 0.668],
@@ -84,21 +87,14 @@ export function iconLayout(name: string, az: number, x: number, y: number, s: nu
   return {size, left, top, cx: x, by: y - (top0 - top), cw: cw * size, content: B(left + bb[0] * size, top + bb[1] * size, left + bb[2] * size, top + bb[3] * size)};
 }
 
-const ASPECT: Record<string, number> = {'archive/const1936.jpg': 1280 / 2106, 'archive/const1936_a13.jpg': 1280 / 2106,
+const ASPECT: Record<string, number> = {...(aspectGen as Record<string, number>), 'archive/const1936.jpg': 1280 / 2106, 'archive/const1936_a13.jpg': 1280 / 2106,
   'archive/const1936_a17.jpg': 1280 / 2106, 'archive/treaty1922.jpg': 2400 / 1533, 'archive/crimea1954.jpg': 2400 / 2278,
   'archive/belovezha.jpg': 2400 / 1578, 'archive/lenin_cut.png': 1270 / 1600, 'archive/stalin_cut.png': 1044 / 1231,
   'archive/gorbachev_cut.png': 1094 / 1541, 'archive/stalin1918_cut.png': 1188 / 1600};
 
 // ---------------- names ----------------
 export type NameL = {id: string; text: string; sub?: string; ctx: boolean; wx: number; wy: number; fs: number; o: number; q: {x: number; y: number; s: number}};
-const sovietEra = (t: number) => t >= T.c1.s && t < T.c4.s;
-const modernEra = (t: number) => t < T.c1.s || t >= T.c4.states;
-function nameFor(id: string, t: number): string | null {
-  if (id === 'shape:ussr_1991') return t < T.c1.s ? 'SOVIET UNION' : null;
-  if (id.startsWith('rep:')) { const iso = id.slice(4); return modernEra(t) ? MODERN[iso] : sovietEra(t) ? SOV[iso] : null; }
-  if (SHAPE_NAME[id]) return sovietEra(t) ? SHAPE_NAME[id] : null;
-  return null;
-}
+// era-correct names come from the project (src/names.ts: nameFor / ctxNamesOn)
 /** screen dy that moves a text centred at q to just below a flag standing near it (0 if none) */
 function underFlag(q: {x: number; y: number}, fs: number, flags: FlagL[]): number {
   let dy = 0;
@@ -125,7 +121,7 @@ function namesAt(t: number, cam: CamState, flags: FlagL[]): NameL[] {
     const text = nameFor(f.id, t);
     if (text && !dup(text, f.id)) put(text, text, f.id, env(t, f.from + 0.45, f.to ?? 1e9, 0.6, 0.5));
   });
-  if (modernEra(t) && t > 3) Object.entries(CTX_NAME).forEach(([iso, text]) => { if (!dup(text, 'ctx:' + iso)) put(text + '|ctx', text, 'ctx:' + iso, 1); });
+  if (ctxNamesOn(t)) Object.entries(CTX_NAME).forEach(([iso, text]) => { if (!dup(text, 'ctx:' + iso)) put(text + '|ctx', text, 'ctx:' + iso, 1); });
   const out: NameL[] = [];
   Object.entries(acc).forEach(([key, v]) => {
     if (v.w <= 0.001) return;

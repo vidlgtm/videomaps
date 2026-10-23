@@ -218,7 +218,7 @@ const CaucLabels: React.FC<{t: number}> = ({t}) => {
   const tr: any = (cauc as any).tracks;
   const placed: {x0: number; x1: number; y0: number; y1: number}[] = [];
   const out: React.ReactNode[] = [];
-  CAUC_NAMES.forEach(([k, name]) => {
+  (((cauc as any).names?.length ? (cauc as any).names : CAUC_NAMES) as [string, string][]).forEach(([k, name]) => {
     const a = tr[k]?.[Math.min(Math.max(f, 0), (tr[k]?.length ?? 1) - 1)];
     if (!a || !a[2]) return;
     const sea = k.includes('SEA');

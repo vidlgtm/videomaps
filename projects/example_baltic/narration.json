@@ -1,0 +1,19 @@
+{
+  "title": "The Baltic Way",
+  "voice": "platform TTS (add_voice + generate_speech, American English narrator); fallback: Kokoro-82M on GitHub",
+  "timing": {"lead": 1.2, "title_gap": 1.6, "gap": 0.85, "tail": 3.4},
+  "paragraphs": [
+    {"id": "01", "scene": "Hook", "text": "On the evening of August twenty-third, nineteen eighty-nine, two million people joined hands and drew a living line across three nations the Soviet Union had swallowed."},
+    {"id": "02", "scene": "1939-1940: the pact and the annexation", "text": "Fifty years earlier, to the day, Nazi Germany and the Soviet Union had signed a pact with a secret protocol that split Eastern Europe between them. In August nineteen forty, Estonia, Latvia and Lithuania were annexed."},
+    {"id": "03", "scene": "23 August 1989: the human chain", "text": "On the pact's fiftieth anniversary, they answered with a human chain six hundred seventy-five kilometers long, from Tallinn, through Riga, to Vilnius. For fifteen minutes, they held the line."},
+    {"id": "04", "scene": "1990-1991: independence", "text": "Less than seven months later, Lithuania became the first Soviet republic to declare independence. Estonia and Latvia followed in August nineteen ninety-one, as a failed coup shook Moscow."},
+    {"id": "05", "scene": "Outro: recognition", "text": "On September sixth, nineteen ninety-one, Moscow recognized all three. Three flags were back on the map of Europe."}
+  ],
+  "sources": [
+    "Baltic Way: about 2 million people, 675 km, Tallinn-Riga-Vilnius, hands joined for 15 minutes at 19:00 on 23 Aug 1989 - en.wikipedia.org/wiki/Baltic_Way ; guinnessworldrecords.com (Longest human chain, multiple countries)",
+    "Molotov-Ribbentrop Pact and its secret protocol, Moscow, 23 Aug 1939 - en.wikipedia.org/wiki/Molotov-Ribbentrop_Pact",
+    "Annexation of the Baltic states, 3-6 Aug 1940 - en.wikipedia.org/wiki/Occupation_of_the_Baltic_states",
+    "Lithuania: Act of the Re-Establishment of the State, 11 Mar 1990 (first Soviet republic) ; Estonia 20 Aug 1991 ; Latvia 21 Aug 1991 (August coup 19-22 Aug 1991)",
+    "USSR State Council recognises the independence of Estonia, Latvia and Lithuania, 6 Sep 1991"
+  ]
+}

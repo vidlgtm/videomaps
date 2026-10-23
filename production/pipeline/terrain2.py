@@ -365,3 +365,7 @@ if not os.path.exists(bmk):
     get("https://eoimages.gsfc.nasa.gov/images/imagerecords/144000/144898/BlackMarble_2016_3km.jpg", bmk)
 Image.open(bmk).convert("RGB").resize((8192, 4096), Image.LANCZOS).save(f"{OUT}/globe_night.jpg", quality=90)
 print(f"all done {time.time() - t0:.0f}s")
+
+# ======================= 5) day globe texture (kit: Three.js hooks can use day or night) =======================
+Image.open(bm_world).convert("RGB").resize((8192, 4096), Image.LANCZOS).save(f"{OUT}/globe_day.jpg", quality=90)
+print("globe_day done", flush=True)
