@@ -42,3 +42,15 @@ import zipfile
 with zipfile.ZipFile(f"{W}/icons.zip", "w") as z:
     for p in pngs: z.write(p, os.path.basename(p))
 log("done", os.path.getsize(f"{W}/icons.zip"))
+# contact sheet for the user (one row per icon, 4 azimuths) -> show it at once (00: results are shown directly)
+from PIL import Image, ImageDraw
+cell = 256; inames = sorted({os.path.basename(p).rsplit("_a", 1)[0] for p in pngs})
+sheet = Image.new("RGB", (4 * cell, len(inames) * cell), (40, 44, 52))
+for r, n in enumerate(inames):
+    for c, a in enumerate((0, 90, 180, 270)):
+        f = f"/tmp/icons/{n}_a{a}.png"
+        if os.path.exists(f):
+            im = Image.open(f).convert("RGBA"); im.thumbnail((cell, cell))
+            sheet.paste(im, (c * cell + (cell - im.width) // 2, r * cell + (cell - im.height) // 2), im)
+    ImageDraw.Draw(sheet).text((8, r * cell + 6), n, fill=(255, 255, 255))
+sheet.save(f"{W}/icons_sheet.jpg", quality=90); log("icons_sheet.jpg", sheet.size)

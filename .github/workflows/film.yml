@@ -194,7 +194,7 @@ jobs:
           mkdir -p out/archive
           if python3 -c "import json,sys; j=json.load(open('projects/$PROJECT/project.json')); sys.exit(0 if (j.get('archive') or j.get('cutouts') or j.get('upscale')) else 1)"; then
             pip install -q torch torchvision --index-url https://download.pytorch.org/whl/cpu
-            pip install -q "transformers>=4.45" "rembg[cpu]" spandrel "pillow==11.2.1" requests numpy scipy
+            pip install -q "transformers==4.57.6" "rembg[cpu]" spandrel "pillow==11.2.1" requests numpy scipy
             python -u production/pipeline/archive_prep.py
           fi
       - uses: actions/upload-artifact@v4
