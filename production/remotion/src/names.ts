@@ -1,22 +1,39 @@
-// Country names on the map, era-correct (Cinzel caps for the film's countries, Cormorant italic caps for neighbours).
-// nameFor(id, t): the name shown on a FILLED region at time t (null = none). ctxNamesOn(t): show neighbour names now?
+// Era-correct map names for the five beats in USSR60.
 import {T} from './script';
 
-export const SOV: Record<string, string> = {EST: 'ESTONIAN SSR', LVA: 'LATVIAN SSR', LTU: 'LITHUANIAN SSR'};
-export const MODERN: Record<string, string> = {EST: 'ESTONIA', LVA: 'LATVIA', LTU: 'LITHUANIA'};
-export const SHAPE_NAME: Record<string, string> = {};
-/** neighbours whose names are valid in every year this film shows (1939-1991) */
-export const CTX_NAME: Record<string, string> = {FIN: 'FINLAND', SWE: 'SWEDEN', POL: 'POLAND'};
+const MODERN: Record<string, string> = {
+  RUS: 'RUSSIA', UKR: 'UKRAINE', BLR: 'BELARUS', KAZ: 'KAZAKHSTAN', UZB: 'UZBEKISTAN', TKM: 'TURKMENISTAN',
+  KGZ: 'KYRGYZSTAN', TJK: 'TAJIKISTAN', GEO: 'GEORGIA', ARM: 'ARMENIA', AZE: 'AZERBAIJAN', MDA: 'MOLDOVA',
+  EST: 'ESTONIA', LVA: 'LATVIA', LTU: 'LITHUANIA',
+};
+const SOV1922: Record<string, string> = {
+  RUS: 'RUSSIAN SFSR', UKR: 'UKRAINIAN SSR', BLR: 'BYELORUSSIAN SSR',
+};
+const SOV1936: Record<string, string> = {
+  ...SOV1922, KAZ: 'KAZAKH SSR', UZB: 'UZBEK SSR', TKM: 'TURKMEN SSR', KGZ: 'KIRGHIZ SSR', TJK: 'TAJIK SSR',
+  GEO: 'GEORGIAN SSR', ARM: 'ARMENIAN SSR', AZE: 'AZERBAIJANI SSR',
+};
+const SOV1940: Record<string, string> = {
+  ...SOV1936, EST: 'ESTONIAN SSR', LVA: 'LATVIAN SSR', LTU: 'LITHUANIAN SSR', MDA: 'MOLDAVIAN SSR',
+};
+export const SHAPE_NAME: Record<string, string> = {
+  'shape:tsfsr': 'TRANSCAUCASIAN SFSR',
+  'shape:kfssr': 'KARELO-FINNISH SSR',
+  'rr:Tatarstan': 'TATARSTAN',
+};
+export const CTX_NAME: Record<string, string> = {
+  FIN: 'FINLAND', SWE: 'SWEDEN', NOR: 'NORWAY', POL: 'POLAND', TUR: 'TURKEY', IRN: 'IRAN', AFG: 'AFGHANISTAN',
+  CHN: 'CHINA', MNG: 'MONGOLIA', JPN: 'JAPAN', KOR: 'KOREA',
+};
 
-/** independence moments (seconds): before them the republic is Soviet (from the annexation on) */
-const indep = (iso: string, t: number) =>
-  iso === 'LTU' ? t >= T.p3.ltu : iso === 'EST' ? t >= T.p3.estlva : iso === 'LVA' ? t >= T.p3.lva : false;
 export function nameFor(id: string, t: number): string | null {
-  if (!id.startsWith('rep:')) return SHAPE_NAME[id] ?? null;
+  if (id in SHAPE_NAME) return SHAPE_NAME[id];
+  if (!id.startsWith('rep:')) return null;
   const iso = id.slice(4);
-  if (t < T.p1.annexed) return MODERN[iso] ?? null;          // 1939: still independent states
-  if (t < T.p2.s) return SOV[iso] ?? null;                    // 1940: Soviet republics
-  if (t < T.p3.s) return null;                                // 1989 chain: keep the map clean for the chain
-  return indep(iso, t) ? MODERN[iso] ?? null : SOV[iso] ?? null;
+  if (t < T.p1.s) return MODERN[iso] ?? null;
+  if (t < T.p2.s) return SOV1922[iso] ?? null;
+  if (t < T.p3.s) return SOV1936[iso] ?? null;
+  if (t < T.p4.s) return SOV1940[iso] ?? null;
+  return MODERN[iso] ?? null;
 }
-export const ctxNamesOn = (t: number) => t > T.p0.hands + 0.8 && t < T.p4.flags - 0.3;
+export const ctxNamesOn = (t: number) => t > T.p0.nextDay + 0.7 && t < T.p4.fifteen - 0.5;
