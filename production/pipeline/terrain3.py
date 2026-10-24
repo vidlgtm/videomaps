@@ -55,16 +55,34 @@ class Mosaic:
         todo = [(a, b) for a in range(self.tx0, tx1 + 1) for b in range(self.ty0, ty1 + 1)]
 
         def fetch(t):
+            # A CDN can return an HTML/XML error page with HTTP 200. Never cache that body as imagery:
+            # validate the decoded tile, delete a bad cached body, and retry the actual request.
             a, b = t
             if kind == "s2":
-                c = cached(f"https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless_3857/default/g/{z}/{b}/{a}.jpg", f"cache/tiles/s2/{z}/{a}_{b}.jpg")
+                url, path = (f"https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless_3857/default/g/{z}/{b}/{a}.jpg",
+                             f"cache/tiles/s2/{z}/{a}_{b}.jpg")
             else:
-                c = cached(f"https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{a}/{b}.png", f"cache/tiles/dem/{z}/{a}_{b}.png")
-            if c is None: return 0
-            v = np.asarray(Image.open(io.BytesIO(c)).convert("RGB"))
-            blk = v if kind == "s2" else (v[..., 0:1].astype(np.float32) * 256 + v[..., 1:2] + v[..., 2:3] / 256 - 32768)
-            self.a[(b - self.ty0) * 256:(b - self.ty0 + 1) * 256, (a - self.tx0) * 256:(a - self.tx0 + 1) * 256] = blk
-            return 1
+                url, path = (f"https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{a}/{b}.png",
+                             f"cache/tiles/dem/{z}/{a}_{b}.png")
+            last = None
+            for attempt in range(5):
+                try:
+                    c = cached(url, path)
+                    if c is None: return 0
+                    with Image.open(io.BytesIO(c)) as im:
+                        im.load()
+                        v = np.asarray(im.convert("RGB"))
+                    if v.shape != (256, 256, 3):
+                        raise ValueError(f"unexpected decoded size {v.shape}")
+                    blk = v if kind == "s2" else (v[..., 0:1].astype(np.float32) * 256 + v[..., 1:2] + v[..., 2:3] / 256 - 32768)
+                    self.a[(b - self.ty0) * 256:(b - self.ty0 + 1) * 256, (a - self.tx0) * 256:(a - self.tx0 + 1) * 256] = blk
+                    return 1
+                except Exception as e:
+                    last = e
+                    try: os.unlink(path)
+                    except FileNotFoundError: pass
+                    time.sleep(1 + attempt * 2)
+            raise RuntimeError(f"invalid {kind} source tile z{z}/{a}/{b} after retries: {last}")
         with cf.ThreadPoolExecutor(10) as ex:
             got = sum(ex.map(fetch, todo))
         print(f"  {kind} z{z}: {got}/{len(todo)} tiles", flush=True)
