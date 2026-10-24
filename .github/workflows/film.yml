@@ -195,7 +195,8 @@ jobs:
             if docker image inspect $M > /dev/null 2>&1; then
               docker run --rm --user root --entrypoint bash -e PROJECT -v "$GITHUB_WORKSPACE":/w -w /w $M -c '
                 set -e
-                pip install -q "pillow==11.2.1" scipy
+                # The official Manim image already supplies a compatible Pillow. Reinstalling 11.2.1 on its current Python can force an unsupported source build.
+                pip install -q scipy
                 mkdir -p /root/.local/share/fonts && cp fonts/*.ttf /root/.local/share/fonts/ && (fc-cache -f > /dev/null 2>&1 || true)
                 for j in projects/$PROJECT/manim/*.json; do
                   n=$(basename $j .json)
