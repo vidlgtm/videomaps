@@ -1,0 +1,50 @@
+{
+  "name": "russia_japan_peace",
+  "slug": "russia_japan_peace",
+  "title": "Why Russia and Japan Never Made Peace After World War Two",
+  "scenes": 15,
+  "music": [
+    "music_c1_hook.mp3",
+    "music_c2_origins.mp3",
+    "music_c3_annex.mp3",
+    "music_c4_collapse.mp3",
+    "music_c5_resolution.mp3"
+  ],
+  "icons": [
+    {
+      "name": "telegraph_key",
+      "ref": "icons_ref/telegraph_key.png"
+    },
+    {
+      "name": "brass_compass",
+      "ref": "icons_ref/brass_compass.png"
+    },
+    {
+      "name": "seal_press",
+      "ref": "icons_ref/seal_press.png"
+    }
+  ],
+  "docs": [
+    "shimoda_treaty",
+    "san_francisco",
+    "joint_declaration_1956"
+  ],
+  "archive": [
+    "shimoda1855",
+    "saint_petersburg1875",
+    "yalta1945",
+    "japanese_surrender1945",
+    "yeltsin_hosokawa1993"
+  ],
+  "cutouts": [],
+  "upscale": [
+    "yeltsin_hosokawa1993"
+  ],
+  "clips": [
+    "pacific_relief_table.mp4",
+    "treaty_scale.mp4"
+  ],
+  "extra_flags": {
+    "su": "https://upload.wikimedia.org/wikipedia/commons/a/a9/Flag_of_the_Soviet_Union.svg"
+  }
+}
