@@ -52,7 +52,6 @@ export const STROKES: Stroke[] = [
 export const LINES: Line[] = []; export const RINGS: Ring[] = [];
 export const LABELS: Label[] = [
   {text: 'SEA OF OKHOTSK', at: [147.7, 47.4], size: 24, from: P.p1.chain + 0.4, to: END + 1, italic: true},
-  {text: 'KURIL ISLANDS', at: [147.2, 45.0], size: 22, from: P.p1.northern, to: END + 1, color: '#F4E3B0'},
 ];
 export const MARKERS: Marker[] = [];
 export const FLAGS: Flag[] = [
