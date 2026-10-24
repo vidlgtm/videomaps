@@ -20,7 +20,8 @@ const p13 = {s: cs(13), century: C(13, 'century and a half'), border: C(13, 'fir
 const p14 = {s: cs(14), question: C(14, 'why did Russia and Japan'), occupation: C(14, 'Soviet occupation'), y1945: C(14, 'nineteen forty-five'), y1951: C(14, 'nineteen fifty-one treaty'), y1956: C(14, 'nineteen fifty-six'), controls: C(14, 'Russia controls'), claim: C(14, 'Japan maintains'), hokkaido: C(14, 'Hokkaido and Kamchatka'), e: ce(14)};
 export const P = {p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14};
 
-export const OPENING: OpeningSpec = {clip: 'clips/pacific_relief_table.mp4', mapIn: p0.islands + 0.15, end: p0.nineteenth + 0.8, textOut: p0.nineteenth + 0.1, rule: p0.treaty + 0.15, bloom: 0.36, lines: [
+// Start on the sharp geographic map; the abstract 3D island forms were intentionally removed after review.
+export const OPENING: OpeningSpec = {clip: null, mapIn: 0, end: p0.nineteenth + 0.8, textOut: p0.nineteenth + 0.1, rule: p0.treaty + 0.15, bloom: 0.20, lines: [
   {text: 'THE LAST WAR', from: p0.war + 0.1, kind: 'kicker'},
   {text: 'WITHOUT A TREATY', from: p0.treaty, kind: 'year'},
   {text: 'HOKKAIDO · KURIL ISLANDS · KAMCHATKA', from: p0.islands, kind: 'place'},
