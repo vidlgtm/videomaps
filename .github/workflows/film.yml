@@ -3,7 +3,7 @@ name: film
 #   base (terrain basemap + HD tiles + globes; built once per repo -> release "base")
 #   voice (the platform takes made in the chat, projects/<P>/vo, REQUIRED; Kokoro only with tts=kokoro and the user's OK
 #          -> matched narration + word timeline + SRT)
-#   plan (type-check, FILM LENGTH for information - the length is free, exact tile needs of the camera path) -> tiles (UHD Sentinel-2 + extra HD cells)
+#   plan (type-check, LENGTH check: long films only, at least 7 minutes, exact tile needs of the camera path) -> tiles (UHD Sentinel-2 + extra HD cells)
 #   icons (TripoSR + Blender, or the Kaggle result in release gpu-<P>) | docs (Manim parchments) | archive (depth, cut-outs)
 #   prep (all assets + quality gate: overlaps, sharpness) -> render (parallel chunks, 3 browsers x 1, self-check) + audio
 #   (offline mix, -14 LUFS master) -> final (frame-exact assembly, 1080p + 720p + SRT + QA sheets -> release TAG)
@@ -110,6 +110,13 @@ jobs:
           cd production/remotion && npm ci --no-audit --no-fund --loglevel=error
           npx tsc --noEmit -p .
           node -e "const t=require('./src/data/timeline.json'); console.log('FILM LENGTH', t.total.toFixed(2), 's,', t.words.length, 'words')"
+          node -e "
+            const t = require('./src/data/timeline.json');
+            if (t.total < 420) {
+              console.log('::error::LENGTH: the film is ' + (t.total / 60).toFixed(1) + ' min - the user wants LONG films only (at least 7 minutes): a longer script (the user corrects it), new takes, push, dispatch again');
+              process.exit(1);
+            }
+            console.log('LENGTH ok: ' + (t.total / 60).toFixed(1) + ' min (at least 7)');"
           npx -y tsx tools/uhd_need.ts /tmp/need.json | tee /tmp/need.txt
           echo "uhd=$(python3 -c "import json; print(json.dumps(json.load(open('/tmp/need.json'))['uhd']))")" >> $GITHUB_OUTPUT
           echo "hd=$(python3 -c "import json; print(json.dumps(json.load(open('/tmp/need.json'))['hd']))")" >> $GITHUB_OUTPUT
@@ -178,19 +185,34 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: '3.11' }
-      - name: Manim parchment documents (projects/<P>/manim/*.json)
+      - name: Manim parchment documents (projects/<P>/manim/*.json) - official Manim image, no apt (06 T42)
         run: |
           set -e
           mkdir -p out/docs
           if ls projects/$PROJECT/manim/*.json > /dev/null 2>&1; then
-            bash production/ci/apt.sh libcairo2-dev libpango1.0-dev pkg-config ffmpeg fontconfig
-            mkdir -p ~/.local/share/fonts && cp fonts/*.ttf ~/.local/share/fonts/ && fc-cache -f > /dev/null
-            pip install -q "manim==0.22.0" "pillow==11.2.1" scipy
-            for j in projects/$PROJECT/manim/*.json; do
-              n=$(basename $j .json)
-              (cd production/manim && DOC_JSON=$GITHUB_WORKSPACE/$j manim render -qh --fps 30 -r 1920,1080 doc_scene.py Doc -o $n 2>&1 | tail -3)
-              cp "$(find production/manim/media -name "$n.mp4" | head -1)" out/docs/$n.mp4
-            done
+            M=manimcommunity/manim:v0.22.0
+            for i in 1 2 3; do timeout 600 docker pull -q $M && break; echo "::warning::docker pull try $i failed"; sleep 20; done
+            if docker image inspect $M > /dev/null 2>&1; then
+              docker run --rm --user root --entrypoint bash -e PROJECT -v "$GITHUB_WORKSPACE":/w -w /w $M -c '
+                set -e
+                pip install -q "pillow==11.2.1" scipy
+                mkdir -p /root/.local/share/fonts && cp fonts/*.ttf /root/.local/share/fonts/ && (fc-cache -f > /dev/null 2>&1 || true)
+                for j in projects/$PROJECT/manim/*.json; do
+                  n=$(basename $j .json)
+                  (cd production/manim && DOC_JSON=/w/$j manim render -qh --fps 30 -r 1920,1080 doc_scene.py Doc -o $n 2>&1 | tail -3)
+                  cp "$(find production/manim/media -name "$n.mp4" | head -1)" out/docs/$n.mp4
+                done'
+            else
+              echo "::warning::Manim image unavailable - building Manim on the runner (apt + pip)"
+              bash production/ci/apt.sh libcairo2-dev libpango1.0-dev pkg-config ffmpeg fontconfig
+              mkdir -p ~/.local/share/fonts && cp fonts/*.ttf ~/.local/share/fonts/ && fc-cache -f > /dev/null
+              pip install -q "manim==0.22.0" "pillow==11.2.1" scipy
+              for j in projects/$PROJECT/manim/*.json; do
+                n=$(basename $j .json)
+                (cd production/manim && DOC_JSON=$GITHUB_WORKSPACE/$j manim render -qh --fps 30 -r 1920,1080 doc_scene.py Doc -o $n 2>&1 | tail -3)
+                cp "$(find production/manim/media -name "$n.mp4" | head -1)" out/docs/$n.mp4
+              done
+            fi
           fi
           ls -la out/docs
       - uses: actions/upload-artifact@v4
