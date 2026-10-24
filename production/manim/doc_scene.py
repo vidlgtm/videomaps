@@ -45,15 +45,25 @@ class Doc(Scene):
         script = d.get("title_font", "Cormorant Garamond") == "Great Vibes"
         title = (Text(d["title"], font="Great Vibes", color=INK).scale(1.7) if script else
                  Text(d["title"], font="Cormorant Garamond", slant=ITALIC, weight=BOLD, color=RED).scale(1.0)).next_to(rule, DOWN, buff=0.55)
-        body = Paragraph(*d["body"], font="Cormorant Garamond", alignment="center", line_spacing=0.85, color=INK).scale(1.05)
-        body.next_to(title, DOWN, buff=0.6)
+        # A document may request a narrower body to preserve a clear safe area for a seal.
+        # This prevents long treaty lines from reaching, or being cropped by, the frame edge.
+        body = Paragraph(*d["body"], font="Cormorant Garamond", alignment="center", line_spacing=0.85, color=INK).scale(d.get("body_scale", 1.05))
+        max_body_width = d.get("body_max_width")
+        if max_body_width and body.width > max_body_width:
+            body.scale(max_body_width / body.width)
+        body.next_to(title, DOWN, buff=d.get("body_buff", 0.6))
         self.play(FadeIn(head, shift=DOWN * 0.15), Create(rule), run_time=0.8)
         self.play(Write(title), run_time=0.7 if not script else 1.4)
         self.play(Write(body), run_time=max(1.2, 0.7 * len(d["body"])), rate_func=linear)
         if d.get("underline") is not None:
             self.play(Create(Underline(body[d["underline"]], color=RED, stroke_width=7, buff=0.08)), run_time=0.5)
         if d.get("seal"):
-            sl = seal(d["seal"]).scale(0.95).to_corner(DR, buff=1.0)
+            sl = seal(d["seal"]).scale(d.get("seal_scale", 0.95))
+            # Optional document-specific placement keeps a date seal in its own blank area.
+            if d.get("seal_placement") == "below_body_right":
+                sl.next_to(body, DOWN, buff=d.get("seal_buff", 0.35)).align_to(body, RIGHT)
+            else:
+                sl.to_corner(DR, buff=1.0)
             self.play(FadeIn(sl, scale=1.6), run_time=0.35, rate_func=rush_into)
             self.play(sl.animate.scale(1.04), run_time=0.12, rate_func=there_and_back)
         self.wait(d.get("hold", 2.2))

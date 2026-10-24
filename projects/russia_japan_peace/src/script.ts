@@ -56,9 +56,11 @@ export const LABELS: Label[] = [
 export const MARKERS: Marker[] = [];
 export const FLAGS: Flag[] = [
   {iso: 'JPN', t: P.p0.surrender + 0.15, to: P.p4.august - 0.15, at: [143.1, 43.4]},
-  {iso: 'SU', t: P.p0.occupied + 0.2, to: P.p10.dissolved + 0.1, at: [146.3, 45.2]},
+  // Exact mainland anchors: Soviet/Russian flag is on southern Sakhalin; Japanese flag is on eastern Hokkaido.
+  // Neither national flag is placed over the Sea of Okhotsk or a disputed island.
+  {iso: 'SU', t: P.p0.occupied + 0.2, to: P.p10.dissolved + 0.1, at: [142.55, 47.85]},
   {iso: 'JPN', t: P.p1.hokkaido + 0.1, to: P.p14.controls - 0.4, at: [143.1, 43.4]},
-  {iso: 'RUS', t: P.p10.dissolved + 0.12, to: P.p14.controls - 0.4, at: [146.4, 45.2]},
+  {iso: 'RUS', t: P.p10.dissolved + 0.12, to: P.p14.controls - 0.4, at: [142.55, 47.85]},
 ];
 export const FLAG_HIDE: [number, number][] = [[P.p14.controls - 0.25, END + 1]];
 export const CARDS: Card[] = [

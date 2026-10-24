@@ -8,6 +8,12 @@
     "after the conclusion of a peace treaty."
   ],
   "underline": 0,
+  "body_scale": 0.90,
+  "body_max_width": 11.0,
+  "body_buff": 0.48,
   "seal": "1956",
+  "seal_scale": 0.68,
+  "seal_placement": "below_body_right",
+  "seal_buff": 0.34,
   "hold": 2.0
 }
