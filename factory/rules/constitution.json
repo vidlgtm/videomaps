@@ -1,0 +1,101 @@
+{
+  "name": "FACTORY CONSTITUTION - the fixed things of every film (from our accepted film v5). The factory applies them; the brain never re-decides them.",
+  "principle": "Everything that needs thinking is decided by the brain (third model) in the order. Everything mechanical (exact positions, timing, camera maths, styling, rhythm, sound mapping, quality checks) is done by the factory with these rules.",
+
+  "look": {
+    "palette": {"GOLD": "#E2BF6A", "INK": "#0E1A24", "TXT": "#F4EFE6", "RED": "#D2434E", "TEAL": "#4FA39E", "UNION": "#8E3741", "page_bg": "#0c1822"},
+    "national_tints": {"RUS": "#A23E44", "UKR": "#D2A93F", "BLR": "#7A9B4E", "KAZ": "#3F8F7F", "UZB": "#5577B0", "TKM": "#9BB25A",
+                       "KGZ": "#C0663D", "TJK": "#8D6CB0", "GEO": "#86B39A", "ARM": "#D9893A", "AZE": "#9F78C9", "MDA": "#B79257",
+                       "EST": "#5C86C2", "LVA": "#9B4F6E", "LTU": "#C98B4E"},
+    "other_country_tint_rule": "same family: saturation 35-55 %, lightness 40-60 %, neighbours clearly different in hue; the same country keeps the same tint in every film",
+    "fills": {"opacity": 0.6, "fade_in_s": 0.8, "fade_out_s": 0.8, "inner_glow": "16 px fill colour at 60 % + 3.2 px white at 32 %, clipped inside"},
+    "borders": {"shadow": "1.5x width, rgba(0,0,0,0.38), offset 1.6/2.2 px", "glow": "5x width at 22 %", "trace": "draw-on with a soft glow head"},
+    "vignette": "radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(0,0,0,0.42) 100%)",
+    "overlay_dim": "radial-gradient(ellipse at center, rgba(6,11,16,0.55), rgba(6,11,16,0.85))",
+    "no_haze": true,
+    "fonts": {"head": "Cinzel (titles, story country names 600-700, years, title cards)", "body": "Inter (kickers, sub-lines, flag labels 600-700, spacing 0.05-0.08 em)",
+              "serif": "Cormorant Garamond (italic: neighbour names, places, quotes, document bodies)", "script": "Great Vibes (signatures, handwritten titles in documents only)"},
+    "text_on_map": {"names": "#F4EFE6 / #FFFFFF, dark stroke rgba(10,16,22,0.8)", "sub_lines": "#F4E3B0", "flag_labels": "#FFF3D0"},
+    "parchment": "linear-gradient(180deg, #f4e8c8 0%, #e6d3a6 55%, #d2bb86 100%), text #0E1A24",
+    "manim_doc": {"ink": "#2A1D12", "red": "#8E1B1B", "brown": "#5A4026"},
+    "cards_frame": "inset 3 px #d8b25a, 6 px #5c1414, 7 px #d8b25a",
+    "light": "warm from the upper left, shadows down-right, soft, never pure black"
+  },
+
+  "elements": {
+    "flag": "flag-icons 4x3 on a short pole, spring drop, soft shadow, true ratio via FLAG_ASPECT, lands on the country's label anchor (placed with tools/place.ts)",
+    "banner": "wooden pole + gold finial, cloth unfurl with an archival photo, parchment caption plate 224 px, ground shadow, optional depth near-layer",
+    "date_card": "top-left (pos tl), Cinzel date + Inter sub-line",
+    "chapter_card": "CHAPTER <n> + title, Cinzel with gold rules, full-frame dim",
+    "title_card": "Cinzel ivory lines + gold rule, smoky reveal",
+    "icon3d": "Blender render at 4 azimuths, smoothstep lift, shadow follows, visible object 236 px",
+    "document": "Manim parchment, full frame, hand-written reveal, map dimmed",
+    "numeral": "big Cinzel gold number + Inter sub-line",
+    "credits": "end card with the archival credits (auto from archive/credits.json)"
+  },
+
+  "camera": {
+    "ease": "bezier(0.45, 0, 0.2, 1)", "ease_out": "bezier(0.16, 1, 0.3, 1)", "rotK": 0.72, "zoom_interp": "log space",
+    "keys_per_paragraph": [2, 4],
+    "move_s": [1.8, 3.0], "opening_push_s": 4.0,
+    "start_before_phrase_s": 0.25,
+    "held_view_push_in": [0.05, 0.10],
+    "tilt_regional": [18, 28], "tilt_wide": [10, 18],
+    "chapter_opens_wide": true,
+    "max_same_view_s": 10,
+    "never_repeat_framing_within_s": 60,
+    "blur_limit_px_per_texel": 1.5
+  },
+
+  "timing": {
+    "flag_after_name_s": [0.05, 0.2], "label_after_word_s": [0.1, 0.3], "exit_before_next_beat_s": [0.3, 0.4],
+    "fade_default_s": 0.6,
+    "flag_spring": {"damping": 11, "mass": 0.55, "stiffness": 120},
+    "card_spring": {"damping": 11, "mass": 0.7, "stiffness": 150}, "card_exit_s": 0.4
+  },
+
+  "rhythm": {
+    "new_visual_every_s": [2, 4],
+    "max_new_elements_per_second": 3,
+    "hook_s": 8,
+    "fill_gaps_with": ["slow push-in", "context names", "border light-trace", "secondary flag or marker", "photo depth drift"]
+  },
+
+  "layout": {
+    "frame": [1920, 1080], "title_safe_px": 96,
+    "declutter_priority": {"cards": 100, "banners": 80, "icons": 70, "markers": 60, "flags": 50, "labels": 40, "names": 30},
+    "no_overlap": true, "no_off_screen": true
+  },
+
+  "structure": {
+    "hook_then_title": true, "chapters": [4, 6], "chapter_own_music_cue": true,
+    "scene_beats": ["arrive", "reveal", "mark", "witness", "turn"],
+    "conclusion_answers_the_question": true, "end_card_credits": true,
+    "film_min_s": 420, "words_min": 1100, "paragraph_max_chars": 1500
+  },
+
+  "sound": {
+    "voice": "platform voice made in the chat, one take per paragraph, matched by voice_master.py",
+    "lufs": -14, "dbtp": -1.5, "vo_over_music_db": 12, "music_xfade_s": 5,
+    "joins": {"lead_s": 1.2, "title_gap_s": 1.6, "gap_s": 0.85, "tail_s": 3.4},
+    "music_roles": {"c1_hook": "opening", "c2_origins": "background history", "c3_annex": "dark chapter", "c4_collapse": "fast change", "c5_resolution": "ending"},
+    "sfx_map": {
+      "camera_move_over_1_5_s": {"f": "whoosh", "v": 0.22, "dt": -0.15},
+      "flag_drop": {"f": "flag_drop", "dt": 0.42},
+      "date_card": {"f": "paper"}, "icon3d": {"f": "wood_thunk"}, "banner": {"f": "cloth_flap"},
+      "annexation_or_seal": {"f": "stamp"}, "tension": {"f": ["riser", "drone_hit"]}, "crowd": {"f": "crowd_bed"},
+      "finale": {"f": ["bell_small", "swell"]}
+    }
+  },
+
+  "quality_gate": ["tsc", "all assets present", "no overlaps", "nothing off-screen", "no blur above 1.5 px/texel", "film >= 420 s",
+                   "every paragraph has its platform take", "loudness -14 LUFS / -1.5 dBTP", "frame-exact final"],
+
+  "3d": {
+    "big_moments": "Blender templates on Kaggle GPU (each film changes the object, the place and the choreography)",
+    "small_icons": "TripoSR on Kaggle + Blender renders, only for small icons",
+    "never_repeat": "projects/IDEAS_USED.txt"
+  },
+
+  "kaggle_key": "never stored in GitHub: the brain injects KAGGLE_API_TOKEN + KAGGLE_USERNAME as temporary repo secrets, dispatches, withdraws them as soon as the Kaggle job has started, and checks the secret list is empty"
+}

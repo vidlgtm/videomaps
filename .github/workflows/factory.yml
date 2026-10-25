@@ -1,0 +1,222 @@
+name: factory
+# MAP FILM FACTORY (folder factory/): order in -> film out. Phase 1 = the automatic director:
+#   direct  : order (storyboard + voice timeline) -> film.json (camera, every element, sound) -> engine audit
+#             (overlaps that stay visible, text cut by the frame) -> feedback passes until clean
+#   tiles   : the UHD/HD map tiles that exactly this camera path needs (Sentinel-2 cloudless + terrain)
+#   stills  : verification stills rendered like the film + side-by-side sheets with a reference release (v5)
+# Never touches our production releases: result tags must start with factory_.
+on:
+  push:
+    branches: [factory]
+    paths: ['factory/**', '.github/workflows/factory.yml']
+  workflow_dispatch:
+    inputs:
+      order: { description: 'order folder (factory/orders/<name>)', default: 'ussr15' }
+      tag: { description: 'result release tag (must start with factory_)', default: 'factory_ussr15_test1' }
+      stills: { description: 'seconds of the verification stills', default: '27.3 38.5 59.5 98 119.5 248 264 330 366 383 411 458.5 475 490' }
+      compare: { description: 'release holding reference stills with the same names (none = no side-by-side)', default: 'test_v5' }
+concurrency:
+  group: factory-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: write
+env:
+  ORDER: ${{ inputs.order || 'ussr15' }}
+  TAG: ${{ inputs.tag || 'factory_ussr15_test1' }}
+  STILLS: ${{ inputs.stills }}
+  COMPARE: ${{ inputs.compare || 'test_v5' }}
+  REL: https://github.com/${{ github.repository }}/releases/download
+jobs:
+  direct:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    outputs:
+      uhd: ${{ steps.d.outputs.uhd }}
+      hd: ${{ steps.d.outputs.hd }}
+    steps:
+      - name: tag guard
+        run: case "$TAG" in factory_*) echo "tag $TAG ok";; *) echo "::error::tag must start with factory_"; exit 1;; esac
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - id: d
+        name: Automatic director -> film.json, type-check, audit, feedback passes
+        working-directory: factory/engine
+        run: |
+          set -e
+          cp ../orders/$ORDER/data/*.json src/data/ 2>/dev/null || true
+          npm ci --no-audit --no-fund --loglevel=error
+          mkdir -p out
+          npx -y tsx ../director/main.ts ../orders/$ORDER
+          npx tsc --noEmit -p .
+          for pass in 1 2 3 4; do
+            npx -y tsx tools/audit.ts out/audit$pass.json > out/audit$pass.txt; tail -n 40 out/audit$pass.txt
+            n=$(python3 -c "import json; a=json.load(open('out/audit$pass.json')); print(len(a['overlaps']) + len(a['offscreen']))")
+            echo "pass $pass: $n problems"
+            if [ "$n" = "0" ] || [ $pass = 4 ]; then break; fi
+            npx -y tsx ../director/main.ts ../orders/$ORDER --feedback out/audit$pass.json
+          done
+          npx -y tsx tools/uhd_need.ts /tmp/need.json | tail -n 6
+          echo "uhd=$(python3 -c "import json; print(json.dumps(json.load(open('/tmp/need.json'))['uhd']))")" >> $GITHUB_OUTPUT
+          echo "hd=$(python3 -c "import json; print(json.dumps(json.load(open('/tmp/need.json'))['hd']))")" >> $GITHUB_OUTPUT
+          cp src/data/film.json out/ && cp ../orders/$ORDER/out/* out/ 2>/dev/null || true
+          ls -la out
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: direction, path: factory/engine/out, retention-days: 7 }
+
+  tiles:
+    needs: direct
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - name: UHD + HD tiles for exactly what this camera path shows
+        env: { UHD: "${{ needs.direct.outputs.uhd }}", HD: "${{ needs.direct.outputs.hd }}" }
+        run: |
+          set -e
+          pip install -q numpy scipy "pillow==11.2.1" requests pyshp
+          cp factory/orders/$ORDER/data/hd_index.json production/remotion/src/data/hd_index.json
+          mkdir -p out/terrain3/uhd out/hd5/hd out/tiles
+          if [ "$UHD" != "[]" ] && [ -n "$UHD" ]; then UHD_TILES="$UHD" python -u production/pipeline/terrain3.py; fi
+          if [ "$HD" != "[]" ] && [ -n "$HD" ]; then HD_CELLS="$HD" python -u production/pipeline/hd5.py; fi
+          rm -f out/terrain3/uhd/index.json; cp -r out/terrain3/uhd out/tiles/uhd; cp -r out/hd5/hd out/tiles/hd
+          echo "new UHD $(ls out/tiles/uhd | wc -l) · new HD $(ls out/tiles/hd | wc -l)"
+      - uses: actions/upload-artifact@v4
+        with: { name: tiles, path: out/tiles, retention-days: 5, if-no-files-found: warn }
+
+  stills:
+    needs: [direct, tiles]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { path: art }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: bash production/ci/apt.sh ffmpeg unzip && pip install -q numpy scipy pillow
+      - name: Assets of the order (read-only from our releases) + the new tiles
+        env: { GH_TOKEN: "${{ github.token }}" }
+        working-directory: factory/engine
+        run: |
+          set -e
+          PUB=public; mkdir -p $PUB/music $PUB/sfx $PUB/flags/4x3 $PUB/archive $PUB/icons $PUB/clips $PUB/hd $PUB/uhd $PUB/fonts $PUB/sig
+          cp ../orders/$ORDER/data/*.json src/data/ 2>/dev/null || true
+          cp ../../art/direction/film.json src/data/film.json
+          if [ "$ORDER" = "ussr15" ]; then
+            curl -sfL --retry 3 -o $PUB/voice.wav "$REL/voice4/voice.wav"
+            curl -sfL --retry 3 -o /tmp/sfx.zip "$REL/stage1/sfx.zip" && (cd $PUB/sfx && unzip -q -o /tmp/sfx.zip)
+            for c in c1_hook c2_origins c3_annex c4_collapse c5_resolution; do curl -sfL --retry 3 -o $PUB/music/music_$c.mp3 "$REL/stage1/music_$c.mp3"; done
+            curl -sfL --retry 3 -o $PUB/caucasus.mp4 "$REL/cauc3/caucasus.mp4"
+            curl -sfL --retry 3 -o $PUB/matryoshka.webm "$REL/assets4/matryoshka.webm"
+            curl -sfL --retry 3 -o /tmp/uhd.zip "$REL/assets4/uhd.zip" && (cd $PUB && unzip -q -o /tmp/uhd.zip && rm -f uhd/index.json)
+            curl -sfL --retry 3 -o /tmp/uhd5.zip "$REL/tiles5/uhd5.zip" && (cd $PUB && unzip -q -o /tmp/uhd5.zip)
+            for f in basemap_v2.jpg basemap_v2_half.jpg globe_night.jpg hd_tiles.zip archive.zip; do curl -sfL --retry 3 -o /tmp/$f "$REL/assets3/$f"; done
+            mv /tmp/basemap_v2.jpg /tmp/basemap_v2_half.jpg $PUB/
+            ffmpeg -v error -y -i /tmp/globe_night.jpg -vf scale=4096:2048 -q:v 2 $PUB/globe_night_4k.jpg
+            (cd $PUB && unzip -q -o /tmp/hd_tiles.zip && rm -f hd/index.json)
+            curl -sfL --retry 3 -o /tmp/hd5.zip "$REL/tiles5/hd5.zip" && (cd $PUB && unzip -q -o /tmp/hd5.zip)
+            (cd $PUB/archive && unzip -q -o /tmp/archive.zip)
+            curl -sfL --retry 3 -o /tmp/cutouts.zip "$REL/assets4/cutouts.zip" && (cd $PUB/archive && unzip -q -o /tmp/cutouts.zip)
+            curl -sfL --retry 3 -o /tmp/icons.zip "$REL/assets4/icons.zip" && (cd $PUB/icons && unzip -q -o /tmp/icons.zip)
+            for f in article72.mp4 uti.mp4; do curl -sfL --retry 3 -o $PUB/clips/$f "$REL/assets2/$f"; done
+            curl -sfL --retry 3 -o $PUB/clips/opening.mp4 "$REL/opening/opening.mp4"
+            curl -sfL --retry 3 -A "videomaps/1.0" -o $PUB/sig/yeltsin.svg "https://upload.wikimedia.org/wikipedia/commons/0/0a/Yeltsin_signature.svg"
+            curl -sfL --retry 3 -A "videomaps/1.0" -o $PUB/sig/kravchuk.svg "https://upload.wikimedia.org/wikipedia/commons/4/4c/Leonid_Kravchuk_signature_1991.svg"
+            curl -sfL --retry 3 -A "videomaps/1.0" -o $PUB/sig/shushkevich.png "https://upload.wikimedia.org/wikipedia/commons/7/76/Signature_of_Stanislau_Shushkevich.png"
+          fi
+          (mkdir -p /tmp/s2 && cd /tmp/s2 && python $GITHUB_WORKSPACE/production/pipeline/sfx2.py > /dev/null && cp out/sfx/*.wav $GITHUB_WORKSPACE/factory/engine/$PUB/sfx/)
+          cp ../../fonts/*.ttf $PUB/fonts/
+          (cd /tmp && npm i --no-audit --no-fund --loglevel=error flag-icons@7.6.0 && cp -r node_modules/flag-icons/flags/4x3/. $GITHUB_WORKSPACE/factory/engine/$PUB/flags/4x3/)
+          cp ../../art/tiles/uhd/*.jpg $PUB/uhd/ 2>/dev/null || true
+          cp ../../art/tiles/hd/*.jpg $PUB/hd/ 2>/dev/null || true
+          python3 - <<'PY'
+          import json, os, glob
+          h = json.load(open('src/data/hd_index.json')); have = {tuple(t) for t in h['tiles']}
+          for f in glob.glob('public/hd/t_*.jpg'):
+              i, j = map(int, os.path.basename(f)[2:-4].split('_')); have.add((i, j))
+          h['tiles'] = sorted([list(t) for t in have]); json.dump(h, open('src/data/hd_index.json', 'w'))
+          u = sorted([list(map(int, os.path.basename(f)[2:-4].split('_'))) for f in glob.glob('public/uhd/u_*.jpg') if os.path.getsize(f)])
+          json.dump({'tile': 256, 'k': 8, 'tiles': u}, open('src/data/uhd_index.json', 'w'))
+          print('HD tiles', len(h['tiles']), 'UHD tiles', len(u))
+          PY
+          python3 - <<'PY'
+          import json, numpy as np
+          from PIL import Image, ImageFilter
+          A = 'public/archive'
+          for i in json.load(open('src/data/film.json')).get('depth_ids', []):
+              try:
+                  im = Image.open(f'{A}/{i}.jpg').convert('RGB')
+                  if im.width > 1100: im = im.resize((1100, round(im.height * 1100 / im.width)), Image.LANCZOS)
+                  d = np.asarray(Image.open(f'{A}/{i}_depth.png').convert('L').resize(im.size, Image.BICUBIC)).astype(np.float32)
+              except FileNotFoundError as e:
+                  print('no depth layer for', i, e); continue
+              lo, hi = np.percentile(d, 3), np.percentile(d, 97)
+              n = np.clip((d - lo) / max(hi - lo, 1.0), 0, 1)
+              a = np.clip((n - 0.55) / 0.25, 0, 1); a = a * a * (3 - 2 * a)
+              m = Image.fromarray((a * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(1.6))
+              out = im.copy(); out.putalpha(m); out.save(f'{A}/{i}_fg.png', optimize=True)
+          PY
+          python ../../production/pipeline/measure_assets.py
+          python3 - <<'PY'
+          import json, os, re
+          F = json.load(open('src/data/film.json')); miss = []
+          s = json.dumps(F)
+          for m in set(re.findall(r'"((?:music|clips|archive|icons|sig)/[^"]+\.(?:mp3|mp4|webm|jpg|png|svg))"', s)):
+              if not os.path.exists('public/' + m): miss.append(m)
+          for c in F['clips']:
+              if not os.path.exists('public/' + c['src']): miss.append(c['src'])
+          for i in F['icons']:
+              if not os.path.exists(f"public/icons/{i['name']}_a{i['az']}.png"): miss.append(f"icons/{i['name']}_a{i['az']}.png")
+          for e in F['sfx']:
+              if not os.path.exists(f"public/sfx/{e['f']}.wav"): miss.append(f"sfx/{e['f']}.wav")
+          miss = sorted(set(miss)); print('MISSING:', miss) if miss else print('all referenced assets present')
+          PY
+          du -sh $PUB
+      - name: Final audit with the measured assets + verification stills
+        working-directory: factory/engine
+        run: |
+          set -e
+          npm ci --no-audit --no-fund --loglevel=error
+          mkdir -p out/stills
+          npx -y tsx tools/audit.ts out/audit_final.json > out/audit_final.txt; tail -n 30 out/audit_final.txt
+          npx -y tsx tools/blur.ts 0.25 1.5 > out/blur.txt 2>&1 || true; tail -n 12 out/blur.txt
+          S="$STILLS"; [ -z "$S" ] && S="27.3 38.5 59.5 98 119.5 248 264 330 366 383 411 458.5 475 490"
+          node scripts/stills4.mjs out/stills $S
+      - name: Side-by-side sheets with the reference stills
+        if: env.COMPARE != 'none'
+        env: { GH_TOKEN: "${{ github.token }}" }
+        working-directory: factory/engine
+        run: |
+          set -e
+          mkdir -p /tmp/ref out/compare
+          gh release download "$COMPARE" -R ${{ github.repository }} -p 't*.jpg' -D /tmp/ref || true
+          python3 - <<'PY'
+          import glob, os
+          from PIL import Image, ImageDraw, ImageFont
+          F = ImageFont.truetype('public/fonts/Inter.ttf', 26)
+          for f in sorted(glob.glob('out/stills/t*.jpg')):
+              n = os.path.basename(f); r = f'/tmp/ref/{n}'
+              if not os.path.exists(r): continue
+              a = Image.open(r).convert('RGB').resize((960, 540), Image.LANCZOS); b = Image.open(f).convert('RGB').resize((960, 540), Image.LANCZOS)
+              s = Image.new('RGB', (1920, 590), (12, 24, 34)); s.paste(a, (0, 50)); s.paste(b, (960, 50))
+              d = ImageDraw.Draw(s); t = n[1:-4].replace('_', '.')
+              d.text((20, 10), f'v5 (hand-made)  ·  t = {t} s', font=F, fill=(244, 239, 230)); d.text((980, 10), 'FACTORY (automatic director)', font=F, fill=(226, 191, 106))
+              s.save(f'out/compare/cmp_{n}', quality=92)
+          print('side-by-side', len(glob.glob('out/compare/*.jpg')))
+          PY
+      - name: Publish
+        env: { GH_TOKEN: "${{ github.token }}" }
+        working-directory: factory/engine
+        run: |
+          set -e
+          cp ../../art/direction/director_report.txt ../../art/direction/audit*.txt out/ 2>/dev/null || true
+          gh release delete "$TAG" -y --cleanup-tag -R ${{ github.repository }} 2>/dev/null || true
+          gh release create "$TAG" -R ${{ github.repository }} --title "$TAG" --notes "factory phase 1: automatic director - order $ORDER" \
+            out/stills/*.jpg out/compare/*.jpg out/*.txt src/data/film.json 2>/dev/null \
+            || gh release create "$TAG" -R ${{ github.repository }} --title "$TAG" --notes "factory phase 1" out/stills/*.jpg out/*.txt src/data/film.json

@@ -1,0 +1,7 @@
+{
+  "compilerOptions": {
+    "target": "ES2022", "module": "ES2022", "moduleResolution": "node", "strict": false, "esModuleInterop": true,
+    "resolveJsonModule": true, "skipLibCheck": true, "noEmit": true, "lib": ["ES2022"], "types": ["node"]
+  },
+  "include": ["main.ts", "lib/*.ts"]
+}
