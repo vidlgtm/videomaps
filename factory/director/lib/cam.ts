@@ -88,16 +88,20 @@ const W_FLOOR: Record<string, number> = {close: 480, region: 900, context: 1400,
 const POINT_W: Record<string, number> = {close: 900, region: 1400, context: 2500, auto: 1250};
 export const SAFE = {x0: 96, y0: 96, x1: 1824, y1: 984};
 /** projected bounds of a world box at a camera state */
-export function projBounds(c: CamState, b: Box) {
+export function projBounds(c: CamState, b: Box | [number, number][]) {
   const pts: [number, number][] = [];
-  for (let i = 0; i <= 4; i++) for (let j = 0; j <= 4; j++) if (i === 0 || i === 4 || j === 0 || j === 4) pts.push([lerp(b[0], b[2], i / 4), lerp(b[1], b[3], j / 4)]);
+  if (Array.isArray(b[0])) pts.push(...(b as [number, number][]));
+  else { const x = b as Box; for (let i = 0; i <= 4; i++) for (let j = 0; j <= 4; j++) if (i === 0 || i === 4 || j === 0 || j === 4) pts.push([lerp(x[0], x[2], i / 4), lerp(x[1], x[3], j / 4)]); }
   const q = pts.map((p) => project(c, p[0], p[1]));
   return {x0: Math.min(...q.map((p) => p.x)), x1: Math.max(...q.map((p) => p.x)), y0: Math.min(...q.map((p) => p.y)), y1: Math.max(...q.map((p) => p.y))};
 }
 /** key that shows world box b at fraction f of the title-safe frame (lon/lat key with local-north rotation) */
-export function frameBox(b: Box, kind = 'auto', opts: {tiltAdd?: number; wMul?: number} = {}): CamKey {
+/** key that shows the places (outline points, or a box) at fraction f of the title-safe frame (lon/lat key, local north) */
+export function frameBox(b: Box | [number, number][], kind = 'auto', opts: {tiltAdd?: number; wMul?: number} = {}): CamKey {
   const f = FRAC[kind] ?? 0.7;
-  let cx = (b[0] + b[2]) / 2, cy = (b[1] + b[3]) / 2, w = 2000;
+  const P = Array.isArray(b[0]) ? (b as [number, number][]) : null;
+  const bb: Box = P ? [Math.min(...P.map((p) => p[0])), Math.min(...P.map((p) => p[1])), Math.max(...P.map((p) => p[0])), Math.max(...P.map((p) => p[1]))] : (b as Box);
+  let cx = (bb[0] + bb[2]) / 2, cy = (bb[1] + bb[3]) / 2, w = 2000;
   const fw = (SAFE.x1 - SAFE.x0) * f, fh = (SAFE.y1 - SAFE.y0) * f;
   for (let it = 0; it < 4; it++) {
     const ll = lonlat(cx, cy), tilt = clamp(tiltFor(w) + (opts.tiltAdd ?? 0), 0, 40);

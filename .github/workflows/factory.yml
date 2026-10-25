@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       order: { description: 'order folder (factory/orders/<name>)', default: 'ussr15' }
-      tag: { description: 'result release tag (must start with factory_)', default: 'factory_ussr15_test3' }
+      tag: { description: 'result release tag (must start with factory_)', default: 'factory_ussr15_test4' }
       stills: { description: 'seconds of the verification stills', default: '27.3 38.5 59.5 98 119.5 248 264 330 366 383 411 458.5 475 490' }
       compare: { description: 'release holding reference stills with the same names (none = no side-by-side)', default: 'test_v5' }
 concurrency:
@@ -22,7 +22,7 @@ permissions:
   contents: write
 env:
   ORDER: ${{ inputs.order || 'ussr15' }}
-  TAG: ${{ inputs.tag || 'factory_ussr15_test3' }}
+  TAG: ${{ inputs.tag || 'factory_ussr15_test4' }}
   STILLS: ${{ inputs.stills }}
   COMPARE: ${{ inputs.compare || 'test_v5' }}
   REL: https://github.com/${{ github.repository }}/releases/download
@@ -212,7 +212,11 @@ jobs:
               d = ImageDraw.Draw(s); t = n[1:-4].replace('_', '.')
               d.text((20, 10), f'v5 (hand-made)  ·  t = {t} s', font=F, fill=(244, 239, 230)); d.text((980, 10), 'FACTORY (automatic director)', font=F, fill=(226, 191, 106))
               s.save(f'out/compare/cmp_{n}', quality=92)
-          print('side-by-side', len(glob.glob('out/compare/*.jpg')))
+          files = sorted(glob.glob('out/compare/cmp_*.jpg'), key=lambda f: float(os.path.basename(f)[5:-4].replace('_', '.')))
+          if files:
+              pages = [Image.open(f).convert('RGB') for f in files]
+              pages[0].save('out/compare/COMPARE_v5_vs_factory.pdf', save_all=True, append_images=pages[1:], resolution=150)
+          print('side-by-side', len(files))
           PY
       - name: Publish
         env: { GH_TOKEN: "${{ github.token }}" }
@@ -222,5 +226,5 @@ jobs:
           cp ../../art/direction/director_report.txt ../../art/direction/audit*.txt out/ 2>/dev/null || true
           gh release delete "$TAG" -y --cleanup-tag -R ${{ github.repository }} 2>/dev/null || true
           gh release create "$TAG" -R ${{ github.repository }} --title "$TAG" --notes "factory phase 1: automatic director - order $ORDER" \
-            out/stills/*.jpg out/compare/*.jpg out/*.txt src/data/film.json 2>/dev/null \
+            out/stills/*.jpg out/compare/*.jpg out/compare/*.pdf out/*.txt src/data/film.json 2>/dev/null \
             || gh release create "$TAG" -R ${{ github.repository }} --title "$TAG" --notes "factory phase 1" out/stills/*.jpg out/*.txt src/data/film.json

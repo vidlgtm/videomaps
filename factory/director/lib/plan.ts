@@ -9,7 +9,7 @@ import type {Order, Storyboard, Assets, Constitution, Beat} from './types';
 
 type RB = {key: string; pid: string; c: number; i: number; t: number; t1: number; b: Beat};
 type Shot = {t: number; place: Place | null; kind: string; key: string; explicit: boolean; box: Box | null; pt: [number, number] | null;
-  variant?: number; tiltAdd?: number; wMul?: number; hold?: boolean; shiftW?: [number, number]; box0?: Box | null};
+  variant?: number; tiltAdd?: number; wMul?: number; hold?: boolean; shiftW?: [number, number]; box0?: Box | null; pts?: [number, number][]};
 const OPTS = new Set(['cue', 'until', 'look', 'like', 'except', 'style', 'at', 'glide', 'sub', 'side', 'pulse', 'alert', 'dot', 'num', 'group',
   'title', 'near', 'name', 'caption', 'signatures', 'size', 'kind', 'layers', 'tempo', 'steps', 'labels', 'shot', 'params', 'hi', 'hi_cue', 'op', 'color',
   'width', 'note', 'dates', 'km', 'text', 'italic', 'order', 'stagger']);
@@ -153,6 +153,7 @@ export class Director {
       const g = rb.b.go;
       const pl = g === 'overview' || g === 'wide' ? null : this.place(g);
       sh.push({t: rb.t, place: pl, kind: rb.b.shot ?? (pl ? 'auto' : 'wide'), key: 'cam:' + rb.key, explicit: true, box: pl?.box ?? null, pt: pl?.pt ?? null,
+        pts: pl && pl.shape.length > 1 ? pl.shape : undefined,
         hold: rb.b.camera === 'hold'});
     });
     // wide chapter openings (constitution camera.chapter_opens_wide)
@@ -177,7 +178,8 @@ export class Director {
       k = overviewKey(this.area, s.variant ?? ovCount);
       if (wm !== 1) k = {...k, w: Math.round(Math.min(9800, k.w * wm))};
       if (s.shiftW) k = {...k, x: Math.round(k.x! + s.shiftW[0]), y: Math.round(k.y! + s.shiftW[1])};
-    } else if (s.box) k = frameBox(s.box, s.kind, {tiltAdd: s.tiltAdd, wMul: wm});
+    } else if (s.pts) k = frameBox(s.pts, s.kind, {tiltAdd: s.tiltAdd, wMul: wm});
+    else if (s.box) k = frameBox(s.box, s.kind, {tiltAdd: s.tiltAdd, wMul: wm});
     else { k = framePoint(s.pt!, s.kind); if (wm !== 1) k = {...k, w: Math.round(Math.min(9800, k.w * wm))}; }
     if (p.shift) {                                                             // audit feedback: move the view by screen px (bounded)
       const sh = [clamp(p.shift[0], -220, 220), clamp(p.shift[1], -220, 220)];
@@ -248,7 +250,7 @@ export class Director {
     const grow = Math.max((nb[2] - nb[0]) / Math.max(1, b0[2] - b0[0]), (nb[3] - nb[1]) / Math.max(1, b0[3] - b0[1]));
     if (grow > 1.35) return 'no';
     if (nb[0] === base[0] && nb[1] === base[1] && nb[2] === base[2] && nb[3] === base[3]) return 'no';
-    s.box = nb; if (s.kind === 'close') s.kind = 'region';
+    s.box = nb; if (s.pts) s.pts = [...s.pts, ...pts]; if (s.kind === 'close') s.kind = 'region';
     this.warn.push(`camera: ${s.key} re-framed x${grow.toFixed(2)} for ${why}`);
     return 'fixed';
   }

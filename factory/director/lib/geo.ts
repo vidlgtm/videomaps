@@ -30,7 +30,7 @@ export function lonlat(wx: number, wy: number): [number, number] {
   return [Math.round(lon * 1000) / 1000, Math.round(lat * 1000) / 1000];
 }
 export type Box = [number, number, number, number];
-export type Place = {name: string; pt: [number, number]; box: Box | null; lonlat: [number, number]; ids: string[]; city?: string};
+export type Place = {name: string; pt: [number, number]; box: Box | null; lonlat: [number, number]; ids: string[]; city?: string; shape: [number, number][]};
 /** world-px points of an SVG path string (M/L absolute coordinates as written by geodata.py) */
 const ptsOf = (d?: string): [number, number][] => {
   if (!d) return [];
@@ -66,6 +66,14 @@ export function ringsOf(id: string): [number, number][][] {
   if (cur.length > 2) out.push(cur);
   return (RINGS[id] = out);
 }
+/** up to ~160 outline points of a region (all its rings), or of a line, for framing */
+export function shapeOf(id: string): [number, number][] {
+  let pts: [number, number][] = ringsOf(id).flat();
+  if (!pts.length) pts = ptsOf(PATHS[id]?.d);
+  if (!pts.length) { const b = boxOf(PATHS[id] ?? ({} as any)); return b ? [[b[0], b[1]], [b[2], b[3]]] : [pointOf(PATHS[id])]; }
+  const k = Math.max(1, Math.floor(pts.length / 160));
+  return pts.filter((_, i) => i % k === 0);
+}
 /** even-odd point-in-region test in world px */
 export function insideRegion(id: string, x: number, y: number) {
   let inside = false;
@@ -92,13 +100,13 @@ export class Gazetteer {
     if (depth > 6) fail(`place definition loops: ${JSON.stringify(q)}`);
     if (Array.isArray(q) && q.length === 2 && typeof q[0] === 'number') {
       const pt = px(q[0], q[1]) as [number, number];
-      return {name: `[${q[0]}, ${q[1]}]`, pt, box: null, lonlat: [q[0], q[1]], ids: []};
+      return {name: `[${q[0]}, ${q[1]}]`, pt, box: null, lonlat: [q[0], q[1]], ids: [], shape: [pt]};
     }
     if (Array.isArray(q)) {
       const ps = q.map((x) => this.resolve(x, depth + 1));
       const box = unionBox(ps.map((p) => p.box), ps.filter((p) => !p.box).map((p) => p.pt))!;
       const pt: [number, number] = [(box[0] + box[2]) / 2, (box[1] + box[3]) / 2];
-      return {name: ps.map((p) => p.name).join(' + '), pt, box, lonlat: lonlat(pt[0], pt[1]), ids: ps.flatMap((p) => p.ids)};
+      return {name: ps.map((p) => p.name).join(' + '), pt, box, lonlat: lonlat(pt[0], pt[1]), ids: ps.flatMap((p) => p.ids), shape: ps.flatMap((p) => p.shape)};
     }
     if (typeof q !== 'string') return fail(`bad place: ${JSON.stringify(q)}`);
     const s = q.trim();
@@ -109,11 +117,11 @@ export class Gazetteer {
     }
     if (PATHS[s]) {
       const p = PATHS[s], pt = pointOf(p);
-      return {name: s, pt, box: boxOf(p), lonlat: lonlat(pt[0], pt[1]), ids: [s]};
+      return {name: s, pt, box: boxOf(p), lonlat: lonlat(pt[0], pt[1]), ids: [s], shape: shapeOf(s)};
     }
     const low = s.toLowerCase();
     const city = Object.keys(CITIES).find((c) => c.toLowerCase() === low);
-    if (city) return {name: city, pt: CITIES[city].px, box: null, lonlat: CITIES[city].lonlat, ids: [], city};
+    if (city) return {name: city, pt: CITIES[city].px, box: null, lonlat: CITIES[city].lonlat, ids: [], city, shape: [CITIES[city].px]};
     for (const pre of ['rep:', 'rr:', 'brk:', 'shape:', 'ctx:', 'river:']) {
       const id = Object.keys(PATHS).find((k) => k.startsWith(pre) && (k.slice(pre.length).toLowerCase() === low || (PATHS[k].name ?? '').toLowerCase() === low));
       if (id) return this.resolve(id, depth + 1);
