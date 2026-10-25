@@ -9,7 +9,7 @@ import type {Order, Storyboard, Assets, Constitution, Beat} from './types';
 
 type RB = {key: string; pid: string; c: number; i: number; t: number; t1: number; b: Beat};
 type Shot = {t: number; place: Place | null; kind: string; key: string; explicit: boolean; box: Box | null; pt: [number, number] | null;
-  variant?: number; tiltAdd?: number; wMul?: number; hold?: boolean; shiftW?: [number, number]};
+  variant?: number; tiltAdd?: number; wMul?: number; hold?: boolean; shiftW?: [number, number]; box0?: Box | null};
 const OPTS = new Set(['cue', 'until', 'look', 'like', 'except', 'style', 'at', 'glide', 'sub', 'side', 'pulse', 'alert', 'dot', 'num', 'group',
   'title', 'near', 'name', 'caption', 'signatures', 'size', 'kind', 'layers', 'tempo', 'steps', 'labels', 'shot', 'params', 'hi', 'hi_cue', 'op', 'color',
   'width', 'note', 'dates', 'km', 'text', 'italic', 'order', 'stagger']);
@@ -241,11 +241,15 @@ export class Director {
       if (Math.abs(nx - cur[0]) < 2 && Math.abs(ny - cur[1]) < 2) return 'no';
       s.shiftW = [nx, ny]; this.warn.push(`camera: overview slid for ${why}`); return 'fixed';
     }
-    const base: Box = s.box ?? (s.pt ? [s.pt[0] - 80, s.pt[1] - 80, s.pt[0] + 80, s.pt[1] + 80] : this.area);
+    // the original target of the shot bounds every re-framing: at most 1.35x its size, never compounding
+    if (s.box0 === undefined) s.box0 = s.box ?? (s.pt ? [s.pt[0] - 80, s.pt[1] - 80, s.pt[0] + 80, s.pt[1] + 80] : null);
+    const b0 = s.box0 ?? this.area, base: Box = s.box ?? b0;
     const nb = unionBox([base], pts)!;
-    const grow = Math.max((nb[2] - nb[0]) / Math.max(1, base[2] - base[0]), (nb[3] - nb[1]) / Math.max(1, base[3] - base[1]));
-    if (grow > 1.5) return 'no';
+    const grow = Math.max((nb[2] - nb[0]) / Math.max(1, b0[2] - b0[0]), (nb[3] - nb[1]) / Math.max(1, b0[3] - b0[1]));
+    if (grow > 1.35) return 'no';
+    if (nb[0] === base[0] && nb[1] === base[1] && nb[2] === base[2] && nb[3] === base[3]) return 'no';
     s.box = nb; if (s.kind === 'close') s.kind = 'region';
+    this.warn.push(`camera: ${s.key} re-framed x${grow.toFixed(2)} for ${why}`);
     return 'fixed';
   }
 
@@ -623,7 +627,7 @@ export class Director {
       let from = cs + 0.1, to = cs + 3.6;
       const scr = [...this.F.cutouts, ...this.F.docs, ...this.F.numerals, ...this.F.cards.filter((c) => c.kind !== 'chapter')]
         .filter((e) => e.from > from + 0.5 && e.from < to);
-      if (scr.length) to = Math.max(from + 2.2, Math.min(...scr.map((e) => e.from)) + 0.35);
+      if (scr.length) to = Math.max(from + 2.2, Math.min(...scr.map((e) => e.from)) - 0.05);
       // the previous paragraph may still be speaking: never cover its last words
       if (ch.cs[0] > 0 && this.pEnd(ch.cs[0] - 1) > from - 0.3) from = this.pEnd(ch.cs[0] - 1) + 0.3;
       this.F.cards.push({kind: 'chapter', num: ch.n ?? undefined, text: ch.title.toUpperCase(), from: r3(from), to: r3(to), _k: `chapter${k}`});

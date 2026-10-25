@@ -14,7 +14,7 @@ export type Label = {text: string; at: string | [number, number]; size: number; 
 /** city marker (city name must exist in data/geo.json cities) */
 export type Marker = {city: string; label?: string; sub?: string; from: number; to?: number; color?: string; pulse?: boolean; side?: 'r' | 'l' | 't' | 'b'; dot?: boolean};
 /** flag drop: iso key -> FLAG_CODE[iso] (flag-icons 4x3 code); anchor = 'rep:'+iso label or at [lon, lat] */
-export type Flag = {iso: string; t: number; to?: number; date?: string; at?: [number, number]; atUntil?: number};
+export type Flag = {iso: string; t: number; to?: number; date?: string; at?: [number, number]; atUntil?: number; hide?: [number, number][]};
 export type Line = {pts: [number, number][]; from: number; dur: number; to?: number; color: string; width: number; dash?: boolean};
 export type Ring = {at: string; km: number[]; from: number; to?: number};
 export type Card = {kind: 'date' | 'chapter' | 'quote' | 'big' | 'title' | 'strike' | 'end' | 'callout'; text: string; sub?: string; from: number; to: number;

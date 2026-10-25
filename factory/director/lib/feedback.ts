@@ -26,7 +26,7 @@ export function feedbackToPatches(audit: any, d: Director, film: any, patches: R
   const shifted = new Set<string>();
   const camShift = (t: number, dx: number, dy: number) => {                // last resort, small and once per shot per pass
     const i = d.path.keyAt(t), src = d.keys[i]?.src;
-    if (!src || src.includes('/drift') || shifted.has(src)) return;
+    if (!src || src.includes('/drift') || shifted.has(src) || d.keys[i].x !== undefined) return;   // overviews slide in the director instead
     shifted.add(src);
     const q = P[src] ?? {};
     P[src] = {...q, shift: [clamp((q.shift?.[0] ?? 0) + clamp(dx, -90, 90), -220, 220), clamp((q.shift?.[1] ?? 0) + clamp(dy, -90, 90), -220, 220)]};

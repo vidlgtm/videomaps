@@ -8,7 +8,7 @@ import * as path from 'path';
 import {readJSON, exists, r3, DirectorError} from './lib/util';
 import {Cues} from './lib/cues';
 import {Director} from './lib/plan';
-import {visibility, placement, rhythm} from './lib/fit';
+import {visibility, placement, rhythm, flagCuts} from './lib/fit';
 import {sound} from './lib/sound';
 import {feedbackToPatches} from './lib/feedback';
 
@@ -53,6 +53,7 @@ try {
     (assets.clips?.[op.clip]?.opening_sfx ?? []).forEach((s: any) => d.sfx(s.f, s.at, s.v ?? 0.3));
   } else d.opening = {clip: null, mapIn: 0, end: -1000, textOut: 0, lines: []};
   const drifts = rhythm(d);
+  flagCuts(d);
   sound(d);
   // credits under the end card, from the archive licences (assets.json "credits")
   const lic: Record<string, string[]> = {};

@@ -159,6 +159,16 @@ export function placement(d: Director) {
   const BC = [[140, 0], [-140, 0], [0, 100], [140, 100], [-140, 100], [0, -90]];
   d.F.banners.forEach((b) => spots(b, BC, (c, w) => BX.bannerBox(c, w, b.size ?? 1)));
   d.F.icons.forEach((i) => spots(i, [[120, 0], [-120, 0], [0, 90], [120, 90], [-120, 90], [0, -80]], (c, w) => BX.iconBox(c, w, i.size ?? 1, d.a.icons?.[i.name]?.bb)));
+  // two billboards that would cover each other never stand together: the earlier one leaves (or the later one waits)
+  const bs = [...d.F.banners].sort((a, b) => a.from - b.from);
+  for (let i = 0; i < bs.length; i++) for (let j = i + 1; j < bs.length; j++) {
+    const a = bs[i], b = bs[j];
+    if (b.from >= a.to - 0.1) continue;
+    const t = Math.max(a.from, b.from) + 0.6, c = d.path.at(t);
+    if (BX.inter(BX.bannerBox(c, W(a.at), a.size ?? 1), BX.bannerBox(c, W(b.at), b.size ?? 1)) < 400) continue;
+    if (b.from - a.from >= 2.5) a.to = r3(b.from - 0.1); else b.from = r3(a.to + 0.1);
+    if (b.to - b.from < 1.5) b.to = r3(b.from + 0.01);
+  }
   // marker label side
   d.F.markers.forEach((m) => {
     if (m.dot || !(m.label || m.sub) || m._fixedSide) return;
@@ -234,4 +244,29 @@ export function rhythm(d: Director) {
   for (let j = 0; j + 1 < events.length; j++) if (events[j + 1] - events[j] > 4.6) drift(events[j] + 2.0);
   if (add.length) { d.keys = [...d.keys, ...add].sort((a, b) => a.t - b.t); d.path = new (d.path.constructor as any)(d.keys); }
   return add.length;
+}
+
+// ---------------------------------------------------------------- flags of the map state
+/** a state flag that a later shot would CUT at the frame edge steps back while that shot holds (fade 0.4 s) */
+export function flagCuts(d: Director) {
+  for (const f of d.F.flags) {
+    const end = Math.min(f.to, d.END);
+    const marks: number[] = [];
+    for (let t = f.t + 0.8; t < end; t += 0.25) {
+      if (d.F.flag_hide.some(([a, b]: number[]) => t > a && t < b)) continue;
+      const c = d.path.at(t), c2 = d.path.at(t + 0.1), q = scr(c2, [c.x, c.y]);
+      if (Math.hypot(q.x - 960, q.y - 540) / 0.1 + Math.abs(Math.log(c2.zoom / c.zoom)) * 4000 > 150) continue;   // moving (as the audit)
+      const b = BX.flagBox(c, flagAnchor(d, f, t), f.date);
+      const visW = Math.min(b.x1, 1920) - Math.max(b.x0, 0), visH = Math.min(b.y1, 1080) - Math.max(b.y0, 0);
+      if (visW < 4 || visH < 4) continue;                    // fully outside: not seen
+      if (BX.outBy(b, 2) > 0) marks.push(t);
+    }
+    const hide: [number, number][] = [];
+    for (const t of marks) {
+      const last = hide[hide.length - 1];
+      if (last && t - last[1] <= 0.6) last[1] = t; else hide.push([t, t]);
+    }
+    const iv = hide.filter(([a, b]) => b - a >= 0.2).map(([a, b]) => [r3(a - 0.45), r3(b + 0.45)] as [number, number]);
+    if (iv.length) { f.hide = iv; d.warn.push(`flag ${f.iso} steps back while cut by the frame: ${iv.map(([a, b]) => `${a}-${b}`).join(', ')}`); }
+  }
 }

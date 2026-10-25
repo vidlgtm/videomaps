@@ -43,7 +43,8 @@ export function flagLayout(t: number, cam: CamState): FlagL[] {
     const ov = cam.zoom < 0.42 ? OFF[f.iso] ?? [0, 0] : [0, 0];
     const k = clamp((0.42 - cam.zoom) / 0.1) * gk;
     out.push({iso: f.iso, f, x: q.x + ov[0] * k * sizeK, y: q.y + ov[1] * k * sizeK, ax: q.x, ay: q.y, size: sizeK * q.s,
-      o: env(t, f.t - 0.05, f.to ?? 1e9, 0.15, 0.6) * (hidden ? hideO : 1), dateO: f.date ? env(t, f.t + 0.3, f.t + 3.2, 0.3, 0.6) : 0});
+      o: env(t, f.t - 0.05, f.to ?? 1e9, 0.15, 0.6) * (hidden ? hideO : 1) * ((f.hide ?? []) as number[][]).reduce((m, [a, b]) => Math.min(m, 1 - env(t, a, b, 0.4, 0.4)), 1),
+      dateO: f.date ? env(t, f.t + 0.3, f.t + 3.2, 0.3, 0.6) : 0});
   });
   // v4: flags never sit on each other - symmetric relaxation (newer flags move more), leader lines drawn by <Flag/>
   out.sort((a, b) => a.f.t - b.f.t);
@@ -143,8 +144,12 @@ function namesAt(t: number, cam: CamState, flags: FlagL[]): NameL[] {
     while (text.length * fs * em > sw * 1.15 && fs > (ctx ? 15 : 16)) fs -= 1;
     if (text.length * fs * em > sw * 1.2 || sh < fs * 1.3) return;
     const dy = underFlag(q, fs, flags);
-    const [nx, ny] = dy ? unproject(cam, q.x, q.y + dy) : [wx, wy];
-    out.push({id: 'name:' + key, text, sub, ctx, wx: nx, wy: ny, fs, o: v.o * (ctx ? 0.62 : 1), q: {x: q.x, y: q.y + dy, s: q.s}});
+    // FACTORY: a name is never cut by the frame - it slides inward up to 40 % of its width, otherwise it stays hidden
+    const hw = (text.length * fs * em) / 2 + 8, M = 36;
+    const dx = q.x - hw < M ? M - (q.x - hw) : q.x + hw > 1920 - M ? 1920 - M - (q.x + hw) : 0;
+    if (Math.abs(dx) > 0.8 * hw || q.y + dy - 0.6 * fs < 30 || q.y + dy + 1.2 * fs > 1050) return;
+    const [nx, ny] = dy || dx ? unproject(cam, q.x + dx, q.y + dy) : [wx, wy];
+    out.push({id: 'name:' + key, text, sub, ctx, wx: nx, wy: ny, fs, o: v.o * (ctx ? 0.62 : 1), q: {x: q.x + dx, y: q.y + dy, s: q.s}});
   });
   return out;
 }
