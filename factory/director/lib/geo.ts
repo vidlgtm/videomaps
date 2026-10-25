@@ -31,7 +31,26 @@ export function lonlat(wx: number, wy: number): [number, number] {
 }
 export type Box = [number, number, number, number];
 export type Place = {name: string; pt: [number, number]; box: Box | null; lonlat: [number, number]; ids: string[]; city?: string};
-const boxOf = (p: PathRec): Box | null => (p.bbox && p.bbox.length === 4 ? [p.bbox[0], p.bbox[1], p.bbox[2], p.bbox[3]] : null);
+/** world-px points of an SVG path string (M/L absolute coordinates as written by geodata.py) */
+const ptsOf = (d?: string): [number, number][] => {
+  if (!d) return [];
+  const n = d.match(/-?\d+(\.\d+)?/g)?.map(Number) ?? [];
+  const out: [number, number][] = [];
+  for (let i = 0; i + 1 < n.length; i += 2) out.push([n[i], n[i + 1]]);
+  return out;
+};
+const boxOf = (p: PathRec): Box | null => {
+  if (p.bbox && p.bbox.length === 4) return [p.bbox[0], p.bbox[1], p.bbox[2], p.bbox[3]];
+  const q = ptsOf(p.d); if (!q.length) return null;
+  return [Math.min(...q.map((x) => x[0])), Math.min(...q.map((x) => x[1])), Math.max(...q.map((x) => x[0])), Math.max(...q.map((x) => x[1]))];
+};
+/** a representative point of a path: its label anchor, else the middle vertex of its line, else its box centre */
+export const pointOf = (p: PathRec): [number, number] => {
+  if (p.label) return p.label;
+  const q = ptsOf(p.d); if (q.length) return q[Math.floor(q.length / 2)];
+  const b = boxOf(p); return b ? [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2] : [0, 0];
+};
+export const hasLabel = (id: string) => !!PATHS[id]?.label;
 export const unionBox = (bs: (Box | null)[], pts: [number, number][] = []): Box | null => {
   const xs: number[] = [], ys: number[] = [];
   bs.forEach((b) => { if (b) { xs.push(b[0], b[2]); ys.push(b[1], b[3]); } });
@@ -65,8 +84,8 @@ export class Gazetteer {
       return {...p, name: s};
     }
     if (PATHS[s]) {
-      const p = PATHS[s];
-      return {name: s, pt: p.label, box: boxOf(p), lonlat: lonlat(p.label[0], p.label[1]), ids: [s]};
+      const p = PATHS[s], pt = pointOf(p);
+      return {name: s, pt, box: boxOf(p), lonlat: lonlat(pt[0], pt[1]), ids: [s]};
     }
     const low = s.toLowerCase();
     const city = Object.keys(CITIES).find((c) => c.toLowerCase() === low);

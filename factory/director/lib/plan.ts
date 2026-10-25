@@ -1,7 +1,7 @@
 // THE AUTOMATIC DIRECTOR: the brain's beats (WHAT, pinned to words) -> every element of the film (HOW: exact times,
 // camera, positions, sizes, colours, sides, sound). Rules come from factory/rules/constitution.json and our film v5.
 import {Cues} from './cues';
-import {Gazetteer, Place, PATHS, unionBox, Box, lonlat, px} from './geo';
+import {Gazetteer, Place, PATHS, unionBox, Box, lonlat, px, hasLabel} from './geo';
 import {CamKey, CamPath, frameBox, framePoint, overviewKey, keyDistance, keyState, inSafe, unproject, scr} from './cam';
 import * as BX from './boxes';
 import {arr, clamp, r2, r3, fail, hash} from './util';
@@ -377,7 +377,7 @@ export class Director {
   a_label(rb: RB, v: any) {
     const style = rb.b.style ?? (rb.b.italic ? 'water' : 'region');
     const pl = this.place(rb.b.at ?? v);
-    const at: string | [number, number] = pl.ids.length === 1 && !pl.city ? pl.ids[0] : pl.lonlat;
+    const at: string | [number, number] = pl.ids.length === 1 && !pl.city && hasLabel(pl.ids[0]) ? pl.ids[0] : pl.lonlat;
     const from = rb.t + 0.3;
     const to = this.until(rb, rb.b.until, () => this.endDefault(rb, 2.5, 12));
     const el: any = {text: v, at, size: rb.b.size ?? this.labelSize(at, from, style, v), from: r3(from), to: r3(to)};
@@ -524,7 +524,7 @@ export class Director {
   }
   a_rings(rb: RB, v: any) {
     const pl = this.place(v);
-    const at = pl.ids.length === 1 ? pl.ids[0] : (pl.lonlat as any);
+    const at = pl.ids.length === 1 && hasLabel(pl.ids[0]) ? pl.ids[0] : (pl.lonlat as any);
     const to = this.until(rb, rb.b.until, () => this.endDefault(rb, 2.5, 10));
     this.push('rings', {at, km: rb.b.km ?? [130, 260, 390], from: r3(rb.t), to: r3(to)}, `${rb.key}/ring`);
   }
