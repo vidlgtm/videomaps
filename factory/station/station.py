@@ -270,19 +270,19 @@ def focus_point(img, d):
     nearest large region of the depth map, pulled towards the centre"""
     np = np_()
     fs = faces(img)
-    if fs:
+    if fs and max(f[2] for f in fs) >= 0.035:                    # tiny faces = background people, not the subject
         big = max(f[2] * f[3] for f in fs)
         fs = [f for f in fs if f[2] * f[3] >= 0.15 * big]
         wsum = sum(f[2] * f[3] for f in fs)
         fx = sum(f[0] * f[2] * f[3] for f in fs) / wsum
         fy = sum((f[1] + 0.3 * f[3]) * f[2] * f[3] for f in fs) / wsum
-        return [round(min(0.95, max(0.05, fx)), 3), round(min(0.95, max(0.05, fy)), 3)], f"{len(fs)} face(s)"
+        return [round(float(min(0.88, max(0.12, fx))), 3), round(float(min(0.85, max(0.15, fy))), 3)], f"{len(fs)} face(s)"
+    # no clear face: the nearest region only moves the crop sideways a little; vertically the centre is kept (the nearest
+    # thing in buildings / landscapes is the ground, a lower crop would cut roofs and skylines)
     dd = np.asarray(d, np.float32); h, w = dd.shape
-    m = dd >= np.percentile(dd, 80)
-    ys, xs = np.nonzero(m)
+    ys, xs = np.nonzero(dd >= np.percentile(dd, 80))
     if not len(xs): return [0.5, 0.5], "centre"
-    cx, cy = xs.mean() / w, ys.mean() / h
-    return [round(0.5 + 0.6 * (cx - 0.5), 3), round(0.5 + 0.6 * (cy - 0.5), 3)], "nearest region"
+    return [round(float(0.5 + 0.4 * (xs.mean() / w - 0.5)), 3), 0.5], "no face: nearest region sideways, centre height"
 
 
 RB = None

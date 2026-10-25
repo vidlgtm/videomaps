@@ -61,7 +61,12 @@ jobs:
               docker run --rm --user root --entrypoint bash -v "$GITHUB_WORKSPACE":/w -w /w $M -c '
                 set -e
                 pip install -q scipy
-                mkdir -p /root/.local/share/fonts && cp fonts/*.ttf /root/.local/share/fonts/ && (fc-cache -f > /dev/null 2>&1 || true)
+                # house fonts system-wide (the image runs with HOME=/manim, so ~/.local/share/fonts of root is not searched)
+                mkdir -p /usr/local/share/fonts/house && cp fonts/*.ttf /usr/local/share/fonts/house/ && fc-cache -f > /dev/null 2>&1
+                for f in "Cormorant Garamond" "Great Vibes"; do
+                  fc-list : family | grep -qi "$f" || { echo "::error::font $f not visible to Manim"; exit 1; }
+                done
+                echo "fonts ok: $(fc-list : family | grep -i -E "cormorant|great vibes" | sort -u | tr "\n" ";")"
                 for j in out/station_tmp/docs_json/*.json; do
                   n=$(basename $j .json)
                   (cd factory/station && DOC_JSON=/w/$j manim render -qh --fps 30 -r 1920,1080 doc_scene.py Doc -o $n 2>&1 | tail -3)
@@ -72,6 +77,7 @@ jobs:
               echo "::warning::Manim image unavailable - building Manim on the runner"
               bash production/ci/apt.sh libcairo2-dev libpango1.0-dev pkg-config ffmpeg fontconfig
               mkdir -p ~/.local/share/fonts && cp fonts/*.ttf ~/.local/share/fonts/ && fc-cache -f > /dev/null
+              for f in "Cormorant Garamond" "Great Vibes"; do fc-list : family | grep -qi "$f" || { echo "::error::font $f missing"; exit 1; }; done
               pip install -q "manim==0.22.0" scipy
               for j in out/station_tmp/docs_json/*.json; do
                 n=$(basename $j .json)
@@ -261,6 +267,38 @@ jobs:
           npx -y tsx tools/blur.ts 0.25 1.5 > out/blur.txt 2>&1 || true; tail -n 12 out/blur.txt
           S="$STILLS"; [ -z "$S" ] && S="27.3 38.5 59.5 98 119.5 248 264 330 366 383 411 458.5 475 490"
           node scripts/stills4.mjs out/stills $S
+          # every asset of the processing station once in the film (when no comparison still already shows it)
+          mkdir -p out/stills_station
+          S="$S" python3 - <<'PY'
+          import json, os
+          F = json.load(open('src/data/film.json')); P = json.load(open('../../art/pack/pack.json'))
+          cmp = [float(x) for x in os.environ['S'].split()]
+          docclips = {v['clip'] for v in P.get('docs', {}).values() if v.get('clip')}
+          items, seen = [], set()
+          for k, kind in (('banners', 'banner'), ('docs', 'document'), ('cutouts', 'portrait')):
+              for e in sorted(F[k], key=lambda e: e['from']):
+                  if e['img'] in seen: continue
+                  seen.add(e['img'])
+                  if any(x['img'] == e['img'] and x['from'] <= T <= x['to'] for x in F[k] for T in cmp): continue   # already in a comparison still
+                  d = e['to'] - e['from']; n = len(e.get('sigs') or [])
+                  t = min(e['from'] + 3.8, e['to'] - 0.45) if n else e['from'] + min(1.6, 0.55 * d)
+                  items.append([round(t, 2), f"{kind} {e['img'].split('/')[-1].rsplit('.', 1)[0].replace('_cut', '')}" + (f" ({n} signatures)" if n else '')])
+          for c in sorted(F['clips'], key=lambda c: c['from']):
+              if c['src'] in docclips and c['src'] not in seen:
+                  seen.add(c['src']); items.append([round(c['to'] - 0.5, 2), f"Manim document {c['src'].split('/')[-1][:-4]}"])
+          items.sort(); keep = []
+          for t, l in items:
+              if keep and t - keep[-1][0] < 0.8: keep[-1][1] += ' + ' + l
+              else: keep.append([t, l])
+          keep = keep[:20]
+          json.dump({f"s{str(t).replace('.', '_')}.jpg": l for t, l in keep}, open('out/stills_station/labels.json', 'w'), indent=1)
+          open('/tmp/station_times', 'w').write(' '.join(str(t) for t, _ in keep))
+          print('station stills:', keep)
+          PY
+          if [ -s /tmp/station_times ]; then
+            node scripts/stills4.mjs out/stills_station $(cat /tmp/station_times)
+            for f in out/stills_station/t*.jpg; do mv "$f" "out/stills_station/s${f##*/t}"; done
+          fi
       - name: Side-by-side sheets with the reference stills
         if: env.COMPARE != 'none'
         env: { GH_TOKEN: "${{ github.token }}" }
@@ -285,9 +323,20 @@ jobs:
           if files:
               pages = [Image.open(f).convert('RGB') for f in files]
               pages[0].save('out/compare/COMPARE_v5_vs_factory.pdf', save_all=True, append_images=pages[1:], resolution=150)
-          # one review file: the station's sheets first, then the side-by-side stills
+          # the station's assets as the film shows them (two stills per page)
+          import json
+          lab = json.load(open('out/stills_station/labels.json')) if os.path.exists('out/stills_station/labels.json') else {}
+          st = sorted(glob.glob('out/stills_station/s*.jpg'), key=lambda f: float(os.path.basename(f)[1:-4].replace('_', '.')))
+          inf = []
+          for k in range(0, len(st), 2):
+              s = Image.new('RGB', (1920, 590), (12, 24, 34)); d = ImageDraw.Draw(s)
+              for j, f in enumerate(st[k:k + 2]):
+                  n = os.path.basename(f); s.paste(Image.open(f).convert('RGB').resize((960, 540), Image.LANCZOS), (960 * j, 50))
+                  d.text((20 + 960 * j, 10), f"t = {n[1:-4].replace('_', '.')} s  ·  {lab.get(n, '')}"[:62], font=F, fill=(226, 191, 106))
+              s.save(f'out/compare/station_in_film_{k // 2 + 1}.jpg', quality=92); inf.append(f'out/compare/station_in_film_{k // 2 + 1}.jpg')
+          # one review file: the station's sheets, the station's assets in the film, then the side-by-side stills with v5
           sheets = sorted(glob.glob('../../art/pack/sheets/station_*.jpg'), key=lambda f: int(f.rsplit('_', 1)[1][:-4]))
-          allp = [Image.open(f).convert('RGB') for f in sheets + files]
+          allp = [Image.open(f).convert('RGB') for f in sheets + inf + files]
           if allp: allp[0].save('out/compare/REVIEW_station_and_stills.pdf', save_all=True, append_images=allp[1:], resolution=150)
           print('side-by-side', len(files), '· review pages', len(allp))
           PY
@@ -300,5 +349,5 @@ jobs:
           mkdir -p out/station && cp ../../art/pack/sheets/* ../../art/pack/station_report.txt ../../art/pack/pack.json out/station/ 2>/dev/null || true
           gh release delete "$TAG" -y --cleanup-tag -R ${{ github.repository }} 2>/dev/null || true
           gh release create "$TAG" -R ${{ github.repository }} --title "$TAG" --notes "factory: automatic director + processing station - order $ORDER" \
-            out/stills/*.jpg out/compare/*.jpg out/compare/*.pdf out/*.txt out/station/* src/data/film.json 2>/dev/null \
+            out/stills/*.jpg out/stills_station/*.jpg out/compare/*.jpg out/compare/*.pdf out/*.txt out/station/* src/data/film.json 2>/dev/null \
             || gh release create "$TAG" -R ${{ github.repository }} --title "$TAG" --notes "factory" out/stills/*.jpg out/*.txt src/data/film.json
