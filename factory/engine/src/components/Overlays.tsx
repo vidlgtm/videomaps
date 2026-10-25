@@ -210,7 +210,7 @@ const Flagpole: React.FC<{t: number}> = ({t}) => {
 const CAUC_NAMES: [string, string][] = [['Grozny', 'CHECHNYA'], ['Sukhumi', 'ABKHAZIA'], ['Tskhinvali', 'SOUTH OSSETIA'],
   ['Tbilisi', 'GEORGIA'], ['Mount Elbrus', 'Mount Elbrus'], ['CASPIAN SEA', 'Caspian Sea'], ['BLACK SEA', 'Black Sea']];
 const CaucLabels: React.FC<{t: number}> = ({t}) => {
-  const clip = CLIPS.find((c) => c.kind === 'cauc');
+  const clip = CLIPS.find((c) => c.kind === 'cauc' && !!c.labels && t >= c.from - 0.1 && t <= c.to + 0.1);
   if (!clip) return null;
   const o = env(t, clip.from + 0.6, clip.to, 0.6, 0.5);
   if (o <= 0) return null;

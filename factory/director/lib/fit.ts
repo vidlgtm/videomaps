@@ -27,7 +27,10 @@ const settle = (d: Director, from: number, to: number) => {
 const extentPts = (c: any, b: BX.SBox): [number, number][] => [unproject(c, b.x0, b.y0), unproject(c, b.x1, b.y0), unproject(c, b.x0, b.y1), unproject(c, b.x1, b.y1)];
 
 /** a point inside region id that the camera c shows inside the title-safe frame with margins (closest to its anchor) */
-export function innerPoint(id: string, c: any, mx: number, mtop: number, mbot: number): [number, number] | null {
+/** inner point of region `id` near its label point whose element box (anchor + rel) stays in the title-safe frame;
+ *  with `avoid`, the box must also keep 24 px away from that screen box */
+export function innerPoint(id: string, c: any, mx: number, mtop: number, mbot: number,
+  avoid?: {box: BX.SBox; rel: [number, number, number, number]}): [number, number] | null {
   const P = PATHS[id]; if (!P?.bbox) return null;
   const [x0, y0, x1, y1] = P.bbox, a = scr(c, P.label ?? [(x0 + x1) / 2, (y0 + y1) / 2]);
   let best: [number, number] | null = null, bd = Infinity;
@@ -36,6 +39,10 @@ export function innerPoint(id: string, c: any, mx: number, mtop: number, mbot: n
     if (!insideRegion(id, wx, wy)) continue;
     const q = scr(c, [wx, wy]);
     if (q.x < SAFE.x0 + mx || q.x > SAFE.x1 - mx || q.y < SAFE.y0 + mtop || q.y > SAFE.y1 - mbot) continue;
+    if (avoid) {
+      const b = BX.B(q.x + avoid.rel[0] - 24, q.y + avoid.rel[1] - 24, q.x + avoid.rel[2] + 24, q.y + avoid.rel[3] + 24);
+      if (BX.inter(b, avoid.box) > 0) continue;
+    }
     const dd = Math.hypot(q.x - a.x, q.y - a.y);
     if (dd < bd) { bd = dd; best = [wx, wy]; }
   }
@@ -149,6 +156,7 @@ export function placement(d: Director) {
   d.F.docs.forEach((o) => { if (!o.side) { const cut = d.F.cutouts.find((c) => overlapT(c, o)); o.side = cut ? (cut.side === 'r' ? 'l' : 'r') : 'r'; } });
   // banners and icons: the spot near their place that covers nothing and stays in frame
   const spots = (el: any, cands: number[][], box: (c: any, w: [number, number]) => BX.SBox) => {
+    if (el._keep) return;                                             // placed by the audit feedback: stays
     const ts = samples(el.from, el.to), tc = settle(d, el.from, el.to), c0 = d.path.at(tc), q = scr(c0, W(el.at));
     const c00 = cost(d, el, ts, (t) => box(d.path.at(t), W(el.at)));
     if (c00 < 1500) return;                                           // nothing covered: the pole stands on its place
@@ -186,7 +194,7 @@ export function placement(d: Director) {
     m.side = best;
   });
   // date cards: top-left unless something lives there
-  d.F.cards.filter((c) => c.kind === 'date').forEach((cd) => {
+  d.F.cards.filter((c) => c.kind === 'date' && !c._posFixed).forEach((cd) => {
     const ts = samples(cd.from, cd.to);
     const tl = cost(d, cd, ts, () => BX.dateBox(cd.text, cd.sub, 'tl')), tr = cost(d, cd, ts, () => BX.dateBox(cd.text, cd.sub, 'tr'));
     cd.pos = tr < tl * 0.8 ? 'tr' : 'tl';

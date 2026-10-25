@@ -22,8 +22,9 @@ export type Card = {kind: 'date' | 'chapter' | 'quote' | 'big' | 'title' | 'stri
 export type Portrait = {img: string; name: string; sub?: string; caption?: string; captionFrom?: number; side: 'left' | 'right'; from: number; to: number};
 /** stepped clip playback: from film time `at`, play source seconds s0..s1 (then hold the last frame) */
 export type Step = {at: number; s0: number; s1: number; rate?: number};
-/** 'manim' / 'doll' = transparent overlay video (webm alpha); 'cauc' = full-frame 3D clip (labels from data/caucasus_labels.json) */
-export type Clip = {src: string; from: number; to: number; steps: Step[]; kind: 'manim' | 'doll' | 'cauc'; dx?: number};
+/** 'manim' / 'doll' = transparent overlay video (webm alpha); 'cauc' = full-frame clip (3D fly-over, Manim document);
+ *  `labels` = this clip carries the 3D label track (data/caucasus_labels.json) - set only from assets.json clips.<id>.labels */
+export type Clip = {src: string; from: number; to: number; steps: Step[]; kind: 'manim' | 'doll' | 'cauc'; dx?: number; labels?: string};
 export type Sfx = {f: string; t: number; v?: number};
 export type Music = {src: string; from: number; to: number; lufs: number; xin?: number; xout?: number};
 export type GlobeKey = {t: number; lon: number; lat: number; dist: number};

@@ -67,7 +67,8 @@
      0,
      9.9
     ]
-   }
+   },
+   "labels": "caucasus_labels.json"
   },
   "opening": {
    "src": "clips/opening.mp4",

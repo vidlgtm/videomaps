@@ -12,7 +12,9 @@ Folder: factory/orders/<name>/   (one folder = one film; example: factory/orders
   storyboard.json   the brain's decisions for every paragraph (below)
   sources.json      the brain's picks: archival photos (Wikimedia Commons file names), document texts, signatures,
                     extra flags (below). The processing station fetches, checks, processes and credits them.
-  assets.json       3D clips, icons and music the factory already has (until the phase 3 workshop)
+  assets.json       3D clips, icons and music the factory already has (until the phase 3 workshop); a full-frame 3D
+                    clip with a label track declares it: "clips": {"<id>": {..., "labels": "<file in data/>"}}
+                    (the labels are drawn over that clip only; one label track per film until phase 3)
   data/             written by the factory (timeline.json from the voice job, tile indexes)
 
 -------------------------------------------------------------------------------------------------- order.json

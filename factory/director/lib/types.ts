@@ -13,6 +13,7 @@ export type Order = {
   end?: {text: string; sub?: string};
 };
 export type ClipAsset = {src: string; kind: 'doll' | 'cauc' | 'manim'; segments: Record<string, [number, number, number?]>; rate?: number;
+  /** this clip has a 3D label track (file name in the order's data/), drawn over it by the engine */ labels?: string;
   dx_with_labels?: number; sfx?: {f: string; at: number; v?: number}[]; opening_sfx?: {f: string; at: number; v?: number}[]};
 export type Assets = {
   archive?: Record<string, {file: string; aspect?: number; depth?: boolean; focus?: [number, number]}>;

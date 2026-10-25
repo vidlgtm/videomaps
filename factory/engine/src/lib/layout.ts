@@ -276,7 +276,7 @@ export function layoutAt(t: number): Layout {
 }
 
 // ---------------- declutter ----------------
-const covered = (a: Item, b: Item) => { const i = inter(a, b); return i > 0 && (i > 0.08 * area(a) || i > 700); };
+export const covered = (a: Item, b: Item) => { const i = inter(a, b); return i > 0 && (i > 0.08 * area(a) || i > 700); };
 function visibleAt(L: Layout): Map<string, number> {
   const vis = new Map<string, number>();
   const nameArea = (it: Item) => area(it) * (it.id.includes('|ctx') ? 0.3 : 1);
