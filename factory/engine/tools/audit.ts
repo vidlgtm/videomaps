@@ -1,6 +1,6 @@
 // FACTORY quality audit of the whole film (machine-readable for the director's second pass + human summary):
 //  * overlaps that stay BOTH VISIBLE after the renderer's declutter (same rules as tools/overlaps.ts)
-//  * OFF-SCREEN: a map text/billboard cut by the frame edge while visible and the camera is settled (new gate)
+//  * OFF-SCREEN: a map text/billboard CUT by the frame edge (partly seen) while visible and the camera is settled (new gate)
 //  * SAFE: inside the frame but outside the 96 px title-safe area for more than 1 s (warning)
 // usage: npx tsx tools/audit.ts out/audit.json   -> exit code 0 always; the workflow decides from the JSON
 import * as fs from 'fs';
@@ -54,6 +54,8 @@ for (let f = 0; f < N; f += STEP) {
   for (const x of it) {
     if (!MAPKINDS.has(x.kind) || x.o < 0.5 || !vis.get(x.id)) continue;
     const out = Math.max(0 - x.x0, x.x1 - 1920, 0 - x.y0, x.y1 - 1080);
+    const visW = Math.min(x.x1, 1920) - Math.max(x.x0, 0), visH = Math.min(x.y1, 1080) - Math.max(x.y0, 0);
+    if (visW < 10 || visH < 10) continue;                    // entirely outside the frame = not seen = fine
     if (out > 6 && !moving) touch('off', x.id, f, () => ({a: x.id, ka: x.kind, f0: f, f1: f, worst: 0, box: [x.x0, x.y0, x.x1, x.y1].map(Math.round)}), out);
     else {
       const s = Math.max(SAFE - x.x0, x.x1 - (1920 - SAFE), SAFE * 0.6 - x.y0, x.y1 - (1080 - SAFE * 0.6));

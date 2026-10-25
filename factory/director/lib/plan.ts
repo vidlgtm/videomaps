@@ -9,7 +9,7 @@ import type {Order, Storyboard, Assets, Constitution, Beat} from './types';
 
 type RB = {key: string; pid: string; c: number; i: number; t: number; t1: number; b: Beat};
 type Shot = {t: number; place: Place | null; kind: string; key: string; explicit: boolean; box: Box | null; pt: [number, number] | null;
-  variant?: number; tiltAdd?: number; wMul?: number; hold?: boolean};
+  variant?: number; tiltAdd?: number; wMul?: number; hold?: boolean; shiftW?: [number, number]};
 const OPTS = new Set(['cue', 'until', 'look', 'like', 'except', 'style', 'at', 'glide', 'sub', 'side', 'pulse', 'alert', 'dot', 'num', 'group',
   'title', 'near', 'name', 'caption', 'signatures', 'size', 'kind', 'layers', 'tempo', 'steps', 'labels', 'shot', 'params', 'hi', 'hi_cue', 'op', 'color',
   'width', 'note', 'dates', 'km', 'text', 'italic', 'order', 'stagger']);
@@ -172,14 +172,19 @@ export class Director {
   shotKey(s: Shot, ovCount: number): CamKey {
     const p = this.patches[s.key] ?? {};
     let k: CamKey;
-    if (!s.place) { k = overviewKey(this.area, s.variant ?? ovCount); const wm = (s.wMul ?? 1) * (p.wmul ?? 1); if (wm !== 1) k = {...k, w: Math.round(Math.min(9800, k.w * wm))}; }
-    else if (s.box) k = frameBox(s.box, s.kind, {tiltAdd: s.tiltAdd, wMul: (s.wMul ?? 1) * (p.wmul ?? 1)});
-    else k = framePoint(s.pt!, s.kind);
-    if (p.shift && k.lon !== undefined) {                                     // audit feedback: move the view by screen px
-      const c = keyState(k), [wx, wy] = unproject(c, 960 + p.shift[0], 540 + p.shift[1]), l = lonlat(wx, wy);
-      k = {...k, lon: r3(l[0]), lat: r3(l[1])};
+    const wm = clamp((s.wMul ?? 1) * (p.wmul ?? 1), 0.8, 1.25);
+    if (!s.place) {
+      k = overviewKey(this.area, s.variant ?? ovCount);
+      if (wm !== 1) k = {...k, w: Math.round(Math.min(9800, k.w * wm))};
+      if (s.shiftW) k = {...k, x: Math.round(k.x! + s.shiftW[0]), y: Math.round(k.y! + s.shiftW[1])};
+    } else if (s.box) k = frameBox(s.box, s.kind, {tiltAdd: s.tiltAdd, wMul: wm});
+    else { k = framePoint(s.pt!, s.kind); if (wm !== 1) k = {...k, w: Math.round(Math.min(9800, k.w * wm))}; }
+    if (p.shift) {                                                             // audit feedback: move the view by screen px (bounded)
+      const sh = [clamp(p.shift[0], -220, 220), clamp(p.shift[1], -220, 220)];
+      const c = keyState(k), [wx, wy] = unproject(c, 960 + sh[0], 540 + sh[1]);
+      if (k.lon !== undefined) { const l = lonlat(wx, wy); k = {...k, lon: r3(l[0]), lat: r3(l[1])}; }
+      else k = {...k, x: Math.round(wx), y: Math.round(wy)};
     }
-    if (p.wmul && !s.box) k = {...k, w: Math.round(k.w * p.wmul)};
     return k;
   }
   buildKeys() {
@@ -201,9 +206,9 @@ export class Director {
         const a = keyState(prev), b = keyState(k);
         const m = Math.abs(Math.log(b.zoom / a.zoom)) + Math.hypot(b.x - a.x, b.y - a.y) * Math.min(a.zoom, b.zoom) / 1920;
         const hook = this.chOf[this.cues.tl.chunks.findIndex((ch) => ch.end >= s.t)] === 0;
-        dur = clamp(1.35 + 0.55 * m, hook ? 1.3 : 1.6, 3.0);
+        dur = clamp(1.25 + 0.32 * m, hook ? 1.3 : 1.6, hook ? 2.4 : 2.8);
         if (!s.explicit && !s.place) dur = Math.max(dur, 2.0);
-        lead = clamp(0.12 + 0.12 * dur, 0.2, 0.5);
+        lead = clamp(0.15 + 0.12 * dur, 0.2, 0.5);
       }
       let t = i === 0 ? 0 : s.t - lead;
       const win = this.inWindow(s.t);
@@ -220,17 +225,28 @@ export class Director {
     this.moves = keys.filter((k, i) => i > 0 && keyDistance(keys[i - 1], k) > 0.3).map((k) => k.t);
   }
   /** make every world point in pts visible (title-safe) while the shot covering t is held: re-frame that shot */
-  ensureVisible(t: number, pts: [number, number][], why: string) {
+  /** 'ok' = already visible, 'fixed' = the shot was re-framed a little, 'no' = would need too much (the element adapts instead) */
+  ensureVisible(t: number, pts: [number, number][], why: string): 'ok' | 'fixed' | 'no' {
     const c = this.path.at(t);
-    if (pts.every((p) => inSafe(c, p, 30))) return false;
+    if (pts.every((p) => inSafe(c, p, 24))) return 'ok';
     const i = this.path.keyAt(t), k = this.keys[i];
     const s = this.shots.find((x) => x.key === k.src);
-    if (!s) return false;
-    const base: Box = s.box ?? (s.pt ? [s.pt[0] - 60, s.pt[1] - 60, s.pt[0] + 60, s.pt[1] + 60] : this.area);
+    if (!s) return 'no';
+    if (!s.place) {                                                          // overview: slide (never wider than the canvas)
+      const q = pts.map((p) => scr(c, p));
+      const lo = Math.min(...q.map((p) => p.y)), hi = Math.max(...q.map((p) => p.y)), le = Math.min(...q.map((p) => p.x)), ri = Math.max(...q.map((p) => p.x));
+      const dy = hi > 960 ? hi - 960 : lo < 120 ? lo - 120 : 0, dx = ri > 1800 ? ri - 1800 : le < 120 ? le - 120 : 0;
+      if (Math.abs(dx) < 4 && Math.abs(dy) < 4) return 'no';
+      const cur = s.shiftW ?? [0, 0], nx = clamp(cur[0] + dx / c.zoom, -320, 320), ny = clamp(cur[1] + dy / c.zoom, -320, 320);
+      if (Math.abs(nx - cur[0]) < 2 && Math.abs(ny - cur[1]) < 2) return 'no';
+      s.shiftW = [nx, ny]; this.warn.push(`camera: overview slid for ${why}`); return 'fixed';
+    }
+    const base: Box = s.box ?? (s.pt ? [s.pt[0] - 80, s.pt[1] - 80, s.pt[0] + 80, s.pt[1] + 80] : this.area);
     const nb = unionBox([base], pts)!;
-    if (!s.place) { s.wMul = (s.wMul ?? 1) * 1.08; this.warn.push(`camera: overview widened for ${why}`); }
-    else { s.box = nb; if (s.kind === 'close') s.kind = 'region'; }
-    return true;
+    const grow = Math.max((nb[2] - nb[0]) / Math.max(1, base[2] - base[0]), (nb[3] - nb[1]) / Math.max(1, base[3] - base[1]));
+    if (grow > 1.5) return 'no';
+    s.box = nb; if (s.kind === 'close') s.kind = 'region';
+    return 'fixed';
   }
 
   // ------------------------------------------------------------------ helpers for elements
@@ -359,7 +375,7 @@ export class Director {
     if (v !== 'hide') fail(`beat ${rb.key}: "flags" only takes "hide"`);
     this.F.flag_hide.push([r3(rb.t - 0.5), r3(this.until(rb, rb.b.until, () => this.pEnd(rb.c)))]);
   }
-  labelSize(at: string | [number, number], t: number, style: string, text: string): number {
+  labelSize(at: string | [number, number], t: number, style: string, text: string, sub?: string): number {
     const c = this.path.at(t + 0.6);
     if (style === 'water') {
       const k = /ocean/i.test(text) ? 1 : /sea/i.test(text) ? 0.76 : /gulf|bay|lake|strait/i.test(text) ? 0.68 : 0.6;
@@ -369,7 +385,7 @@ export class Director {
     if (typeof at === 'string' && PATHS[at]?.area_px) {
       const q = scr(c, PATHS[at].label);
       const L = Math.sqrt(PATHS[at].area_px!) * c.zoom * q.s;
-      if (style === 'title') return Math.round(clamp(L * 0.12, 40, 120));
+      if (style === 'title') return Math.round(clamp(L * 0.12, 40, 120) * (sub ? 0.6 : 1));
       return Math.round(clamp(L * 0.085, 20, text.length > 14 ? 34 : 52));
     }
     return style === 'small' ? 20 : style === 'title' ? 64 : 24;
@@ -380,7 +396,7 @@ export class Director {
     const at: string | [number, number] = pl.ids.length === 1 && !pl.city && hasLabel(pl.ids[0]) ? pl.ids[0] : pl.lonlat;
     const from = rb.t + 0.3;
     const to = this.until(rb, rb.b.until, () => this.endDefault(rb, 2.5, 12));
-    const el: any = {text: v, at, size: rb.b.size ?? this.labelSize(at, from, style, v), from: r3(from), to: r3(to)};
+    const el: any = {text: v, at, size: rb.b.size ?? this.labelSize(at, from, style, v, rb.b.sub), from: r3(from), to: r3(to)};
     if (style === 'water' || style === 'italic') el.italic = true;
     if (rb.b.sub) el.sub = rb.b.sub;
     if (rb.b.color) el.color = rb.b.color;
@@ -457,7 +473,7 @@ export class Director {
   a_banner(rb: RB, v: any) {
     const A = this.a.archive?.[v] ?? fail(`beat ${rb.key}: banner image "${v}" is not in assets.json archive`);
     const pl = this.place(rb.b.near ?? rb.b.at ?? fail(`beat ${rb.key}: banner needs "near": place`));
-    const from = rb.t + 0.25, to = this.until(rb, rb.b.until, () => this.endDefault(rb, 3, 14, 'banner') - 0.2);
+    const from = rb.t + 0.15, to = this.until(rb, rb.b.until, () => this.endDefault(rb, 3, 14, 'banner') - 0.2);
     const el: any = {at: pl.lonlat, img: A.file, title: rb.b.title ?? fail(`beat ${rb.key}: banner needs "title"`), from: r3(from), to: r3(to)};
     if (rb.b.sub) el.sub = rb.b.sub;
     if (rb.b.size) el.size = rb.b.size;

@@ -83,10 +83,10 @@ export function tiltFor(w: number) {
   return TILT[TILT.length - 1][1];
 }
 export const W_MIN = 480, W_MAX = 9800;
-const FRAC: Record<string, number> = {close: 0.8, region: 0.62, context: 0.38, auto: 0.55};
-const W_FLOOR: Record<string, number> = {close: 480, region: 1000, context: 1800, auto: 1000};
+const FRAC: Record<string, number> = {close: 0.8, region: 0.62, context: 0.4, auto: 0.55};
+const W_FLOOR: Record<string, number> = {close: 480, region: 900, context: 1400, auto: 1000};
 const POINT_W: Record<string, number> = {close: 900, region: 1400, context: 2500, auto: 1250};
-const SAFE = {x0: 96, y0: 96, x1: 1824, y1: 984};
+export const SAFE = {x0: 96, y0: 96, x1: 1824, y1: 984};
 /** projected bounds of a world box at a camera state */
 export function projBounds(c: CamState, b: Box) {
   const pts: [number, number][] = [];
@@ -129,12 +129,12 @@ export function framePoint(p: [number, number], kind = 'auto'): CamKey {
 }
 /** whole film area, canvas-aligned (north up, no rotation) like our overview shots */
 export function overviewKey(area: Box, variant = 0): CamKey {
-  const V = [{tilt: 0, w: 1.0, dx: 0, dy: 0}, {tilt: 10, w: 0.94, dx: -160, dy: 40}, {tilt: 6, w: 0.97, dx: 240, dy: 0}, {tilt: 4, w: 1.03, dx: 0, dy: -40},
-    {tilt: 12, w: 0.92, dx: 120, dy: 60}][variant % 5];
+  const V = [{tilt: 0, w: 1.0, dx: 0, dy: 0}, {tilt: 4, w: 0.97, dx: -120, dy: 30}, {tilt: 7, w: 0.95, dx: 160, dy: -10}, {tilt: 2, w: 1.0, dx: 60, dy: 40},
+    {tilt: 5, w: 0.98, dx: -60, dy: 10}][variant % 5];
   const cx = (area[0] + area[2]) / 2, cy = (area[1] + area[3]) / 2;
   const wpx = Math.max(area[2] - area[0], (area[3] - area[1]) * 16 / 9) * 1.1;
   const w = clamp(wpx * KM_PER_PX * V.w, 2000, W_MAX);
-  return {t: 0, x: Math.round(cx + V.dx), y: Math.round(cy - 140 + V.dy), w: Math.round(w), tilt: V.tilt, rotK: 0};
+  return {t: 0, x: Math.round(cx + V.dx), y: Math.round(cy - 110 + V.dy), w: Math.round(w), tilt: V.tilt, rotK: 0};
 }
 /** similarity of two keys (0 = same framing) */
 export function keyDistance(a: CamKey, b: CamKey) {

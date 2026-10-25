@@ -4,7 +4,8 @@
 import type {Director} from './plan';
 import {px, lonlat, PATHS} from './geo';
 import {unproject, scr} from './cam';
-import {r3} from './util';
+import {r3, clamp} from './util';
+import {innerPoint} from './fit';
 
 const ARR: Record<string, string> = {banner: 'banners', icon: 'icons', mlab: 'markers', label: 'labels', card: 'cards', doc: 'docs', cut: 'cutouts',
   cutn: 'cutouts', num: 'numerals', tag: 'tags'};
@@ -22,10 +23,13 @@ export function feedbackToPatches(audit: any, d: Director, film: any, patches: R
     return film[a]?.[i] ? {arr: a, key: film.keys[a][i], el: film[a][i]} : null;
   };
   const set = (e: {arr: string; key: string}, s: any) => { const k = `${e.arr}:${e.key}`; P[k] = {set: {...(P[k]?.set ?? {}), ...s}}; };
-  const camShift = (t: number, dx: number, dy: number, wmul = 1) => {
+  const shifted = new Set<string>();
+  const camShift = (t: number, dx: number, dy: number) => {                // last resort, small and once per shot per pass
     const i = d.path.keyAt(t), src = d.keys[i]?.src;
-    if (!src || src.includes('/drift')) return;
-    const q = P[src] ?? {}; P[src] = {...q, shift: [(q.shift?.[0] ?? 0) + dx, (q.shift?.[1] ?? 0) + dy], wmul: (q.wmul ?? 1) * wmul};
+    if (!src || src.includes('/drift') || shifted.has(src)) return;
+    shifted.add(src);
+    const q = P[src] ?? {};
+    P[src] = {...q, shift: [clamp((q.shift?.[0] ?? 0) + clamp(dx, -90, 90), -220, 220), clamp((q.shift?.[1] ?? 0) + clamp(dy, -90, 90), -220, 220)]};
   };
   const moveAt = (e: {arr: string; key: string; el: any}, t: number, dx: number, dy: number) => {
     const c = d.path.at(t), at = e.el.at;
@@ -38,9 +42,16 @@ export function feedbackToPatches(audit: any, d: Director, film: any, patches: R
     const e = elOf(v.a, v.t0); if (!e) continue;
     const [x0, y0, x1, y1] = v.box, m = 40;
     const dx = x0 < 0 ? -x0 + m : x1 > 1920 ? 1920 - x1 - m : 0, dy = y0 < 0 ? -y0 + m : y1 > 1080 ? 1080 - y1 - m : 0;
+    const c = d.path.at(v.t0 + 0.2);
     if (e.arr === 'markers') set(e, {side: dx > 0 ? 'r' : dx < 0 ? 'l' : dy > 0 ? 'b' : 't', _fixedSide: true});
     else if (e.arr === 'banners' || e.arr === 'icons' || (e.arr === 'labels' && Array.isArray(e.el.at))) moveAt(e, v.t0 + 0.2, dx, dy);
-    else camShift(v.t0, -dx, -dy, 1.04);
+    else if (e.arr === 'labels' && typeof e.el.at === 'string') {
+      const p = innerPoint(e.el.at, c, (x1 - x0) / 2 + 12, 30, 40);
+      if (p) set(e, {at: lonlat(p[0], p[1])}); else camShift(v.t0, -dx, -dy);
+    } else if (e.arr === 'flags' && !e.el.at) {
+      const p = innerPoint('rep:' + e.el.iso, c, 70, 110, e.el.date ? 60 : 30);
+      if (p) set(e, {at: lonlat(p[0], p[1])}); else camShift(v.t0, -dx, -dy);
+    } else camShift(v.t0, -dx, -dy);
   }
   for (const v of audit.overlaps ?? []) {
     const lo = elOf(v.b, v.t0), hi = elOf(v.a, v.t0);

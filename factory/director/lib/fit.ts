@@ -2,8 +2,8 @@
 // (banner/icon spots, marker sides, date-card corner, numeral height, document/portrait sides), and the rhythm
 // filler (slow camera drifts so no view is held over 10 s and something new happens every 2-4 s).
 import type {Director} from './plan';
-import {px, PATHS, lonlat} from './geo';
-import {keyState, unproject, inSafe, scr, CamKey, keyDistance} from './cam';
+import {px, PATHS, lonlat, insideRegion} from './geo';
+import {keyState, unproject, inSafe, scr, CamKey, keyDistance, SAFE} from './cam';
 import * as BX from './boxes';
 import {clamp, r2, r3} from './util';
 
@@ -26,31 +26,76 @@ const settle = (d: Director, from: number, to: number) => {
 /** world points of the top/side extent of a screen box drawn above anchor a (so the camera includes the billboard) */
 const extentPts = (c: any, b: BX.SBox): [number, number][] => [unproject(c, b.x0, b.y0), unproject(c, b.x1, b.y0), unproject(c, b.x0, b.y1), unproject(c, b.x1, b.y1)];
 
+/** a point inside region id that the camera c shows inside the title-safe frame with margins (closest to its anchor) */
+export function innerPoint(id: string, c: any, mx: number, mtop: number, mbot: number): [number, number] | null {
+  const P = PATHS[id]; if (!P?.bbox) return null;
+  const [x0, y0, x1, y1] = P.bbox, a = scr(c, P.label ?? [(x0 + x1) / 2, (y0 + y1) / 2]);
+  let best: [number, number] | null = null, bd = Infinity;
+  for (let i = 0; i <= 16; i++) for (let j = 0; j <= 16; j++) {
+    const wx = x0 + ((x1 - x0) * i) / 16, wy = y0 + ((y1 - y0) * j) / 16;
+    if (!insideRegion(id, wx, wy)) continue;
+    const q = scr(c, [wx, wy]);
+    if (q.x < SAFE.x0 + mx || q.x > SAFE.x1 - mx || q.y < SAFE.y0 + mtop || q.y > SAFE.y1 - mbot) continue;
+    const dd = Math.hypot(q.x - a.x, q.y - a.y);
+    if (dd < bd) { bd = dd; best = [wx, wy]; }
+  }
+  return best;
+}
+/** screen shift that brings box b inside the title-safe frame (bounded) */
+const inward = (b: BX.SBox, lim = 240): [number, number] => {
+  const dx = b.x0 < SAFE.x0 ? SAFE.x0 - b.x0 : b.x1 > SAFE.x1 ? SAFE.x1 - b.x1 : 0;
+  const dy = b.y0 < SAFE.y0 * 0.6 ? SAFE.y0 * 0.6 - b.y0 : b.y1 > 1080 - SAFE.y0 * 0.6 ? 1080 - SAFE.y0 * 0.6 - b.y1 : 0;
+  return [clamp(dx, -lim, lim), clamp(dy, -lim, lim)];
+};
+const moveBy = (c: any, ll: [number, number], d: [number, number]): [number, number] => {
+  const q = scr(c, W(ll)), w = unproject(c, q.x + d[0], q.y + d[1]); return lonlat(w[0], w[1]);
+};
 export function visibility(d: Director) {
   for (let pass = 0; pass < 3; pass++) {
     let changed = false;
-    const need = (from: number, to: number, why: string, pts: (c: any) => [number, number][]) => {
+    /** first the shot is re-framed a little; if that would need too much, the element adapts (inner spot, other side) */
+    const need = (e: any, from: number, to: number, why: string, pts: (c: any) => [number, number][], adapt?: (c: any) => boolean) => {
+      if (e._adapted) return;
       for (const tc of [settle(d, from, to), Math.max(settle(d, from, to), to - 0.6)]) {
         if (tc <= from) continue;
         const c = d.path.at(tc);
-        if (d.ensureVisible(tc, pts(c), why)) { changed = true; break; }
+        const r = d.ensureVisible(tc, pts(c), why);
+        if (r === 'fixed') { changed = true; return; }
+        if (r === 'no' && adapt && adapt(c)) { e._adapted = true; changed = true; d.warn.push(`moved inward: ${why}`); return; }
       }
     };
-    d.F.banners.forEach((b) => need(b.from, b.to, `banner ${b.title}`, (c) => extentPts(c, BX.bannerBox(c, W(b.at), b.size ?? 1))));
-    d.F.icons.forEach((i) => need(i.from, i.to, `icon ${i.name}`, (c) => extentPts(c, BX.iconBox(c, W(i.at), i.size ?? 1, d.a.icons?.[i.name]?.bb))));
+    d.F.banners.forEach((b) => need(b, b.from, b.to, `banner ${b.title}`, (c) => extentPts(c, BX.bannerBox(c, W(b.at), b.size ?? 1)),
+      (c) => { const m = inward(BX.bannerBox(c, W(b.at), b.size ?? 1)); if (!m[0] && !m[1]) return false; b.at = moveBy(c, b.at, m); return true; }));
+    d.F.icons.forEach((i) => need(i, i.from, i.to, `icon ${i.name}`, (c) => extentPts(c, BX.iconBox(c, W(i.at), i.size ?? 1, d.a.icons?.[i.name]?.bb)),
+      (c) => { const m = inward(BX.iconBox(c, W(i.at), i.size ?? 1, d.a.icons?.[i.name]?.bb)); if (!m[0] && !m[1]) return false; i.at = moveBy(c, i.at, m); return true; }));
     d.F.markers.forEach((m) => {
       if (m.dot) return;
       const ll = d.gaz.resolve(m.city).lonlat;
-      need(m.from, m.to, `marker ${m.city}`, (c) => extentPts(c, BX.markerBox(c, W(ll), m.label, m.sub, m.side, m.city)));
+      need(m, m.from, m.to, `marker ${m.city}`, (c) => extentPts(c, BX.markerBox(c, W(ll), m.label, m.sub, m.side, m.city)), (c) => {
+        const b = BX.markerBox(c, W(ll), m.label, m.sub, m.side, m.city);
+        const side = b.x1 > SAFE.x1 ? 'l' : b.x0 < SAFE.x0 ? 'r' : b.y1 > SAFE.y1 ? 't' : b.y0 < SAFE.y0 ? 'b' : m.side;
+        if (side === m.side) return false; m.side = side; m._fixedSide = true; return true;
+      });
     });
-    d.F.labels.forEach((l) => { if (!l.italic) need(l.from, l.to, `label ${l.text}`, (c) => extentPts(c, BX.labelBox(c, anchorOf(l.at), l.text, l.size, l.italic, l.sub))); });
+    d.F.labels.forEach((l) => {
+      if (l.italic) return;
+      need(l, l.from, l.to, `label ${l.text}`, (c) => extentPts(c, BX.labelBox(c, anchorOf(l.at), l.text, l.size, l.italic, l.sub)), (c) => {
+        const b = BX.labelBox(c, anchorOf(l.at), l.text, l.size, l.italic, l.sub), hw = (b.x1 - b.x0) / 2 + 12;
+        if (typeof l.at === 'string') { const p = innerPoint(l.at, c, hw, 30, 40); if (!p) return false; l.at = lonlat(p[0], p[1]); return true; }
+        const m = inward(b); if (!m[0] && !m[1]) return false; l.at = moveBy(c, l.at, m); return true;
+      });
+    });
     d.F.flags.forEach((f) => {
       if (d.F.flag_hide.some(([a, b]: number[]) => f.t > a && f.t < b)) return;
       const to = Math.min(f.to, f.t + 6);
-      need(f.t, to, `flag ${f.iso}`, (c) => extentPts(c, BX.flagBox(c, flagAnchor(d, f, settle(d, f.t, to)), f.date)));
+      need(f, f.t, to, `flag ${f.iso}`, (c) => extentPts(c, BX.flagBox(c, flagAnchor(d, f, settle(d, f.t, to)), f.date)), (c) => {
+        if (f.at) return false;
+        const p = innerPoint('rep:' + f.iso, c, 70, 110, f.date ? 60 : 30); if (!p) return false;
+        f.at = lonlat(p[0], p[1]); return true;
+      });
     });
-    d.F.arrows.forEach((a) => need(a.t, a.to, 'arrow', () => [W(a.a), W(a.b)]));
-    d.F.lines.forEach((l) => need(l.from, l.to, 'route', () => l.pts.map((p: [number, number]) => W(p))));
+    d.F.arrows.forEach((a) => need(a, a.t, a.to, 'arrow', () => [W(a.a), W(a.b)]));
+    d.F.lines.forEach((l) => need(l, l.from, l.to, 'route', () => l.pts.map((p: [number, number]) => W(p))));
     if (!changed) break;
     d.buildKeys();
   }
@@ -101,17 +146,19 @@ export function placement(d: Director) {
   // banners and icons: the spot near their place that covers nothing and stays in frame
   const spots = (el: any, cands: number[][], box: (c: any, w: [number, number]) => BX.SBox) => {
     const ts = samples(el.from, el.to), tc = settle(d, el.from, el.to), c0 = d.path.at(tc), q = scr(c0, W(el.at));
-    let best = el.at, bestC = Infinity;
+    const c00 = cost(d, el, ts, (t) => box(d.path.at(t), W(el.at)));
+    if (c00 < 1500) return;                                           // nothing covered: the pole stands on its place
+    let best = el.at, bestC = c00;
     for (const [dx, dy] of cands) {
       const wpt = unproject(c0, q.x + dx, q.y + dy), ll = lonlat(wpt[0], wpt[1]);
-      const cc = cost(d, el, ts, (t) => box(d.path.at(t), W(ll))) + 3 * Math.hypot(dx, dy);
-      if (cc < bestC) { bestC = cc; best = ll; }
+      const cc = cost(d, el, ts, (t) => box(d.path.at(t), W(ll))) + 10 * Math.hypot(dx, dy);
+      if (cc < bestC * 0.6) { bestC = cc; best = ll; }
     }
     el.at = best;
   };
-  const BC = [[0, 0], [170, 0], [-170, 0], [0, 110], [170, 110], [-170, 110], [260, -40], [-260, -40], [0, 200]];
+  const BC = [[140, 0], [-140, 0], [0, 100], [140, 100], [-140, 100], [0, -90]];
   d.F.banners.forEach((b) => spots(b, BC, (c, w) => BX.bannerBox(c, w, b.size ?? 1)));
-  d.F.icons.forEach((i) => spots(i, [[0, 0], [120, 0], [-120, 0], [0, 90], [120, 90], [-120, 90], [0, -80]], (c, w) => BX.iconBox(c, w, i.size ?? 1, d.a.icons?.[i.name]?.bb)));
+  d.F.icons.forEach((i) => spots(i, [[120, 0], [-120, 0], [0, 90], [120, 90], [-120, 90], [0, -80]], (c, w) => BX.iconBox(c, w, i.size ?? 1, d.a.icons?.[i.name]?.bb)));
   // marker label side
   d.F.markers.forEach((m) => {
     if (m.dot || !(m.label || m.sub) || m._fixedSide) return;
@@ -160,7 +207,9 @@ export function rhythm(d: Director) {
     const sh = d.shots.find((s) => s.key === base.src);
     if (sh?.hold) return;
     const c = d.path.at(t);
-    const vis = itemsAt(d, t + 1.5, '').filter((it) => it.y1 < 1080 && it.y0 > 0);
+    const nextK = d.keys.find((q) => q.t > t + 0.5);
+    const tEnd = Math.min(t + 3.6, nextK ? nextK.t - 0.2 : t + 3.6);
+    const vis = [...itemsAt(d, t + 1.5, ''), ...itemsAt(d, tEnd, '')].filter((it) => it.y1 < 1080 && it.y0 > 0 && it.x1 > 0 && it.x0 < 1920);
     const push = n % 2 === 0;
     const k: CamKey = {...base, t: r3(t), dur: 3.6, kind: 'drift', src: (base.src ?? '') + '/drift',
       w: Math.round(base.w * (push ? 0.91 : 1.07)), tilt: r2(clamp((base.tilt ?? 0) + (push ? 2.5 : -2), 0, 40))};

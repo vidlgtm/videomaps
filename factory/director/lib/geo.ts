@@ -51,6 +51,30 @@ export const pointOf = (p: PathRec): [number, number] => {
   const b = boxOf(p); return b ? [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2] : [0, 0];
 };
 export const hasLabel = (id: string) => !!PATHS[id]?.label;
+const RINGS: Record<string, [number, number][][]> = {};
+/** polygon rings of a region path (M/L/Z absolute, as written by geodata.py) */
+export function ringsOf(id: string): [number, number][][] {
+  if (RINGS[id]) return RINGS[id];
+  const d = PATHS[id]?.d ?? '', out: [number, number][][] = [];
+  let cur: [number, number][] = [];
+  for (const m of d.matchAll(/([MLZ])([^MLZ]*)/g)) {
+    if (m[1] === 'M') { if (cur.length > 2) out.push(cur); cur = []; }
+    if (m[1] === 'Z') { if (cur.length > 2) out.push(cur); cur = []; continue; }
+    const n = m[2].match(/-?\d+(\.\d+)?/g)?.map(Number) ?? [];
+    for (let i = 0; i + 1 < n.length; i += 2) cur.push([n[i], n[i + 1]]);
+  }
+  if (cur.length > 2) out.push(cur);
+  return (RINGS[id] = out);
+}
+/** even-odd point-in-region test in world px */
+export function insideRegion(id: string, x: number, y: number) {
+  let inside = false;
+  for (const r of ringsOf(id)) for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
+    const [xi, yi] = r[i], [xj, yj] = r[j];
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi + 1e-12) + xi) inside = !inside;
+  }
+  return inside;
+}
 export const unionBox = (bs: (Box | null)[], pts: [number, number][] = []): Box | null => {
   const xs: number[] = [], ys: number[] = [];
   bs.forEach((b) => { if (b) { xs.push(b[0], b[2]); ys.push(b[1], b[3]); } });

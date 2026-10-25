@@ -139,14 +139,13 @@
    "rep:UKR",
    "rep:GEO",
    "rep:AZE",
-   "rr:Komi",
-   "rr:Bashkortostan"
+   "rep:KAZ"
   ],
   "European USSR and Central Asia": [
    "rep:UKR",
+   "rep:BLR",
    "rep:KAZ",
-   "rep:TKM",
-   "rr:Komi"
+   "rep:TKM"
   ],
   "the West in 1940": [
    "rep:EST",

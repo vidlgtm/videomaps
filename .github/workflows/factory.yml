@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       order: { description: 'order folder (factory/orders/<name>)', default: 'ussr15' }
-      tag: { description: 'result release tag (must start with factory_)', default: 'factory_ussr15_test1' }
+      tag: { description: 'result release tag (must start with factory_)', default: 'factory_ussr15_test2' }
       stills: { description: 'seconds of the verification stills', default: '27.3 38.5 59.5 98 119.5 248 264 330 366 383 411 458.5 475 490' }
       compare: { description: 'release holding reference stills with the same names (none = no side-by-side)', default: 'test_v5' }
 concurrency:
@@ -22,7 +22,7 @@ permissions:
   contents: write
 env:
   ORDER: ${{ inputs.order || 'ussr15' }}
-  TAG: ${{ inputs.tag || 'factory_ussr15_test1' }}
+  TAG: ${{ inputs.tag || 'factory_ussr15_test2' }}
   STILLS: ${{ inputs.stills }}
   COMPARE: ${{ inputs.compare || 'test_v5' }}
   REL: https://github.com/${{ github.repository }}/releases/download
@@ -49,17 +49,21 @@ jobs:
           mkdir -p out
           npx -y tsx ../director/main.ts ../orders/$ORDER
           npx tsc --noEmit -p .
+          best=999999; bp=0
           for pass in 1 2 3 4; do
             npx -y tsx tools/audit.ts out/audit$pass.json > out/audit$pass.txt; tail -n 40 out/audit$pass.txt
             n=$(python3 -c "import json; a=json.load(open('out/audit$pass.json')); print(len(a['overlaps']) + len(a['offscreen']))")
             echo "pass $pass: $n problems"
+            if [ "$n" -lt "$best" ]; then best=$n; bp=$pass; cp src/data/film.json out/film_best.json; cp ../orders/$ORDER/out/director_report.txt out/director_report_best.txt; fi
             if [ "$n" = "0" ] || [ $pass = 4 ]; then break; fi
             npx -y tsx ../director/main.ts ../orders/$ORDER --feedback out/audit$pass.json
           done
+          cp out/film_best.json src/data/film.json; echo "BEST pass $bp: $best problems"
           npx -y tsx tools/uhd_need.ts /tmp/need.json | tail -n 6
           echo "uhd=$(python3 -c "import json; print(json.dumps(json.load(open('/tmp/need.json'))['uhd']))")" >> $GITHUB_OUTPUT
           echo "hd=$(python3 -c "import json; print(json.dumps(json.load(open('/tmp/need.json'))['hd']))")" >> $GITHUB_OUTPUT
-          cp src/data/film.json out/ && cp ../orders/$ORDER/out/* out/ 2>/dev/null || true
+          cp src/data/film.json out/ && cp ../orders/$ORDER/out/patches.json out/ 2>/dev/null || true
+          cp out/director_report_best.txt out/director_report.txt
           ls -la out
       - uses: actions/upload-artifact@v4
         if: always()

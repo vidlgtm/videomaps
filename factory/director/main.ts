@@ -71,7 +71,7 @@ try {
     eras: N.eras.map((e: any) => ({from: r3(e.from === 'start' ? 0 : cues.resolve(0, e.from).t), set: e.set, extra: e.extra, neighbours: !!e.neighbours}))};
   // assemble film.json (element keys kept apart for the audit feedback)
   const keys: Record<string, string[]> = {};
-  const clean = (name: string) => d.F[name].map((e: any) => { (keys[name] ??= []).push(e._k ?? ''); const {_k, _g, _fixedSide, _ov, ...r} = e; return r; });
+  const clean = (name: string) => d.F[name].map((e: any) => { (keys[name] ??= []).push(e._k ?? ''); const {_k, _g, _fixedSide, _ov, _adapted, ...r} = e; return r; });
   const film = {
     meta: {title: o.title, slug: o.slug, total: cues.total, generated: new Date().toISOString(), director: 'factory/director v1',
       beats: d.beats.length, camera_keys: d.keys.length, drifts},
