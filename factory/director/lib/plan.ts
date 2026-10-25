@@ -239,7 +239,7 @@ export class Director {
       const lo = Math.min(...q.map((p) => p.y)), hi = Math.max(...q.map((p) => p.y)), le = Math.min(...q.map((p) => p.x)), ri = Math.max(...q.map((p) => p.x));
       const dy = hi > 960 ? hi - 960 : lo < 120 ? lo - 120 : 0, dx = ri > 1800 ? ri - 1800 : le < 120 ? le - 120 : 0;
       if (Math.abs(dx) < 4 && Math.abs(dy) < 4) return 'no';
-      const cur = s.shiftW ?? [0, 0], nx = clamp(cur[0] + dx / c.zoom, -320, 320), ny = clamp(cur[1] + dy / c.zoom, -320, 320);
+      const cur = s.shiftW ?? [0, 0], nx = clamp(cur[0] + dx / c.zoom, -650, 650), ny = clamp(cur[1] + dy / c.zoom, -650, 650);
       if (Math.abs(nx - cur[0]) < 2 && Math.abs(ny - cur[1]) < 2) return 'no';
       s.shiftW = [nx, ny]; this.warn.push(`camera: overview slid for ${why}`); return 'fixed';
     }

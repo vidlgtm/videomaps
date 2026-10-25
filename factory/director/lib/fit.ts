@@ -257,7 +257,7 @@ export function flagCuts(d: Director) {
   for (const f of d.F.flags) {
     const end = Math.min(f.to, d.END);
     const marks: number[] = [];
-    for (let t = f.t + 0.8; t < end; t += 0.25) {
+    for (let t = f.t + 0.15; t < end; t += 0.25) {
       if (d.F.flag_hide.some(([a, b]: number[]) => t > a && t < b)) continue;
       const c = d.path.at(t), c2 = d.path.at(t + 0.1), q = scr(c2, [c.x, c.y]);
       if (Math.hypot(q.x - 960, q.y - 540) / 0.1 + Math.abs(Math.log(c2.zoom / c.zoom)) * 4000 > 150) continue;   // moving (as the audit)
@@ -271,7 +271,7 @@ export function flagCuts(d: Director) {
       const last = hide[hide.length - 1];
       if (last && t - last[1] <= 0.6) last[1] = t; else hide.push([t, t]);
     }
-    const iv = hide.filter(([a, b]) => b - a >= 0.2).map(([a, b]) => [r3(a - 0.45), r3(b + 0.45)] as [number, number]);
+    const iv = hide.filter(([a, b]) => b - a >= 0.2 || a < f.t + 0.5).map(([a, b]) => [r3(a < f.t + 0.5 ? f.t - 0.5 : a - 0.45), r3(b + 0.45)] as [number, number]);
     if (iv.length) { f.hide = iv; d.warn.push(`flag ${f.iso} steps back while cut by the frame: ${iv.map(([a, b]) => `${a}-${b}`).join(', ')}`); }
   }
 }
