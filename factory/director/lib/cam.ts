@@ -83,8 +83,8 @@ export function tiltFor(w: number) {
   return TILT[TILT.length - 1][1];
 }
 export const W_MIN = 480, W_MAX = 9800;
-const FRAC: Record<string, number> = {close: 0.8, region: 0.62, context: 0.4, auto: 0.55};
-const W_FLOOR: Record<string, number> = {close: 480, region: 900, context: 1400, auto: 1000};
+const FRAC: Record<string, number> = {close: 0.85, region: 0.75, context: 0.45, auto: 0.72};
+const W_FLOOR: Record<string, number> = {close: 480, region: 800, context: 1300, auto: 900};
 const POINT_W: Record<string, number> = {close: 900, region: 1400, context: 2500, auto: 1250};
 export const SAFE = {x0: 96, y0: 96, x1: 1824, y1: 984};
 /** projected bounds of a world box at a camera state */
@@ -120,7 +120,18 @@ export function frameBox(b: Box | [number, number][], kind = 'auto', opts: {tilt
     cx += (nx - c.x) * 0.9; cy += (ny - c.y) * 0.9;
   }
   w = clamp(Math.max(w, W_FLOOR[kind] ?? W_MIN) * (opts.wMul ?? 1), W_MIN, W_MAX);
+  // near the edge of the basemap the renderer would push the view sideways (clampCam) and the places would sit off-centre:
+  // come closer instead, as long as the places still fit (<= 95 % of the title-safe frame)
   const ll = lonlat(cx, cy);
+  for (let it = 0; it < 10; it++) {
+    const k: CamKey = {t: 0, lon: ll[0], lat: ll[1], w, tilt: clamp(tiltFor(w) + (opts.tiltAdd ?? 0), 0, 40)};
+    const c = keyState(k), v = viewBox(c, 0);
+    const over = Math.max(-v[0], v[2] - WORLD_W, -v[1], v[3] - WORLD_H, 0);
+    if (over < 8) break;
+    const w2 = w * 0.92, c2 = keyState({...k, w: w2, tilt: clamp(tiltFor(w2) + (opts.tiltAdd ?? 0), 0, 40)}), pb = projBounds(c2, b);
+    if (pb.x1 - pb.x0 > (SAFE.x1 - SAFE.x0) * 0.95 || pb.y1 - pb.y0 > (SAFE.y1 - SAFE.y0) * 0.95 || w2 < W_MIN) break;
+    w = w2;
+  }
   return {t: 0, lon: r3(ll[0]), lat: r3(ll[1]), w: Math.round(w), tilt: r2(clamp(tiltFor(w) + (opts.tiltAdd ?? 0), 0, 40))};
 }
 export function framePoint(p: [number, number], kind = 'auto'): CamKey {
@@ -149,7 +160,8 @@ export function keyDistance(a: CamKey, b: CamKey) {
 /** world points visible inside the title-safe frame at camera state c */
 export const inSafe = (c: CamState, p: [number, number], m = 0) => { const q = project(c, p[0], p[1]); return q.x > SAFE.x0 + m && q.x < SAFE.x1 - m && q.y > SAFE.y0 + m && q.y < SAFE.y1 - m; };
 /** the world box currently framed by c (approx, for "zoom out to include") */
-export function viewBox(c: CamState): Box {
-  const pts = [[SAFE.x0, SAFE.y0], [SAFE.x1, SAFE.y0], [SAFE.x0, SAFE.y1], [SAFE.x1, SAFE.y1]].map(([x, y]) => unproject(c, x, y));
+export function viewBox(c: CamState, m = -1): Box {
+  const a = m < 0 ? SAFE : {x0: m, y0: m, x1: 1920 - m, y1: 1080 - m};
+  const pts = [[a.x0, a.y0], [a.x1, a.y0], [a.x0, a.y1], [a.x1, a.y1], [960, a.y0], [960, a.y1], [a.x0, 540], [a.x1, 540]].map(([x, y]) => unproject(c, x, y));
   return [Math.min(...pts.map((p) => p[0])), Math.min(...pts.map((p) => p[1])), Math.max(...pts.map((p) => p[0])), Math.max(...pts.map((p) => p[1]))];
 }

@@ -59,6 +59,10 @@ export function visibility(d: Director) {
       for (const tc of [settle(d, from, to), Math.max(settle(d, from, to), to - 0.6)]) {
         if (tc <= from) continue;
         const c = d.path.at(tc);
+        const onOverview = d.keys[d.path.keyAt(tc)]?.x !== undefined;
+        if (onOverview && adapt && (why.startsWith('flag') || why.startsWith('label')) && pts(c).some((p) => !inSafe(c, p, 24))) {
+          if (adapt(c)) { e._adapted = true; changed = true; d.warn.push(`moved inward: ${why}`); return; }
+        }
         const r = d.ensureVisible(tc, pts(c), why);
         if (r === 'fixed') { changed = true; return; }
         if (r === 'no' && adapt && adapt(c)) { e._adapted = true; changed = true; d.warn.push(`moved inward: ${why}`); return; }
@@ -158,7 +162,8 @@ export function placement(d: Director) {
   };
   const BC = [[140, 0], [-140, 0], [0, 100], [140, 100], [-140, 100], [0, -90]];
   d.F.banners.forEach((b) => spots(b, BC, (c, w) => BX.bannerBox(c, w, b.size ?? 1)));
-  d.F.icons.forEach((i) => spots(i, [[120, 0], [-120, 0], [0, 90], [120, 90], [-120, 90], [0, -80]], (c, w) => BX.iconBox(c, w, i.size ?? 1, d.a.icons?.[i.name]?.bb)));
+  d.F.icons.forEach((i) => spots(i, [[120, 0], [-120, 0], [0, 90], [120, 90], [-120, 90], [0, -80], [190, 0], [-190, 0], [190, 120], [-190, 120]],
+    (c, w) => BX.iconBox(c, w, i.size ?? 1, d.a.icons?.[i.name]?.bb)));
   // two billboards that would cover each other never stand together: the earlier one leaves (or the later one waits)
   const bs = [...d.F.banners].sort((a, b) => a.from - b.from);
   for (let i = 0; i < bs.length; i++) for (let j = i + 1; j < bs.length; j++) {
