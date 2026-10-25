@@ -88,10 +88,11 @@ export function iconLayout(name: string, az: number, x: number, y: number, s: nu
   return {size, left, top, cx: x, by: y - (top0 - top), cw: cw * size, content: B(left + bb[0] * size, top + bb[1] * size, left + bb[2] * size, top + bb[3] * size)};
 }
 
-const ASPECT: Record<string, number> = {...(aspectGen as Record<string, number>), 'archive/const1936.jpg': 1280 / 2106, 'archive/const1936_a13.jpg': 1280 / 2106,
+// measured sizes (src/data/aspect.json, written from the real files) win; the old v5 values are only a fallback
+const ASPECT: Record<string, number> = {'archive/const1936.jpg': 1280 / 2106, 'archive/const1936_a13.jpg': 1280 / 2106,
   'archive/const1936_a17.jpg': 1280 / 2106, 'archive/treaty1922.jpg': 2400 / 1533, 'archive/crimea1954.jpg': 2400 / 2278,
   'archive/belovezha.jpg': 2400 / 1578, 'archive/lenin_cut.png': 1270 / 1600, 'archive/stalin_cut.png': 1044 / 1231,
-  'archive/gorbachev_cut.png': 1094 / 1541, 'archive/stalin1918_cut.png': 1188 / 1600};
+  'archive/gorbachev_cut.png': 1094 / 1541, 'archive/stalin1918_cut.png': 1188 / 1600, ...(aspectGen as Record<string, number>)};
 
 // ---------------- names ----------------
 export type NameL = {id: string; text: string; sub?: string; ctx: boolean; wx: number; wy: number; fs: number; o: number; q: {x: number; y: number; s: number}};

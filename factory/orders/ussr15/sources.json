@@ -1,0 +1,159 @@
+{
+ "note": "The brain's picks for the film (phase 2 test: the same files as our film v5). Photos come from Wikimedia Commons by file name; the station checks every licence, processes the image and writes the credits.",
+ "photos": {
+  "kazan": {
+   "commons": "Казанский кремль. Панорама с колеса обозрения.jpg",
+   "use": "banner",
+   "what": "Kazan Kremlin"
+  },
+  "tallinn": {
+   "commons": "Tallinn Toompea Upper Old Town 2013.jpg",
+   "use": "banner",
+   "what": "Tallinn"
+  },
+  "lenin": {
+   "commons": "Lenin in 1920 (cropped).jpg",
+   "use": "portrait",
+   "what": "Lenin (1920)"
+  },
+  "redarmy": {
+   "commons": "Red army in moscow.jpg",
+   "use": "banner",
+   "what": "Red Army in Moscow"
+  },
+  "treaty1922": {
+   "commons": "Treaty on the Creation of the Union of Soviet Socialist Republics.jpg",
+   "use": "document",
+   "what": "Treaty on the Creation of the USSR (1922)"
+  },
+  "stalin": {
+   "commons": "State portrait of Stalin.jpg",
+   "use": "portrait",
+   "what": "Stalin"
+  },
+  "gulag": {
+   "commons": "Canal Mer Blanche.jpg",
+   "use": "banner",
+   "what": "White Sea Canal"
+  },
+  "const1936": {
+   "commons": "The Soviet Socialist Constitution of december 5, 1936.djvu",
+   "page": 3,
+   "use": "document",
+   "what": "USSR Constitution (1936)"
+  },
+  "const1936_a13": {
+   "commons": "The Soviet Socialist Constitution of december 5, 1936.djvu",
+   "page": 9,
+   "use": "document",
+   "what": "USSR Constitution (1936)"
+  },
+  "const1936_a17": {
+   "commons": "The Soviet Socialist Constitution of december 5, 1936.djvu",
+   "page": 11,
+   "use": "document",
+   "what": "USSR Constitution (1936)"
+  },
+  "winterwar": {
+   "commons": "A Finnish Maxim M-32 machine gun nest during the Winter War.jpg",
+   "use": "banner",
+   "what": "Winter War"
+  },
+  "crimea1954": {
+   "commons": "The transfer of Crimea.jpg",
+   "use": "document",
+   "what": "Transfer of Crimea (1954)"
+  },
+  "gorbachev": {
+   "commons": "Mikhail Gorbachev in 1987 (cropped).jpg",
+   "use": "portrait",
+   "what": "Gorbachev (1987)"
+  },
+  "balticway": {
+   "commons": "Baltic Way in Latvia between Cēsis and Valmiera.jpeg",
+   "use": "banner",
+   "what": "Baltic Way"
+  },
+  "lithuania90": {
+   "commons": "Leaders of the Supreme Council of Lithuania on 11 March 1990.jpg",
+   "use": "banner",
+   "what": "Lithuania, 11 Mar 1990"
+  },
+  "tanks91": {
+   "commons": "Red army tanks (8000380028).jpg",
+   "use": "banner",
+   "what": "Moscow, 20 Aug 1991"
+  },
+  "belovezha": {
+   "commons": "RIAN archive 848095 Signing the Agreement to eliminate the USSR and establish the Commonwealth of Independent States.jpg",
+   "use": [
+    "document",
+    "scene"
+   ],
+   "what": "Belovezha, 8 Dec 1991"
+  },
+  "viskuli": {
+   "commons": "RIAN archive 22982 Agreement on the setup of the CIS was signed in this building.jpg",
+   "use": "banner",
+   "what": "Viskuli, 8 Dec 1991"
+  },
+  "almaata": {
+   "commons": "Egemen Archive Nazarbayev and CIS leaders.jpg",
+   "use": "banner",
+   "what": "Alma-Ata, 21 Dec 1991"
+  },
+  "grozny": {
+   "commons": "Evstafiev-chechnya-palace-gunman.jpg",
+   "use": "banner",
+   "what": "Grozny 1995"
+  },
+  "bender": {
+   "commons": "Bender 1992.jpg",
+   "use": "banner",
+   "what": "Bender 1992"
+  },
+  "sukhumi": {
+   "commons": "The burned out shell of the former Parliament building of the Autonomous Republic of Abkhazia, (28489422794).jpg",
+   "use": "banner",
+   "what": "Sukhumi"
+  }
+ },
+ "documents": {
+  "article72": {
+   "layout": "article",
+   "head": "CONSTITUTION OF THE USSR  ·  1977",
+   "title": "Article 72",
+   "body": [
+    "Each Union Republic shall retain",
+    "the right freely to secede",
+    "from the USSR."
+   ],
+   "underline": 1,
+   "what": "Constitution of the USSR (1977), Article 72"
+  },
+  "uti": {
+   "layout": "maxim",
+   "title": "Uti possidetis juris",
+   "gloss": [
+    "new states inherit the borders",
+    "they held as administrative units"
+   ],
+   "seal": "1991",
+   "what": "Uti possidetis juris"
+  }
+ },
+ "signatures": {
+  "yeltsin": {
+   "commons": "Yeltsin signature.svg",
+   "what": "Signature of Boris Yeltsin"
+  },
+  "kravchuk": {
+   "commons": "Leonid Kravchuk signature 1991.svg",
+   "what": "Signature of Leonid Kravchuk"
+  },
+  "shushkevich": {
+   "commons": "Signature of Stanislau Shushkevich.png",
+   "what": "Signature of Stanislav Shushkevich"
+  }
+ }
+}

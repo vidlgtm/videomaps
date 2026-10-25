@@ -10,8 +10,9 @@ Folder: factory/orders/<name>/   (one folder = one film; example: factory/orders
   script_final.txt  the user's corrected script (English), for the record
   vo/vo_<id>.mp3    one platform take per paragraph (made in the chat, same voice_id)
   storyboard.json   the brain's decisions for every paragraph (below)
-  assets.json       manifest of photos / cut-outs / documents / icons / clips / music / credits (phase 2 fills it)
-  archive/          archival photos fetched by the brain (PD, CC0, CC BY, CC BY-SA only) - credits in assets.json
+  sources.json      the brain's picks: archival photos (Wikimedia Commons file names), document texts, signatures,
+                    extra flags (below). The processing station fetches, checks, processes and credits them.
+  assets.json       3D clips, icons and music the factory already has (until the phase 3 workshop)
   data/             written by the factory (timeline.json from the voice job, tile indexes)
 
 -------------------------------------------------------------------------------------------------- order.json
@@ -56,7 +57,7 @@ MAP STATE
 MAP NOTES
   {"label": "TEXT", "at": "place", "sub": "...", "style": "region | water | italic | title | small", "color": "#hex"}
   {"marker": "city", "label": "Text", "sub": "...", "side": "r|l|t|b", "pulse": true, "alert": true, "dot": true}
-  {"banner": "<archive id>", "title": "TATARSTAN", "sub": "...", "near": "place"}        photo on a pole
+  {"banner": "<photo id>", "title": "TATARSTAN", "sub": "...", "near": "place"}          photo on a pole
   {"icon": "<icon id>", "near": "place"}                                                  small 3D object
   {"arrow": ["A", "B"] | [["A", "B"], ["A", "C"]], "kind": "force | link"}
   {"route": ["A", "B", "C"], "style": "chain | converge | path"}    {"rings": "place"}
@@ -64,8 +65,8 @@ MAP NOTES
 SCREEN
   {"date": "30 DECEMBER 1922", "sub": "..."}   {"numeral": "90%+", "sub": "..."}   {"tag": "TEXT", "num": "I"} (or slots)
   {"quote": "“...”", "sub": "attribution"}   {"strike": ["LANGUAGE", "RELIGION"]}   {"callout": "TEXT"}   {"big": "TEXT"}
-  {"portrait": "<cut-out id>", "name": "...", "sub": "..."}
-  {"document": "<doc id>", "caption": "...", "signatures": [{"img": "<sig id>", "name": "..."}]}  (image doc or Manim clip)
+  {"portrait": "<photo id>", "name": "...", "sub": "..."}          (a photo with "use": "portrait")
+  {"document": "<photo id | document id>", "caption": "...", "signatures": [{"img": "<signature id>", "name": "..."}]}
   {"titles": [{"text": "...", "cue": "...", "hi": "15", "hi_cue": "..."}]}       the hook title sequence
   {"closing": "EXACTLY 15 COUNTRIES"}                                            closing title + end card + credits
 3D / CREATIVE
@@ -76,3 +77,26 @@ SCREEN
 The factory refuses an order with a clear message when a cue is not in the narration, a place or asset is unknown, or a
 key is not in this list. Chapter cards, whooshes, flag drops, paper/stamp/tick sounds, music cross-fades, era names,
 credits and the overlap/off-screen fixes are automatic.
+
+-------------------------------------------------------------------------------------------------- sources.json
+The brain chooses (it knows the story, the event and the era); the PROCESSING STATION does the rest.
+{"photos": {
+   "kazan":     {"commons": "Казанский кремль. Панорама с колеса обозрения.jpg", "use": "banner", "what": "Kazan Kremlin"},
+   "lenin":     {"commons": "Lenin in 1920 (cropped).jpg", "use": "portrait", "what": "Lenin (1920)"},
+   "const1936": {"commons": "The Soviet Socialist Constitution of december 5, 1936.djvu", "page": 3, "use": "document", "what": "..."},
+   "belovezha": {"commons": "RIAN archive 848095 ....jpg", "use": ["document", "scene"], "what": "...", "author": "optional fix"}},
+ "documents": {
+   "article72": {"layout": "article", "head": "CONSTITUTION OF THE USSR · 1977", "title": "Article 72",
+                 "body": ["Each Union Republic shall retain", "the right freely to secede", "from the USSR."], "underline": 1},
+   "uti":       {"layout": "maxim", "title": "Uti possidetis juris", "gloss": ["new states inherit the borders", "..."], "seal": "1991"}},
+ "signatures": {"yeltsin": {"commons": "Yeltsin signature.svg", "what": "Signature of Boris Yeltsin"}},
+ "flags": {"su": {"commons": "Flag of the Soviet Union.svg"}},          only flags that are not a modern ISO flag
+ "credits_fixed": ["..."]}                                               optional, else the house lines (relief, imagery, ...)
+use: banner (photo on a pole, 2.5D depth) | scene (2.5D photo) | portrait (cut-out) | document (page / paper photo).
+"commons" = the exact file name on Wikimedia Commons; "page" for djvu / pdf / tif pages; "what" = short credit caption.
+Documents: up to 6 body lines of at most 44 characters; title_font "serif" | "script"; seal = a short date.
+The station REFUSES (ORDER ERROR, all problems listed at once): a file that does not exist, a licence other than
+Public domain / CC0 / CC BY / CC BY-SA (no NC, no ND, no fair use), an unknown key, a portrait with no person in it.
+Automatic: download in the best size, scan-border trim, 4x super-resolution of small files, levels, depth + near layer,
+focus point (faces) so no crop cuts the subject, cut-outs, Manim documents, credits of what the film really shows
+(end card + CREDITS.txt for the YouTube description) and review sheets (original | processed | depth | cut-out).

@@ -7,10 +7,14 @@ Order in -> film out. The brain (third model, in a chat) decides everything that
   director/                 THE AUTOMATIC DIRECTOR (TypeScript): order + voice timeline -> engine/src/data/film.json
                             cues (word times) · geo (places) · cam (framing, moves, drifts) · plan (every element) ·
                             fit (in-frame re-framing, spots/sides/corners) · sound (SFX map, music bed) · feedback (audit)
+  station/                  THE PROCESSING STATION (Python + Manim): the brain's picks (orders/<o>/sources.json) ->
+                            licence gate, super-resolution, levels, depth + near layer, focus point, cut-outs, signatures,
+                            extra flags, Manim documents, credits, review sheets  (station.py, doc_scene.py)
   engine/                   our Remotion engine; script.ts / v2.ts / names.ts only LOAD film.json (no hand-written scene code)
                             tools/audit.ts = overlap + OFF-SCREEN + title-safe audit (machine-readable)
-  orders/ussr15/            acceptance test of phase 1: our film v5 written as an order
-  .github/workflows/factory.yml   direct -> tiles -> stills (+ side-by-side with the reference release)
+  orders/ussr15/            acceptance test: our film v5 written as an order (storyboard + sources.json)
+  .github/workflows/factory.yml   station -> direct -> tiles -> stills (+ side-by-side with the reference release);
+                            started by workflow_dispatch (inputs: order, tag factory_*, stills, compare)
 
-Kaggle key: never stored in GitHub - injected as temporary secrets by the brain and withdrawn as soon as the Kaggle job
-has started. Status: phase 0 done; phase 1 (automatic director) built, under test with orders/ussr15.
+Kaggle key: never stored in GitHub (phase 3 decides the safest hand-over). Status: phases 0-1 done and approved;
+phase 2 (processing station) built, under test with orders/ussr15.

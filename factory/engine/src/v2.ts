@@ -23,5 +23,7 @@ export const CREDITS: {from: number; lines: string[]} = F.credits;
 export const STAR: {from: number} = F.star ?? {from: OFF};
 export const STAR_TARGETS: [string, number, number][] = F.star_targets ?? [];
 export const DEPTH_IDS: string[] = F.depth_ids ?? [];
+/** processing station: where a cover-crop must stay for each photo (file -> [fx, fy, aspect]) */
+export const FOCUS: Record<string, [number, number, number]> = F.focus ?? {};
 export const LIGHTS = F.lights ?? {from: OFF, off0: OFF, off1: OFF, lift0: OFF, lift1: OFF};
 export const CITY_LIGHTS: [number, number, number][] = F.city_lights ?? [];

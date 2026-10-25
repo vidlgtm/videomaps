@@ -15,14 +15,14 @@ export type Order = {
 export type ClipAsset = {src: string; kind: 'doll' | 'cauc' | 'manim'; segments: Record<string, [number, number, number?]>; rate?: number;
   dx_with_labels?: number; sfx?: {f: string; at: number; v?: number}[]; opening_sfx?: {f: string; at: number; v?: number}[]};
 export type Assets = {
-  archive?: Record<string, {file: string; aspect?: number; depth?: boolean}>;
+  archive?: Record<string, {file: string; aspect?: number; depth?: boolean; focus?: [number, number]}>;
   cutouts?: Record<string, {file: string; aspect?: number}>;
-  docs?: Record<string, {file?: string; aspect?: number; clip?: string; length?: number}>;
+  docs?: Record<string, {file?: string; aspect?: number; clip?: string; length?: number | null}>;
   icons?: Record<string, {az?: number; size?: number; bb?: number[]}>;
   clips?: Record<string, ClipAsset>;
   sig?: Record<string, string>;
   music?: Record<string, {file: string; lufs: number}>;
-  credits?: {what: string; author?: string; license: string}[];
+  credits?: {id?: string; files?: string[]; what: string; author?: string; license: string; page?: string}[];
   credits_fixed?: string[];
 };
 export type Constitution = any;

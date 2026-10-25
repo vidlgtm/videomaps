@@ -1,6 +1,7 @@
 // FACTORY - automatic director. usage (from the repo root, after npm ci in factory/engine):
 //   npx tsx factory/director/main.ts <orderDir> [--feedback audit.json] [--out factory/engine/src/data/film.json]
-// Reads: <order>/order.json, narration.json, storyboard.json, assets.json, data/timeline.json (voice job) + the rules.
+// Reads: <order>/order.json, narration.json, storyboard.json, assets.json, out/pack.json (processing station),
+//        data/timeline.json (voice job) + the rules. Also writes <order>/out/CREDITS.txt (YouTube description).
 // Writes: film.json (every element of the film) + <order>/out/director_report.txt. Fails with a clear message on any
 // mistake in the order (cue not in the narration, unknown place, missing asset).
 import * as fs from 'fs';
@@ -23,6 +24,15 @@ try {
   const nar = readJSON(path.join(orderDir, 'narration.json'));
   const sb = readJSON(path.join(orderDir, 'storyboard.json'));
   const assets = exists(path.join(orderDir, 'assets.json')) ? readJSON(path.join(orderDir, 'assets.json')) : {};
+  // phase 2: the processing station's pack (photos, cut-outs, documents, signatures, extra flags, credits) wins over assets.json
+  const packFile = opt('--pack', path.join(orderDir, 'out/pack.json'))!;
+  const pack = exists(packFile) ? readJSON(packFile) : null;
+  if (pack) {
+    for (const k of ['archive', 'cutouts', 'docs', 'sig']) assets[k] = {...(assets[k] ?? {}), ...(pack[k] ?? {})};
+    assets.credits = pack.credits ?? []; if (pack.credits_fixed) assets.credits_fixed = pack.credits_fixed;
+    o.flag_aspect = {...(o.flag_aspect ?? {}), ...Object.fromEntries(Object.entries(pack.flags ?? {}).map(([c, f]: any) => [c, f.aspect]))};
+    console.log(`station pack: ${Object.keys(pack.archive ?? {}).length} banner photos, ${Object.keys(pack.cutouts ?? {}).length} portraits, ${Object.keys(pack.docs ?? {}).length} documents, ${Object.keys(pack.sig ?? {}).length} signatures`);
+  }
   const K = readJSON(path.join(ROOT, 'rules/constitution.json'));
   const tlPath = exists(path.join(orderDir, 'data/timeline.json')) ? path.join(orderDir, 'data/timeline.json') : path.join(ROOT, 'engine/src/data/timeline.json');
   const tl = readJSON(tlPath);
@@ -55,9 +65,17 @@ try {
   const drifts = rhythm(d);
   flagCuts(d);
   sound(d);
-  // credits under the end card, from the archive licences (assets.json "credits")
+  // credits under the end card: only the files the film really shows (station pack: licence + author from Commons)
+  const used = new Set<string>();
+  d.F.banners.forEach((b: any) => used.add(b.img)); d.F.cutouts.forEach((c: any) => used.add(c.img));
+  d.F.docs.forEach((x: any) => { used.add(x.img); (x.sigs ?? []).forEach((g: any) => used.add(g.img)); });
+  d.F.clips.forEach((c: any) => used.add(c.src));
+  Object.values(d.FLAG ?? {}).forEach((c: any) => used.add(`flags/4x3/${c}.svg`));
+  const seen = new Set<string>();
+  const cr = (assets.credits ?? []).filter((c: any) => !c.files || c.files.some((f: string) => used.has(f))).filter((c: any) => {
+    const k = `${c.what}|${c.license}|${c.license === 'Public domain' ? '' : c.author ?? ''}`; if (seen.has(k)) return false; seen.add(k); return true; });
   const lic: Record<string, string[]> = {};
-  (assets.credits ?? []).forEach((c: any) => (lic[c.license] ??= []).push(c.author ? `${c.what} — ${c.author}` : c.what));
+  cr.forEach((c: any) => (lic[c.license] ??= []).push(c.author && c.license !== 'Public domain' && c.author !== 'unknown author' ? `${c.what} — ${c.author}` : c.what));
   const parts = Object.entries(lic).sort((a, b) => (a[0] === 'Public domain' ? -1 : b[0] === 'Public domain' ? 1 : 0)).map(([l, xs]) => `${l}: ${xs.join(' · ')}`);
   const lines: string[] = [];
   let cur = parts.length ? 'Archival images via Wikimedia Commons — ' : '';
@@ -65,6 +83,11 @@ try {
   if (cur.trim()) lines.push(cur.trim());
   lines.push(...(assets.credits_fixed ?? ['Relief: AWS Terrain Tiles (SRTM, ETOPO) · Imagery: NASA Blue Marble & Black Marble · Boundaries: Natural Earth · Narration: synthetic voice · Music: original score']));
   const last = cues.ids.length - 1;
+  const yt = ['CREDITS', '', 'Archival images (Wikimedia Commons):',
+    ...cr.map((c: any) => `• ${c.what} — ${c.author && c.author !== 'unknown author' ? c.author + ' — ' : ''}${c.license}${c.page ? ' — ' + c.page : ''}`),
+    '', ...(assets.credits_fixed ?? [])];
+  fs.mkdirSync(path.join(orderDir, 'out'), {recursive: true});
+  fs.writeFileSync(path.join(orderDir, 'out/CREDITS.txt'), yt.join('\n') + '\n');
   d.credits = {from: r3(cues.end(last) + 0.1), lines};
   // era names
   const N = o.names ?? {sets: {}, eras: [], neighbours: {}};
@@ -83,6 +106,7 @@ try {
     banners: clean('banners'), icons: clean('icons'), dots: d.F.dots, dot_shows: clean('dot_shows'), docs: clean('docs'), cutouts: clean('cutouts'),
     numerals: clean('numerals'), arrows: clean('arrows'), tags: clean('tags'), chain: d.chain, title: d.title, credits: d.credits,
     star: d.star, star_targets: d.star_targets, depth_ids: Object.entries(assets.archive ?? {}).filter(([, v]: any) => v.depth).map(([k]) => k),
+    focus: Object.fromEntries(Object.values(assets.archive ?? {}).filter((v: any) => v.focus).map((v: any) => [v.file, [...v.focus, v.aspect ?? 1.5]])),
     lights: d.lights, city_lights: d.city_lights, names, extra_cities: d.gaz.extraCities, keys,
     camera_src: [...d.keys].sort((a, b) => a.t - b.t).map((k) => `${k.src ?? ''}|${k.kind ?? ''}`),
   };

@@ -6,7 +6,7 @@ import {project, px, CamState, KM_PER_PX} from '../lib/proj';
 import {clamp, env, ease, easeOut, prog, lerp} from '../lib/anim';
 import {FONTS} from '../fonts';
 import {iconLayout, bannerSizeK} from '../lib/layout';
-import {BANNERS, ICONS, DOTS, DOT_COL, DOT_SHOWS, DOCS, CUTOUTS, NUMERALS, ARROWS, TITLE, TAGS, CHAIN, CREDITS, Banner, STAR, STAR_TARGETS, DEPTH_IDS, LIGHTS, CITY_LIGHTS} from '../v2';
+import {BANNERS, ICONS, DOTS, DOT_COL, DOT_SHOWS, DOCS, CUTOUTS, NUMERALS, ARROWS, TITLE, TAGS, CHAIN, CREDITS, Banner, STAR, STAR_TARGETS, DEPTH_IDS, FOCUS, LIGHTS, CITY_LIGHTS} from '../v2';
 import * as echarts from 'echarts';
 
 const FPS = 30;
@@ -20,10 +20,18 @@ const onScreen = (q: {x: number; y: number}, m = 260) => q.x > -m && q.x < 1920 
 // ---------------- banner on a pole ----------------
 const depthId = (img: string) => { const id = img.replace(/^archive\//, '').replace(/\.(jpg|jpeg|png)$/i, ''); return DEPTH_IDS.includes(id) ? id : null; };
 /** v3 2.5D parallax: the photo (background) and its near layer (archive/<id>_fg.png, cut by the depth map) drift apart */
+/** object-position that puts the station's focus point (faces / nearest subject) as close to the centre of a w x h cover-crop as the photo allows */
+const focusPos = (img: string, w: number, h?: number): string => {
+  const f = FOCUS[img];
+  if (!f || !h) return '50% 50%';
+  const [fx, fy, a] = f, iw = Math.max(w, h * a), ih = Math.max(h, w / a);
+  const ox = iw > w + 0.5 ? clamp((fx * iw - w / 2) / (iw - w)) : 0.5, oy = ih > h + 0.5 ? clamp((fy * ih - h / 2) / (ih - h)) : 0.5;
+  return `${(ox * 100).toFixed(1)}% ${(oy * 100).toFixed(1)}%`;
+};
 const DepthPhoto: React.FC<{img: string; w: number; h?: number; p: number; filter?: string}> = ({img, w, h, p, filter}) => {
-  const id = depthId(img);
+  const id = depthId(img), pos = focusPos(img, w, h);
   const st = (k: number, dx: number, dy: number): React.CSSProperties => ({position: 'absolute', left: 0, top: 0, width: w, height: h ?? 'auto',
-    objectFit: 'cover', filter, transform: `scale(${k}) translate(${dx}px, ${dy}px)`, transformOrigin: '50% 50%'});
+    objectFit: 'cover', objectPosition: pos, filter, transform: `scale(${k}) translate(${dx}px, ${dy}px)`, transformOrigin: '50% 50%'});
   return (
     <>
       <Img src={staticFile(img)} style={{...st(id ? 1.05 + 0.025 * p : 1, id ? -5 * p : 0, id ? -1.5 * p : 0), position: h ? 'absolute' : 'relative', display: 'block'}} />

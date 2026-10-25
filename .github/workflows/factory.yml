@@ -1,6 +1,9 @@
 name: factory
-# MAP FILM FACTORY (folder factory/): order in -> film out. Phase 1 = the automatic director:
-#   direct  : order (storyboard + voice timeline) -> film.json (camera, every element, sound) -> engine audit
+# MAP FILM FACTORY (folder factory/): order in -> film out.
+#   station : PROCESSING STATION (phase 2) - the brain's picks (sources.json: Commons photos, document texts, signatures,
+#             extra flags) -> licence gate, super-resolution, levels, depth + near layer, focus, cut-outs, Manim documents,
+#             credits, review sheets (artifact "pack")
+#   direct  : AUTOMATIC DIRECTOR (phase 1) - order (storyboard + voice timeline + pack) -> film.json (camera, every element, sound) -> engine audit
 #             (overlaps that stay visible, text cut by the frame) -> feedback passes until clean
 #   tiles   : the UHD/HD map tiles that exactly this camera path needs (Sentinel-2 cloudless + terrain)
 #   stills  : verification stills rendered like the film + side-by-side sheets with a reference release (v5)
@@ -25,16 +28,76 @@ env:
   COMPARE: ${{ inputs.compare || 'test_v5' }}
   REL: https://github.com/${{ github.repository }}/releases/download
 jobs:
+  station:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - name: tag guard
+        run: case "$TAG" in factory_*) echo "tag $TAG ok";; *) echo "::error::tag must start with factory_"; exit 1;; esac
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.u2net
+            ~/.cache/huggingface
+            factory/station/cache
+          key: station-models-v1
+      - name: Processing station - the brain's photos, signatures and flags -> film-ready assets + credits
+        run: |
+          set -e
+          pip install -q torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          pip install -q "transformers==4.57.6" "rembg[cpu]" spandrel "pillow==11.2.1" requests numpy scipy opencv-python-headless cairosvg
+          python -u factory/station/station.py process factory/orders/$ORDER
+      - name: Manim documents from the brain's texts (official Manim image)
+        run: |
+          set -e
+          mkdir -p out/pack/clips
+          if ls out/station_tmp/docs_json/*.json > /dev/null 2>&1; then
+            M=manimcommunity/manim:v0.22.0
+            for i in 1 2 3; do timeout 600 docker pull -q $M && break; echo "::warning::docker pull try $i failed"; sleep 20; done
+            if docker image inspect $M > /dev/null 2>&1; then
+              docker run --rm --user root --entrypoint bash -v "$GITHUB_WORKSPACE":/w -w /w $M -c '
+                set -e
+                pip install -q scipy
+                mkdir -p /root/.local/share/fonts && cp fonts/*.ttf /root/.local/share/fonts/ && (fc-cache -f > /dev/null 2>&1 || true)
+                for j in out/station_tmp/docs_json/*.json; do
+                  n=$(basename $j .json)
+                  (cd factory/station && DOC_JSON=/w/$j manim render -qh --fps 30 -r 1920,1080 doc_scene.py Doc -o $n 2>&1 | tail -3)
+                  cp "$(find factory/station/media -name "$n.mp4" | head -1)" out/pack/clips/$n.mp4
+                done
+                chmod -R a+rwX out/pack factory/station'
+            else
+              echo "::warning::Manim image unavailable - building Manim on the runner"
+              bash production/ci/apt.sh libcairo2-dev libpango1.0-dev pkg-config ffmpeg fontconfig
+              mkdir -p ~/.local/share/fonts && cp fonts/*.ttf ~/.local/share/fonts/ && fc-cache -f > /dev/null
+              pip install -q "manim==0.22.0" scipy
+              for j in out/station_tmp/docs_json/*.json; do
+                n=$(basename $j .json)
+                (cd factory/station && DOC_JSON=$GITHUB_WORKSPACE/$j manim render -qh --fps 30 -r 1920,1080 doc_scene.py Doc -o $n 2>&1 | tail -3)
+                cp "$(find factory/station/media -name "$n.mp4" | head -1)" out/pack/clips/$n.mp4
+              done
+            fi
+          fi
+          ls -la out/pack/clips
+      - name: Clip lengths, review sheets, report
+        run: python -u factory/station/station.py finish factory/orders/$ORDER
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: pack, path: out/pack, retention-days: 7, if-no-files-found: warn }
+
   direct:
+    needs: station
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     outputs:
       uhd: ${{ steps.d.outputs.uhd }}
       hd: ${{ steps.d.outputs.hd }}
     steps:
-      - name: tag guard
-        run: case "$TAG" in factory_*) echo "tag $TAG ok";; *) echo "::error::tag must start with factory_"; exit 1;; esac
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: pack, path: art/pack }
       - uses: actions/setup-node@v4
         with: { node-version: 20 }
       - id: d
@@ -43,6 +106,15 @@ jobs:
         run: |
           set -e
           cp ../orders/$ORDER/data/*.json src/data/ 2>/dev/null || true
+          mkdir -p ../orders/$ORDER/out && cp ../../art/pack/pack.json ../orders/$ORDER/out/pack.json
+          python3 - <<'PY'
+          import json
+          P = json.load(open('../../art/pack/pack.json')); A = json.load(open('src/data/aspect.json'))
+          for sect in ('archive', 'cutouts', 'docs'):
+              for v in P.get(sect, {}).values():
+                  if v.get('file') and v.get('aspect'): A[v['file']] = v['aspect']
+          json.dump(A, open('src/data/aspect.json', 'w'), indent=0); print('aspects from the station pack:', len(A))
+          PY
           npm ci --no-audit --no-fund --loglevel=error
           mkdir -p out
           npx -y tsx ../director/main.ts ../orders/$ORDER
@@ -62,6 +134,7 @@ jobs:
           echo "hd=$(python3 -c "import json; print(json.dumps(json.load(open('/tmp/need.json'))['hd']))")" >> $GITHUB_OUTPUT
           cp src/data/film.json out/ && cp ../orders/$ORDER/out/patches.json out/ 2>/dev/null || true
           cp out/director_report_best.txt out/director_report.txt
+          cp ../orders/$ORDER/out/CREDITS.txt out/ 2>/dev/null || true
           ls -la out
       - uses: actions/upload-artifact@v4
         if: always()
@@ -102,7 +175,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 20 }
       - run: bash production/ci/apt.sh ffmpeg unzip && pip install -q numpy scipy pillow
-      - name: Assets of the order (read-only from our releases) + the new tiles
+      - name: Assets - station pack + (until phases 3-4) the v5 3D clips, icons, music and voice from our releases + the new tiles
         env: { GH_TOKEN: "${{ github.token }}" }
         working-directory: factory/engine
         run: |
@@ -118,23 +191,20 @@ jobs:
             curl -sfL --retry 3 -o $PUB/matryoshka.webm "$REL/assets4/matryoshka.webm"
             curl -sfL --retry 3 -o /tmp/uhd.zip "$REL/assets4/uhd.zip" && (cd $PUB && unzip -q -o /tmp/uhd.zip && rm -f uhd/index.json)
             curl -sfL --retry 3 -o /tmp/uhd5.zip "$REL/tiles5/uhd5.zip" && (cd $PUB && unzip -q -o /tmp/uhd5.zip)
-            for f in basemap_v2.jpg basemap_v2_half.jpg globe_night.jpg hd_tiles.zip archive.zip; do curl -sfL --retry 3 -o /tmp/$f "$REL/assets3/$f"; done
+            for f in basemap_v2.jpg basemap_v2_half.jpg globe_night.jpg hd_tiles.zip; do curl -sfL --retry 3 -o /tmp/$f "$REL/assets3/$f"; done
             mv /tmp/basemap_v2.jpg /tmp/basemap_v2_half.jpg $PUB/
             ffmpeg -v error -y -i /tmp/globe_night.jpg -vf scale=4096:2048 -q:v 2 $PUB/globe_night_4k.jpg
             (cd $PUB && unzip -q -o /tmp/hd_tiles.zip && rm -f hd/index.json)
             curl -sfL --retry 3 -o /tmp/hd5.zip "$REL/tiles5/hd5.zip" && (cd $PUB && unzip -q -o /tmp/hd5.zip)
-            (cd $PUB/archive && unzip -q -o /tmp/archive.zip)
-            curl -sfL --retry 3 -o /tmp/cutouts.zip "$REL/assets4/cutouts.zip" && (cd $PUB/archive && unzip -q -o /tmp/cutouts.zip)
             curl -sfL --retry 3 -o /tmp/icons.zip "$REL/assets4/icons.zip" && (cd $PUB/icons && unzip -q -o /tmp/icons.zip)
-            for f in article72.mp4 uti.mp4; do curl -sfL --retry 3 -o $PUB/clips/$f "$REL/assets2/$f"; done
             curl -sfL --retry 3 -o $PUB/clips/opening.mp4 "$REL/opening/opening.mp4"
-            curl -sfL --retry 3 -A "videomaps/1.0" -o $PUB/sig/yeltsin.svg "https://upload.wikimedia.org/wikipedia/commons/0/0a/Yeltsin_signature.svg"
-            curl -sfL --retry 3 -A "videomaps/1.0" -o $PUB/sig/kravchuk.svg "https://upload.wikimedia.org/wikipedia/commons/4/4c/Leonid_Kravchuk_signature_1991.svg"
-            curl -sfL --retry 3 -A "videomaps/1.0" -o $PUB/sig/shushkevich.png "https://upload.wikimedia.org/wikipedia/commons/7/76/Signature_of_Stanislau_Shushkevich.png"
           fi
           (mkdir -p /tmp/s2 && cd /tmp/s2 && python $GITHUB_WORKSPACE/production/pipeline/sfx2.py > /dev/null && cp out/sfx/*.wav $GITHUB_WORKSPACE/factory/engine/$PUB/sfx/)
           cp ../../fonts/*.ttf $PUB/fonts/
           (cd /tmp && npm i --no-audit --no-fund --loglevel=error flag-icons@7.6.0 && cp -r node_modules/flag-icons/flags/4x3/. $GITHUB_WORKSPACE/factory/engine/$PUB/flags/4x3/)
+          # the processing station's pack: photos, depth + near layers, cut-outs, Manim documents, signatures, extra flags
+          for d in archive sig clips flags; do [ -d ../../art/pack/$d ] && cp -r ../../art/pack/$d/. $PUB/$d/; done
+          echo "station pack: $(ls $PUB/archive | wc -l) archive files, $(ls $PUB/clips | wc -l) clips, $(ls $PUB/sig | wc -l) signatures"
           cp ../../art/tiles/uhd/*.jpg $PUB/uhd/ 2>/dev/null || true
           cp ../../art/tiles/hd/*.jpg $PUB/hd/ 2>/dev/null || true
           python3 - <<'PY'
@@ -148,10 +218,11 @@ jobs:
           print('HD tiles', len(h['tiles']), 'UHD tiles', len(u))
           PY
           python3 - <<'PY'
-          import json, numpy as np
+          import json, os, numpy as np
           from PIL import Image, ImageFilter
           A = 'public/archive'
           for i in json.load(open('src/data/film.json')).get('depth_ids', []):
+              if os.path.exists(f'{A}/{i}_fg.png'): continue      # made by the processing station
               try:
                   im = Image.open(f'{A}/{i}.jpg').convert('RGB')
                   if im.width > 1100: im = im.resize((1100, round(im.height * 1100 / im.width)), Image.LANCZOS)
@@ -208,21 +279,26 @@ jobs:
               a = Image.open(r).convert('RGB').resize((960, 540), Image.LANCZOS); b = Image.open(f).convert('RGB').resize((960, 540), Image.LANCZOS)
               s = Image.new('RGB', (1920, 590), (12, 24, 34)); s.paste(a, (0, 50)); s.paste(b, (960, 50))
               d = ImageDraw.Draw(s); t = n[1:-4].replace('_', '.')
-              d.text((20, 10), f'v5 (hand-made)  ·  t = {t} s', font=F, fill=(244, 239, 230)); d.text((980, 10), 'FACTORY (automatic director)', font=F, fill=(226, 191, 106))
+              d.text((20, 10), f'v5 (hand-made)  ·  t = {t} s', font=F, fill=(244, 239, 230)); d.text((980, 10), 'FACTORY (director + processing station)', font=F, fill=(226, 191, 106))
               s.save(f'out/compare/cmp_{n}', quality=92)
           files = sorted(glob.glob('out/compare/cmp_*.jpg'), key=lambda f: float(os.path.basename(f)[5:-4].replace('_', '.')))
           if files:
               pages = [Image.open(f).convert('RGB') for f in files]
               pages[0].save('out/compare/COMPARE_v5_vs_factory.pdf', save_all=True, append_images=pages[1:], resolution=150)
-          print('side-by-side', len(files))
+          # one review file: the station's sheets first, then the side-by-side stills
+          sheets = sorted(glob.glob('../../art/pack/sheets/station_*.jpg'), key=lambda f: int(f.rsplit('_', 1)[1][:-4]))
+          allp = [Image.open(f).convert('RGB') for f in sheets + files]
+          if allp: allp[0].save('out/compare/REVIEW_station_and_stills.pdf', save_all=True, append_images=allp[1:], resolution=150)
+          print('side-by-side', len(files), '· review pages', len(allp))
           PY
       - name: Publish
         env: { GH_TOKEN: "${{ github.token }}" }
         working-directory: factory/engine
         run: |
           set -e
-          cp ../../art/direction/director_report.txt ../../art/direction/audit*.txt out/ 2>/dev/null || true
+          cp ../../art/direction/director_report.txt ../../art/direction/audit*.txt ../../art/direction/CREDITS.txt out/ 2>/dev/null || true
+          mkdir -p out/station && cp ../../art/pack/sheets/* ../../art/pack/station_report.txt ../../art/pack/pack.json out/station/ 2>/dev/null || true
           gh release delete "$TAG" -y --cleanup-tag -R ${{ github.repository }} 2>/dev/null || true
-          gh release create "$TAG" -R ${{ github.repository }} --title "$TAG" --notes "factory phase 1: automatic director - order $ORDER" \
-            out/stills/*.jpg out/compare/*.jpg out/compare/*.pdf out/*.txt src/data/film.json 2>/dev/null \
-            || gh release create "$TAG" -R ${{ github.repository }} --title "$TAG" --notes "factory phase 1" out/stills/*.jpg out/*.txt src/data/film.json
+          gh release create "$TAG" -R ${{ github.repository }} --title "$TAG" --notes "factory: automatic director + processing station - order $ORDER" \
+            out/stills/*.jpg out/compare/*.jpg out/compare/*.pdf out/*.txt out/station/* src/data/film.json 2>/dev/null \
+            || gh release create "$TAG" -R ${{ github.repository }} --title "$TAG" --notes "factory" out/stills/*.jpg out/*.txt src/data/film.json
