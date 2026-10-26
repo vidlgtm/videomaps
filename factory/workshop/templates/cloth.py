@@ -205,11 +205,17 @@ def sun_lamp(el, rot, energy, color, angle=1.0):
     so.rotation_euler = (-d).to_track_quat("-Z", "Y").to_euler()
 
 
+HERO = bpy.data.collections.new("hero")
+for ob_ in [flag] + POLE: HERO.objects.link(ob_)
+
+
 def spot(name, loc, target, power, size, color, blend=0.6, soft=0.4):
     ld = bpy.data.lights.new(name, "SPOT"); ld.energy = power; ld.spot_size = math.radians(size); ld.spot_blend = blend
     ld.color = color; ld.shadow_soft_size = soft
     o = bpy.data.objects.new(name, ld); o.location = loc; sc.collection.objects.link(o); C.aim(o, target)
     o.visible_camera = False
+    try: o.light_linking.receiver_collection = HERO
+    except Exception as e: print("light linking unavailable:", e, flush=True)
 
 
 if NISHITA:
@@ -232,7 +238,8 @@ if TOD in ("dusk", "night", "storm") and not NISHITA:
     spot("rim", (cx - 4.0, 7.0, zmid + 4.0), (cx, 0, zmid), 3000 * k, 60, (0.75, 0.82, 1.0))
 
 # ------------------------------------------------------------------ the setting
-LIT = {"night": (0.45, 7.0), "dusk": (0.32, 4.0), "storm": (0.3, 3.0), "dawn": (0.12, 2.0), "day": (0.0, 0.0)}[TOD]
+LIT = {"night": (0.40, 6.0), "dusk": (0.26, 4.0), "storm": (0.24, 3.0), "dawn": (0.10, 2.0), "day": (0.0, 0.0)}[TOD]
+FACADE = (0.36, 0.33, 0.30) if TOD in ("day", "dawn") else (0.15, 0.142, 0.135)
 FOG = (60.0, 1600.0)
 
 
@@ -309,11 +316,13 @@ def facade_material():
               op("MULTIPLY", at.outputs["Fac"], 1000.0))
     wnz = N.new("ShaderNodeTexWhiteNoise"); wnz.noise_dimensions = "1D"; Lk.new(cell, wnz.inputs["W"])
     lit = op("GREATER_THAN", wnz.outputs["Value"], 1.0 - LIT[0])
-    Lk.new(op("MULTIPLY", op("MULTIPLY", win, lit), LIT[1]), pb.inputs["Emission Strength"])
+    wn2 = N.new("ShaderNodeTexWhiteNoise"); wn2.noise_dimensions = "1D"; Lk.new(op("ADD", cell, 0.5), wn2.inputs["W"])
+    var = op("ADD", 0.35, op("MULTIPLY", wn2.outputs["Value"], 1.1))
+    Lk.new(op("MULTIPLY", op("MULTIPLY", op("MULTIPLY", win, lit), var), LIT[1]), pb.inputs["Emission Strength"])
     pb.inputs["Emission Color"].default_value = (1.0, 0.72, 0.42, 1)
     shade = op("ADD", 0.7, op("MULTIPLY", at.outputs["Fac"], 0.6))
     fac_rgb = N.new("ShaderNodeCombineXYZ")
-    for i, c in enumerate((0.36, 0.33, 0.30)): Lk.new(op("MULTIPLY", shade, c), fac_rgb.inputs[i])
+    for i, c in enumerate(FACADE): Lk.new(op("MULTIPLY", shade, c), fac_rgb.inputs[i])
     cm = N.new("ShaderNodeMix"); cm.data_type = "RGBA"; cm.inputs[7].default_value = (0.03, 0.035, 0.045, 1)
     Lk.new(win, cm.inputs[0]); Lk.new(fac_rgb.outputs[0], cm.inputs[6]); Lk.new(cm.outputs[2], pb.inputs["Base Color"])
     rm = N.new("ShaderNodeMapRange"); rm.inputs["To Min"].default_value = 0.85; rm.inputs["To Max"].default_value = 0.12
@@ -419,15 +428,16 @@ c = cam.constraints.new("TRACK_TO"); c.target = look; c.track_axis = "TRACK_NEGA
 camd.sensor_width = 36; camd.dof.use_dof = True; camd.dof.focus_object = focus; camd.clip_start = 0.3; camd.clip_end = 9000
 
 FU, FV = [float(x) for x in P.get("focus_uv", [0.3, 0.65])]
+FVI = int(round(FV * NV)) * (NU + 1) + int(round(FU * NU))      # cloth vertex at the point of interest
 
 
 def shot(t):
-    k = t / T; f = flag_center(t); q = flag_point(t, FU, FV)
+    k = t / T; f = flag_center(t); q = Vector(flag_at(t)[FVI])
     if CAMERA == "pull":
         a = C.smooth(k / 0.45); b = C.smooth((k - 0.45) / 0.55)
         cp = Vector((q.x - 0.3, -2.9, q.z - 0.1)).lerp(Vector((q.x + 0.2, -2.4, q.z + 0.05)), a).lerp(Vector((f.x + 1.4, -10.5, f.z - 0.5)), b)
         lp = q.lerp(Vector((f.x - 0.3, 0, f.z - 0.3)), b)
-        return cp, lp, (q if b < 0.5 else f), 50, 1.8 + 1.2 * b
+        return cp, lp, (q if b < 0.5 else f), 50, 2.8 - 0.8 * b
     if CAMERA == "push":
         cp = Vector((f.x + 2.6, -15.0, f.z - 1.6)).lerp(Vector((f.x + 0.9, -7.6, f.z - 0.5)), C.smooth(k))
         return cp, f, f, 50, 2.8
@@ -438,8 +448,8 @@ def shot(t):
     return cp, f, f, 26, 4.0
 
 
-for i in range(int(math.ceil(T)) + 1):
-    t = min(T, float(i)); fr = 1 + round(t * FPS)
+for i in range(int(math.ceil(T * 2)) + 1):
+    t = min(T, i / 2.0); fr = 1 + round(t * FPS)
     cp, lp, fp, lens, fs = shot(t)
     cam.location = cp; look.location = lp; focus.location = fp; camd.lens = lens; camd.dof.aperture_fstop = fs
     for ob in (cam, look, focus): ob.keyframe_insert("location", frame=fr)
@@ -452,7 +462,7 @@ cams = np.array(cams)
 
 # ------------------------------------------------------------------ weather (analytic points, never near the lens)
 WX = {"snow": (1.6, 30000, (0.006, 0.019), (0.55, 1.35), (0.95, 0.97, 1.0), 0.5, 1.6),
-      "rain": (2.4, 40000, (0.0022, 0.0040), (8.0, 10.5), (0.78, 0.82, 0.88), 0.9, 2.0),
+      "rain": (2.4, 40000, (0.0022, 0.0040), (8.0, 10.5), (0.78, 0.82, 0.88), 0.5, 2.0),
       "embers": (0.15, 3000, (0.008, 0.022), (-1.3, -0.5), (1.0, 0.45, 0.12), 9.0, 2.0),
       "dust": (0.35, 7000, (0.003, 0.009), (-0.08, 0.08), (1.0, 0.85, 0.6), 0.6, 2.0)}
 NEAR = 0
@@ -490,13 +500,13 @@ if WEATHER in WX:
         for x in list(rnt.nodes): rnt.nodes.remove(x)
         tr_ = rnt.nodes.new("ShaderNodeBsdfTransparent"); em = rnt.nodes.new("ShaderNodeEmission")
         em.inputs["Color"].default_value = (*col, 1); em.inputs["Strength"].default_value = est
-        mx2 = rnt.nodes.new("ShaderNodeMixShader"); mx2.inputs[0].default_value = 0.42
+        mx2 = rnt.nodes.new("ShaderNodeMixShader"); mx2.inputs[0].default_value = 0.28
         o2 = rnt.nodes.new("ShaderNodeOutputMaterial")
         rnt.links.new(tr_.outputs[0], mx2.inputs[1]); rnt.links.new(em.outputs[0], mx2.inputs[2]); rnt.links.new(mx2.outputs[0], o2.inputs["Surface"])
         C.not_a_light(rm)
         vel = Vector((drift, 0.0, -float(np.mean(spd)))).normalized()
         eul = Vector((0, 0, 1)).rotation_difference(vel).to_euler()
-        C.points_object("weather", wx_at(TT[0]), radii, rm, f"{WORK}/wx.pc2", streak=(float(np.mean(spd)) * 0.45 / FPS, eul))
+        C.points_object("weather", wx_at(TT[0]), radii, rm, f"{WORK}/wx.pc2", streak=(float(np.mean(spd)) * 0.45 / FPS / float(np.mean(rr)), eul))
     else:
         wm_ = C.mat("wx", col, 0.45, emit=col, estr=est); C.not_a_light(wm_)
         C.points_object("weather", wx_at(TT[0]), radii, wm_, f"{WORK}/wx.pc2")

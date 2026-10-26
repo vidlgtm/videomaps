@@ -1,5 +1,5 @@
 """Workshop template 'fly' - region data on one web-mercator grid: terrain (AWS terrarium DEM) + colour (EOX Sentinel-2
-cloudless 2016, CC BY 4.0) for the region, and a coarse ring of both around it out to the horizon (3 zoom levels lower).
+cloudless 2016, CC BY 4.0) for the region, and a coarse ring of both around it out to the horizon (2 zoom levels lower).
 Open sea is forced well below the water plane: the DEM has flat 0 m patches at sea that would otherwise sit exactly at
 water level and show as pale slabs. Border lines (Natural Earth 10m) clipped to the region.
 usage: python3 fly_prep.py <params.json> <out_dir>
@@ -97,7 +97,7 @@ print("texture", ti.size, flush=True)
 del tex, ti
 
 # ---------------------------------------------------------------- coarse ring out to the horizon
-ZF = max(3, Z - 3); F = 2 ** (Z - ZF)
+ZF = max(3, Z - 2); F = 2 ** (Z - ZF)
 span = max(W, H); M = 2.5 * span
 fx0, fx1 = x0 - M, x1 + M
 fy0, fy1 = max(my(84.0), y0 - M), min(my(-84.0), y1 + M)
@@ -108,7 +108,7 @@ tf = mosaic("s2", ZF, fx0 / F, fy0 / F, fw, fh)
 hf, far_sea, _ = sea_fix(hf, tf, SEA)
 hf = ndimage.gaussian_filter(hf, 0.7)
 fi = Image.fromarray(tf)
-if fi.width > 8192: fi = fi.resize((8192, round(fi.height * 8192 / fi.width)), Image.LANCZOS)
+if fi.width > 16384: fi = fi.resize((16384, round(fi.height * 16384 / fi.width)), Image.LANCZOS)
 fi.save(f"{OUT}/far.jpg", quality=90)
 print(f"ring: {fw} x {fh} px at z{ZF}, sea {far_sea:.1%}", flush=True)
 del tf, fi

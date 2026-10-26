@@ -67,7 +67,7 @@ def mist(d):
 
 # ---------- terrain: region + ring, one mesh
 STEP = max(2, int(math.ceil(math.sqrt(W * H / 5.5e6))))
-SF = 4 * FAR["f"]
+SF = max(16, 8 * FAR["f"])
 co, quads, tris = TM.assemble(W, H, STEP, FAR, SF, h_main, h_far)
 wco = np.stack([(co[:, 0] - W / 2) / U, (H / 2 - co[:, 1]) / U, co[:, 2] * VS], 1)
 quads, tris = TM.orient_up(wco, quads), TM.orient_up(wco, tris)
@@ -253,7 +253,7 @@ if O.preview:
     if clear_min < 1.0: errors.append(f"camera only {clear_min:.2f} km above the ground at frame {clear_at} (min 1 km)")
     for k, s in vis_s.items():
         if s < 1.0: warnings.append(f"label {k} visible only {s:.1f} s")
-    near_lim = 0.6 * WU
+    near_lim = (FAR["f"] / U) / (2 * (36.0 / cam.data.lens) / 1920)     # where a ring texel covers 2 screen pixels
     fx0w, fx1w = (FAR["x0"] - W / 2) / U, (FAR["x1"] - W / 2) / U
     fy0w, fy1w = (H / 2 - FAR["y1"]) / U, (H / 2 - FAR["y0"]) / U
     hw, hh = (W - 1) / 2 / U, (H - 1) / 2 / U

@@ -82,7 +82,8 @@ def _cross(a, b): return (a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], 
 
 
 def fly_footprint(p, sec):
-    """extends the bbox until every ground point the camera sees closer than 0.6 x region size lies inside it"""
+    """extends the bbox until every ground point the camera sees closer than the ring-detail limit lies inside it
+    (10 % margin over the preview check for the difference between this spline and Blender's)"""
     notes = []
     for _ in range(4):
         lon0, lon1, lat0, lat1 = p["bbox"]
@@ -93,13 +94,15 @@ def fly_footprint(p, sec):
         P3 = lambda lon, lat, alt: (mx(lon) - x0, -(my(lat) - y0), alt * 1000 * ex / mpp)
         keys = [(float(k["t"]), P3(*k["cam"]), P3(*k["look"])) for k in p["path"]]
         thx = 18.0 / float(p.get("lens", 30)); thy = thx * 1080 / 1920
-        near, m = 0.6 * max(W, H), 0.02 * max(W, H)
+        # the ring is 2 zoom levels coarser (texel = 4 region px): ground closer than where a ring texel covers
+        # 2 screen pixels must be region ground (the preview check uses the same limit)
+        near, m = 4.0 / (2 * (36.0 / float(p.get("lens", 30))) / 1920) * 1.1, 0.02 * max(W, H)
         out = []
         for i in range(int(sec * 4) + 1):
             t = min(sec, i / 4)
             c, l = _interp(keys, t, 1), _interp(keys, t, 2)
             f = _norm(tuple(b - a for a, b in zip(c, l))); r = _norm(_cross(f, (0, 0, 1))); u = _cross(r, f)
-            for a, b in ((-1, -1), (1, -1), (0, -1), (-1, 0), (1, 0), (-1, 0.5), (1, 0.5), (0, 0)):
+            for a, b in [(-1 + i_ / 4, -1 + j_ / 10) for i_ in range(9) for j_ in range(21)]:
                 d = _norm(tuple(f[k] + r[k] * a * thx + u[k] * b * thy for k in range(3)))
                 if d[2] >= -1e-6: continue
                 s = -c[2] / d[2]

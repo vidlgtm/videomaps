@@ -172,7 +172,7 @@ def add_fog(m, sky_group, start, depth, strength=1.0, maxf=1.0):
 
 def points_object(name, verts, radii, material, cache=None, streak=None):
     """vertex cloud rendered as spheres of per-point radius (snow, embers, dust), or as thin streaks
-    streak = (length, euler) for rain: the streak already shows the motion, so no motion blur is needed"""
+    streak = (length per unit radius, euler) for rain: the streak already shows the motion, so no motion blur is needed"""
     sc = bpy.context.scene
     me = bpy.data.meshes.new(name); me.vertices.add(len(verts)); me.vertices.foreach_set("co", np.asarray(verts, np.float32).ravel()); me.update()
     ra = me.attributes.new("rad", "FLOAT", "POINT"); ra.data.foreach_set("value", np.asarray(radii, np.float32))
@@ -194,7 +194,9 @@ def points_object(name, verts, radii, material, cache=None, streak=None):
         ng.links.new(cyl.outputs["Mesh"], smc.inputs["Geometry"])
         iop = ng.nodes.new("GeometryNodeInstanceOnPoints")
         ng.links.new(m2p.outputs["Points"], iop.inputs["Points"]); ng.links.new(smc.outputs["Geometry"], iop.inputs["Instance"])
-        cx = ng.nodes.new("ShaderNodeCombineXYZ"); cx.inputs[2].default_value = float(length)
+        ln = ng.nodes.new("ShaderNodeMath"); ln.operation = "MULTIPLY"; ln.inputs[1].default_value = float(length)
+        ng.links.new(na.outputs["Attribute"], ln.inputs[0])
+        cx = ng.nodes.new("ShaderNodeCombineXYZ"); ng.links.new(ln.outputs[0], cx.inputs[2])
         ng.links.new(na.outputs["Attribute"], cx.inputs[0]); ng.links.new(na.outputs["Attribute"], cx.inputs[1])
         ng.links.new(cx.outputs[0], iop.inputs["Scale"])
         try: iop.inputs["Rotation"].default_value = tuple(eul)
