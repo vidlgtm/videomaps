@@ -123,7 +123,7 @@ def fly_footprint(p, sec):
 # ------------------------------------------------------------------ templates
 PRESETS = {"gold", "red", "orange", "white", "blue"}
 FLY_KEYS = {"bbox", "zoom", "sea", "borders", "highlight", "styles", "places", "labels", "path", "exaggeration", "snow",
-            "sun", "lens", "samples", "haze", "saturation"}
+            "sun", "lens", "samples", "haze", "saturation", "look"}
 
 
 def check_fly(c, sec):
@@ -137,7 +137,7 @@ def check_fly(c, sec):
     if lon1 - lon0 > 16 or lat1 - lat0 > 12: c.bad("bbox too large for one fly-over (max 16 x 12 degrees)")
     if lon1 - lon0 < 0.5 or lat1 - lat0 < 0.4: c.bad("bbox too small (min 0.5 x 0.4 degrees)")
     c.number("zoom", 6, 12); c.number("sea", -50, 50); c.number("exaggeration", 1, 5); c.number("lens", 18, 85)
-    c.number("samples", 16, 256); c.number("haze", 0.2, 1.0); c.number("saturation", 0.6, 1.6)
+    c.number("samples", 16, 256); c.number("haze", 0.2, 1.0); c.number("saturation", 0.6, 1.6); c.choice("look", ("punchy", "base"))
     sun = p.get("sun", {})
     if not isinstance(sun, dict) or set(sun) - {"elevation", "azimuth"}: c.bad("'sun' must be {elevation, azimuth}")
     else: c.number("elevation", 10, 70, src=sun); c.number("azimuth", 0, 360, src=sun)

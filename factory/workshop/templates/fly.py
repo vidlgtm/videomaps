@@ -9,7 +9,7 @@ usage: blender -b -P fly.py -- --params p.json --data <prep dir> --out <dir> [--
        --budget-min M | --preview]
 params: seconds; path [{t, cam: [lon, lat, alt_km], look: [lon, lat, alt_km]}...]; exaggeration; sea; snow [m0, m1];
         sun {elevation, azimuth}; styles {line key: preset | [r, g, b, strength, width]}; places {name: [lon, lat]};
-        labels [[place, display, style]]; lens; samples; haze 0.2..1; saturation"""
+        labels [[place, display, style]]; lens; samples; haze 0.2..1; saturation; look punchy | base"""
 import bpy, os, sys, json, math, gc
 import numpy as np
 from mathutils import Vector
@@ -214,7 +214,11 @@ for k in P["path"]:
     tgt.location = wpt(*k["look"]); tgt.keyframe_insert("location", frame=f)
 C.bezier_keys([cam, tgt])
 sc.frame_start, sc.frame_end = 1, FRAMES
-C.setup_cycles(sc, O, samples=int(P.get("samples", 72)), look="AgX - Base Contrast")
+# AgX Base is neutral but flat on satellite imagery; Punchy adds contrast + colour, the exposure is calibrated after it
+C.setup_cycles(sc, O, samples=int(P.get("samples", 72)), look={"punchy": "AgX - Punchy", "base": "AgX - Base Contrast"}[P.get("look", "punchy")])
+LOOK = {"punchy": "AgX - Punchy", "base": "AgX - Base Contrast"}[P.get("look", "punchy")]
+if sc.view_settings.look != LOOK: raise SystemExit(f"colour look {LOOK!r} is not available (got {sc.view_settings.look!r})")
+print(f"look {sc.view_settings.view_transform} / {sc.view_settings.look}", flush=True)
 print(f"built: terrain {NV} verts (step {STEP}, ring {FAR['w']}x{FAR['h']} px), lines {len(meta['lines'])}", flush=True)
 
 # ---------- preview: labels + checks + exposure calibration + key frames (CPU)
