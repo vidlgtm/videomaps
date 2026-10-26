@@ -19,8 +19,10 @@ MATERIAL = {"sheet": "paper", "print": "paper", "canvas": "gold", "frame": "gold
             "pole": "walnut", "plinth": "marble", "table": "walnut", "candle": "wax"}
 # LIGHT. A document or picture is shown in its exact colours, so the scene is lit for paper: the key light gives the cast an
 # irradiance that is a share of E_PAPER (under E_PAPER white paper is exactly white at 0 EV). Seals, hands and props on the
-# documents are then lit as the documents appear, and the mood comes from the key's direction, height, size and colour, the
-# fill, the rim and the dark room. A key is one large soft light (a lamp shade, a window, a skylight), never pools of spots.
+# documents are then lit as the documents appear. The key is one soft pool over the whole cast (full strength over the cast,
+# a smooth fall-off beyond it), so the room around falls into the mood's darkness; its direction, height, softness and colour,
+# the fill, the rim and the room make the mood. The room's own light follows its surface, so a black slate floor or white
+# marble still reads as a room, not as a void or a glare.
 E_PAPER = math.pi / 0.8
 PAPER_LIGHT = E_PAPER * 4 * math.pi                                # spot power for E_PAPER = PAPER_LIGHT x distance^2
 # key: azimuth and elevation from the centre of the cast (deg; the camera stands at -90), distance and size (x L0), colour,
@@ -46,6 +48,7 @@ LIGHT = {
               "world": (0.0012, 0.0016, 0.0032), "dark": 0.95},
 }
 DIM = 0.25                    # a scene whose pictures get their light on cue keeps its room at a quarter of the key
+A_ROOM = 0.06                 # the room light is set for a surface of this albedo and scaled to the real one (1/8 .. 4)
 # linear albedo of the place's surfaces (the exposure target on the lit surface follows from it)
 ALBEDO = {"walnut": 0.06, "wood": 0.06, "oak": 0.28, "marble": 0.58, "stone": 0.25, "slate": 0.012, "sand": 0.3,
           "plaster": 0.52, "velvet": 0.011}
@@ -398,18 +401,23 @@ class Stage:
             m = self.L[candle]; v = Vector((m["x"], m["y"], 0)) - self.center
             if v.length > 1e-3: az = math.degrees(math.atan2(v.y, v.x))
         if any(b["do"] == "light" for b in self.beats): share *= DIM
+        room = float(np.clip(A_ROOM / self.albedo, 1 / 8, 4)) if self.albedo else 1.0
+        if self.albedo is not None and self.albedo < 0.03: self.dark_max = max(self.dark_max, 0.95)
+        self.sc.world.node_tree.nodes["Background"].inputs["Strength"].default_value = room
         tgt = self.center + Vector((0, 0, 0.25 * self.Lz))
-        self.key = self.area("key", az, el, dist, size, col, share * E_PAPER, tgt)
+        d = dist * self.L0; at = tgt + d * Vector(P.cam_dir(el, az))
+        self.key = self.spot("key", at, tgt, col, PAPER_LIGHT * share * d * d, 1.5 * self.L0, 0.6)
+        self.key.data.shadow_soft_size = 0.5 * size * self.L0; self.key.visible_glossy = False
         fcol, fsh = Lt["fill"]
-        self.area("fill", az + 180, 30, 2.0, 1.5, fcol, share * fsh * E_PAPER, tgt)
+        self.area("fill", az + 180, 30, 2.0, 1.5, fcol, share * fsh * E_PAPER * room, tgt).visible_glossy = False
         if Lt["rim"]:
-            rcol, rsh = Lt["rim"]; d = 2.0 * self.L0; at = tgt + d * Vector(P.cam_dir(35, 70))
-            ob = self.spot("rim", at, tgt, rcol, PAPER_LIGHT * share * rsh * d * d, self.L0, 0.6)
+            rcol, rsh = Lt["rim"]; d2 = 2.0 * self.L0; at2 = tgt + d2 * Vector(P.cam_dir(35, 70))
+            ob = self.spot("rim", at2, tgt, rcol, PAPER_LIGHT * share * rsh * d2 * d2, self.L0, 0.6)
             ob.visible_glossy = False
         # exposure target: the lit surface near the cast as this light shows it (linear -> sRGB luma)
         if self.albedo is not None:
-            lin = self.albedo * (share * math.sin(math.radians(el)) + share * fsh * 0.5) * E_PAPER / math.pi
-            lin += self.albedo * float(np.mean(Lt["world"]))
+            lin = self.albedo * (share * math.sin(math.radians(el)) + share * fsh * 0.5 * room) * E_PAPER / math.pi
+            lin += self.albedo * float(np.mean(Lt["world"])) * room
             self.target = round(srgb(lin), 3)
         else: self.target = 0.18
         self.share = share

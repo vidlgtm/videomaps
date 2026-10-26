@@ -78,8 +78,8 @@ def presence_node(m):
 def wood(kind="walnut", presence=False):
     """polished wood veneer: fine grain along x (lines about 6 mm apart, warped), slow colour drift, pores, clear coat"""
     g = Graph(f"wood_{kind}")
-    p = g.node("ShaderNodeBsdfPrincipled", Roughness=0.36)
-    p.inputs["Coat Weight"].default_value = 0.6; p.inputs["Coat Roughness"].default_value = 0.1
+    p = g.node("ShaderNodeBsdfPrincipled", Roughness=0.42)
+    p.inputs["Coat Weight"].default_value = 0.3; p.inputs["Coat Roughness"].default_value = 0.22
     co = g.tc.outputs["Object"]
     wn = g.node("ShaderNodeTexNoise", Scale=2.2, Detail=3.0); g.L.new(co, wn.inputs["Vector"])
     wc = g.N.new("ShaderNodeVectorMath"); wc.operation = "SUBTRACT"; g.L.new(wn.outputs["Color"], wc.inputs[0]); wc.inputs[1].default_value = (0.5, 0.5, 0.5)
@@ -121,9 +121,10 @@ def stone(kind="stone", presence=False):
         dk = g.math("LESS_THAN", sc_.outputs[0], 0.24); lt = g.math("GREATER_THAN", sc_.outputs[1], 0.88)
         f = g.math("ADD", g.math("MULTIPLY_ADD", dk, -0.4, nz.outputs["Fac"]), g.math("MULTIPLY", lt, 0.35))
     if kind == "marble":                                       # soft veins
-        wv = g.N.new("ShaderNodeTexWave"); wv.inputs["Scale"].default_value = 1.4; wv.inputs["Distortion"].default_value = 9.0
-        wv.inputs["Detail"].default_value = 6.0; g.L.new(g.tc.outputs["Object"], wv.inputs["Vector"])
-        f = g.math("MULTIPLY_ADD", g.math("POWER", wv.outputs["Fac"], 6.0), -0.6, g.math("MULTIPLY_ADD", nz.outputs["Fac"], 0.4, 0.6))
+        wv = g.N.new("ShaderNodeTexWave"); wv.inputs["Scale"].default_value = 5.0; wv.inputs["Distortion"].default_value = 14.0
+        wv.inputs["Detail"].default_value = 8.0; wv.inputs["Detail Roughness"].default_value = 0.6
+        g.L.new(g.tc.outputs["Object"], wv.inputs["Vector"])
+        f = g.math("MULTIPLY_ADD", g.math("POWER", wv.outputs["Fac"], 10.0), -0.22, g.math("MULTIPLY_ADD", nz.outputs["Fac"], 0.3, 0.68))
     cr = g.N.new("ShaderNodeValToRGB"); g.L.new(f, cr.inputs[0])
     cr.color_ramp.elements[0].color = (*lin3(base[0]), 1); cr.color_ramp.elements[1].color = (*lin3(base[1]), 1)
     g.L.new(cr.outputs[0], p.inputs["Base Color"])
