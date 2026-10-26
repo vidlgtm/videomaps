@@ -391,12 +391,12 @@ if O.preview:
     for k, ts_ in cut.items(): errors.append(f"item {k} is cut by the frame edge while it is held ({ts_[0]:.1f}-{ts_[-1]:.1f} s)")
     for k, sp_ in small.items(): warnings.append(f"item {k} is small in the frame while held ({min(sp_):.0%} of the frame)")
 
-    # key frames: every item held (picture readable), then the end of its reveal
+    # key frames: every item held (picture readable), then its reveal under way (the sweeping edge shows)
     holds, revs = [], []
     for i in range(NI):
         a = TL["t_rev"][i] + G.REV + 0.2; b = TL["end"][i] - 0.15
         holds.append([int(round((a + q * (b - a)) * FPS)) + 1 for q in (0.6, 0.15, 0.95)])
-        revs.append(int(round((TL["t_rev"][i] + 0.80 * G.REV) * FPS)) + 1)
+        revs.append(int(round((TL["t_rev"][i] + 0.60 * G.REV) * FPS)) + 1)
     order = [h[0] for h in holds] + revs + [h[1] for h in holds] + [h[2] for h in holds]
     KEYF = []
     for f in order:
@@ -424,6 +424,21 @@ if O.preview:
         cp = os.path.join(O.out, "check.json"); ck = json.load(open(cp))
         imgs = {k: pixels(os.path.join(DATA, IMGS[k])) for k in KEYS}
         acc = {k: [] for k in KEYS}; acc_all = {k: [] for k in KEYS}
+        lin = lambda c: np.where(c <= 0.04045, c / 12.92, ((c + 0.055) / 1.055) ** 2.4)
+        srgb = lambda c: np.where(c <= 0.0031308, c * 12.92, 1.055 * np.power(np.maximum(c, 0.0), 1 / 2.4) - 0.055)
+        yl = lambda c: lin(c) @ np.array([0.2126, 0.7152, 0.0722])
+        seen = {}
+
+        def seen_as(k, by, bx):
+            """the picture as the camera sees it at that size: means in linear light over by x bx source pixels"""
+            if (k, by, bx) not in seen:
+                a = imgs[k]
+                if by > 1 or bx > 1:
+                    h2, w2 = a.shape[0] // by * by, a.shape[1] // bx * bx
+                    a = srgb(lin(a[:h2, :w2]).reshape(h2 // by, by, w2 // bx, bx, 3).mean(axis=(1, 3)))
+                seen[(k, by, bx)] = a
+            return seen[(k, by, bx)]
+
         for f in ck["key_frames"]:
             t = (f - 1) / FPS; i = held(t)
             if i is None: continue
@@ -431,6 +446,9 @@ if O.preview:
             rend = pixels(os.path.join(O.out, f"p_{f:04d}{ck.get('ext', '.jpg')}"))[::-1]
             rh_, rw_ = rend.shape[:2]
             sc.frame_set(f); o, rows = C.cam_rays(sc, cam, nx, ny)
+            cv = [world_to_camera_view(sc, cam, MW[key] @ Vector((sx * it["iw"] / 2, sy * it["ih"] / 2, 0.0))) for sx in (-1, 1) for sy in (-1, 1)]
+            wpx = (max(p.x for p in cv) - min(p.x for p in cv)) * rw_; hpx = (max(p.y for p in cv) - min(p.y for p in cv)) * rh_
+            fa = seen_as(key, max(1, int(round(fa.shape[0] / max(hpx, 1.0)))), max(1, int(round(fa.shape[1] / max(wpx, 1.0)))))
             hk = np.zeros((ny, nx), bool); ex = np.zeros((ny, nx, 3), np.float32)
             for j, row in enumerate(rows):
                 for i_, d in enumerate(row):
@@ -454,23 +472,32 @@ if O.preview:
                 r_ = rend[min(int((j + 0.5) / ny * rh_), rh_ - 1), min(int((i_ + 0.5) / nx * rw_), rw_ - 1)]
                 acc_all[key].append((r_, ex[j, i_]))
                 if ok[j, i_]: acc[key].append((r_, ex[j, i_]))
-        lin = lambda c: np.where(c <= 0.04045, c / 12.92, ((c + 0.055) / 1.055) ** 2.4)
         res, errs, warns = {}, [], []
-        yl = lambda c: lin(c) @ np.array([0.2126, 0.7152, 0.0722])
+
+        def gain(r_, e_):
+            """brightness offset (EV) from the means in linear light over the cells that are not near black"""
+            br = yl(e_) >= 0.02
+            if br.sum() < 12: return None, int(br.sum())
+            return float(np.log2(max(yl(r_)[br].mean(), 1e-5) / max(yl(e_)[br].mean(), 1e-5))), int(br.sum())
+
         for k, v in acc.items():
-            if len(v) < 12:                                           # a textured picture: medians over all its inner cells
+            if len(v) < 12:                                           # a textured picture: brightness over all its inner cells
                 w_ = acc_all[k]
                 if len(w_) < 40: warns.append(f"picture {k}: too few cells to measure its colours ({len(w_)})"); continue
                 r_ = np.array([a for a, _ in w_]); e_ = np.array([b for _, b in w_])
-                evo = float(np.log2(max(np.median(yl(r_)), 1e-4) / max(np.median(yl(e_)), 1e-4)))
-                res[k] = {"ev_offset": round(evo, 3), "cells": len(w_), "mode": "median"}
+                evo, nb = gain(r_, e_)
+                if evo is None: warns.append(f"picture {k}: too dark to measure its brightness"); continue
+                res[k] = {"ev_offset": round(evo, 3), "cells": len(w_), "bright_cells": nb, "mode": "all"}
                 if abs(evo) > 0.25: errs.append(f"picture {k} renders off its true brightness ({evo:+.2f} EV)")
                 continue
             r_ = np.array([a for a, _ in v]); e_ = np.array([b for _, b in v])
             dmed = float(np.median(np.abs(r_ - e_).max(-1)) * 255)
-            evo = float(np.log2(max(np.median(yl(r_)), 1e-4) / max(np.median(yl(e_)), 1e-4)))
-            res[k] = {"median_diff": round(dmed, 1), "ev_offset": round(evo, 3), "cells": len(v)}
-            if dmed > 16 or abs(evo) > 0.2: errs.append(f"picture {k} renders off its true colours (median difference {dmed:.0f}/255, {evo:+.2f} EV)")
+            evo, nb = gain(r_, e_)
+            if evo is None:                                           # flat dark cells: the brightness comes from all inner cells
+                w_ = acc_all[k]; evo, nb = gain(np.array([a for a, _ in w_]), np.array([b for _, b in w_])) if len(w_) >= 40 else (None, 0)
+            res[k] = {"median_diff": round(dmed, 1), "ev_offset": None if evo is None else round(evo, 3), "cells": len(v), "bright_cells": nb}
+            if dmed > 16 or (evo is not None and abs(evo) > 0.2):
+                errs.append(f"picture {k} renders off its true colours (median difference {dmed:.0f}/255, {0.0 if evo is None else evo:+.2f} EV)")
             elif dmed > 9: warns.append(f"picture {k} colours slightly off (median difference {dmed:.0f}/255)")
         lo_, hi_ = EV_RANGE
         if min(abs(ck["ev"] - lo_), abs(ck["ev"] - hi_)) < 0.02:
