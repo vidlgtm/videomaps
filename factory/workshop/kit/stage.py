@@ -191,6 +191,10 @@ class Stage:
         self.make_lights()
         self.animate()
         self.make_camera()
+        for ob in self.sc.objects:                                      # lamps light the scene but are never seen as dots
+            if ob.type == "LIGHT":
+                try: ob.visible_camera = False
+                except Exception as e: print("light visibility:", e, flush=True)
 
     # ---------------------------------------------------------- cast
     def src(self, name):
@@ -435,7 +439,7 @@ class Stage:
             if n in self.spots or not (c["is"] in ("sheet", "print", "canvas") or (c["is"] == "block" and self.src(n)[0] == "store")): continue
             m = self.L[n]; Lm = max(0.25, max(m["w"], m["d"]))
             cc = Vector((m["x"], m["y"], m["z"] + m["h"]))
-            self.spot(f"{n}_own", cc + Vector((-0.35, -0.8, 2.2)) * Lm, cc, warm, self.k * 32.0 * Lm * Lm, Lm, 0.45)
+            self.spot(f"{n}_own", cc + Vector((-0.35, -0.8, 2.2)) * Lm, cc, warm, self.k * 12.0 * Lm * Lm, Lm, 0.5)
         for n, sp in self.spots.items():
             m = self.L[n]; Lm = max(0.25, max(m["w"], m["d"]))
             c = Vector((m["x"], m["y"], m["z"] + m["h"]))

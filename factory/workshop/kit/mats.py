@@ -212,7 +212,8 @@ def burn_mask(g, x, y, w, h, burn, burn_from="left"):
 
 
 def paper(name, kind="paper", w=0.3, h=0.42, burn_from="left"):
-    """blank paper or parchment: mottling, fibres, darker aged edges; burn, glow and presence like a picture
+    """blank paper or parchment: mottling, fibres, darker aged edges; shown like a picture of itself (the camera sees its
+    exact colours, as it sees every document and photo next to it); burn, glow and presence like a picture
     returns (material, nodes)"""
     g = Graph(f"paper_{name}")
     sx = g.node("ShaderNodeSeparateXYZ"); g.L.new(g.tc.outputs["Object"], sx.inputs[0]); x, y = sx.outputs[0], sx.outputs[1]
@@ -237,12 +238,19 @@ def paper(name, kind="paper", w=0.3, h=0.42, burn_from="left"):
     except Exception: pass
     bp = g.node("ShaderNodeBump", Strength=0.04, Distance=0.0005); g.L.new(mo.outputs["Fac"], bp.inputs["Height"]); g.L.new(bp.outputs[0], p.inputs["Normal"])
     ex = g.value(1.0); EXACT.append(ex)
+    lw = g.node("ShaderNodeLayerWeight", Blend=0.5)
+    shade = g.math("MULTIPLY_ADD", g.math("POWER", lw.outputs["Facing"], 2.0), -0.3, 1.0)
+    lift = g.math("MULTIPLY_ADD", glow.outputs[0], 0.8, 1.0)
+    em = g.node("ShaderNodeEmission", Strength=1.0)
+    g.L.new(g.scale(col, g.math("MULTIPLY", g.math("MULTIPLY", ex.outputs[0], shade), lift)), em.inputs["Color"])
+    lp = g.node("ShaderNodeLightPath")
+    surf = g.mix_shader(lp.outputs["Is Camera Ray"], p.outputs[0], em.outputs[0])
     fire = g.node("ShaderNodeEmission", Color=(1.0, 0.36, 0.06)); g.L.new(g.math("MULTIPLY", ember, g.math("MULTIPLY", ex.outputs[0], 6.0)), fire.inputs["Strength"])
-    gl = g.node("ShaderNodeEmission"); g.L.new(col, gl.inputs["Color"]); g.L.new(g.math("MULTIPLY", glow.outputs[0], g.math("MULTIPLY", ex.outputs[0], 0.9)), gl.inputs["Strength"])
-    a1 = g.node("ShaderNodeAddShader"); g.L.new(p.outputs[0], a1.inputs[0]); g.L.new(fire.outputs[0], a1.inputs[1])
-    a2 = g.node("ShaderNodeAddShader"); g.L.new(a1.outputs[0], a2.inputs[0]); g.L.new(gl.outputs[0], a2.inputs[1])
+    a1 = g.node("ShaderNodeAddShader"); g.L.new(surf, a1.inputs[0]); g.L.new(fire.outputs[0], a1.inputs[1])
     tr = g.node("ShaderNodeBsdfTransparent")
-    m = g.finish(g.mix_shader(gone, a2.outputs[0], tr.outputs[0]))
+    m = g.finish(g.mix_shader(gone, a1.outputs[0], tr.outputs[0]))
+    try: m.cycles.emission_sampling = "NONE"
+    except Exception: pass
     return m, {"reveal": None, "burn": burn, "glow": glow, "presence": presence_node(m)}
 
 
