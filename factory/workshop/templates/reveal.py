@@ -1,6 +1,7 @@
 """Workshop template 'reveal' - archival pictures and documents revealed as physical objects (Blender Cycles): photo
 prints and paper sheets lying on a walnut desk or on museum velvet, each one revealed in turn by its own light (a spot that
-fades up, or a beam that sweeps across it), the camera travelling from one to the next and pushing in slowly.
+fades up, or a beam that sweeps across it), the camera travelling from one to the next and pushing in slowly; once the
+camera moves on, the item it leaves sinks back to a low light.
 built-in rules: once lit, every picture keeps its exact colours (camera-only emission at 2^-exposure, Standard view);
 the light that reveals it is a real light, so the desk, the paper edges and the shadows answer it; items never overlap;
 every item is held whole in the frame with its label; the exposure is set on the lit desk around the items.
@@ -29,9 +30,9 @@ EL, LENS, FILL = float(CAMP.get("elevation", 58)), float(CAMP.get("lens", 50)), 
 TL = G.timeline(T, NI)
 DARK = 0.008                        # what is left of a picture before its light comes on (linear)
 SOFT = 0.35                         # width of the edge of a sweeping reveal (share of the item width)
-K0, K1 = 1.12, 1.07                 # camera distance at the start of the first item / on arrival at the next, pushing to 1
-E_SPOT = 260.0 if SETTING == "desk" else 170.0
+E_SPOT = 60.0 if SETTING == "desk" else 39.0
 BLEND = 0.45
+DIM = 0.35                          # what is left of an item's light (and picture) once the camera has moved on
 
 
 def srgb2lin(c): return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
@@ -44,19 +45,13 @@ DIMS = []
 for e in IT:
     d = G.dims(meta["items"][e["key"]]["aspect"], e.get("kind", "print"), float(e.get("size", 1.0)))
     d.update(key=e["key"], kind=e.get("kind", "print")); DIMS.append(d)
-ITEMS, MIN_GAP = G.layout(DIMS)
-
-
-def curl(it, x, y):
-    L_ = max(it["w"], it["h"]); doc = it["kind"] == "document"
-    a, b = np.abs(2 * x / it["w"]), np.abs(2 * y / it["h"])
-    return L_ * ((0.016 if doc else 0.010) * (0.7 * a ** 3 + 0.3 * b ** 3) + (0.012 if doc else 0.006) * (a * b) ** 4)
+ITEMS, MIN_GAP, GAP_USED, SLIVERS = G.plan(DIMS, T, EL, LENS, FILL, FPS)    # the gap that leaves no sliver at the frame edge
 
 
 def sheet(it):
     L_ = max(it["w"], it["h"]); nx = max(8, int(round(56 * it["w"] / L_))); ny = max(8, int(round(56 * it["h"] / L_)))
     xs, ys = np.linspace(-it["w"] / 2, it["w"] / 2, nx + 1), np.linspace(-it["h"] / 2, it["h"] / 2, ny + 1)
-    X, Y = np.meshgrid(xs, ys); Z = curl(it, X, Y)
+    X, Y = np.meshgrid(xs, ys); Z = G.curl(it, X, Y)
     V = np.column_stack([X.ravel(), Y.ravel(), Z.ravel()])
     idx = lambda i, j: j * (nx + 1) + i
     Q = np.array([[idx(i, j), idx(i + 1, j), idx(i + 1, j + 1), idx(i, j + 1)] for j in range(ny) for i in range(nx)])
@@ -78,7 +73,7 @@ def mix(nt, fac, a, b):
     nt.links.new(a, m.inputs[1]); nt.links.new(b, m.inputs[2]); return m.outputs[0]
 
 
-EXACT, REVN, IMGS = [], {}, {}
+EXACT, REVN, REVD, IMGS = [], {}, {}, {}
 PAPER = (0.93, 0.91, 0.86)                                           # photo paper (sRGB)
 
 
@@ -112,6 +107,8 @@ def item_material(it):
     else:
         r = rv.outputs[0]
     fac = M(nt, "MULTIPLY_ADD", r, 1.0 - DARK, DARK)
+    dm = N.new("ShaderNodeValue"); dm.outputs[0].default_value = 1.0; REVD[key] = dm
+    fac = M(nt, "MULTIPLY", fac, dm.outputs[0])
     ex = N.new("ShaderNodeValue"); ex.outputs[0].default_value = 1.0; EXACT.append(ex)
     lw = N.new("ShaderNodeLayerWeight"); lw.inputs["Blend"].default_value = 0.5
     shade = M(nt, "MULTIPLY_ADD", M(nt, "POWER", lw.outputs["Facing"], 2.0), -0.3, 1.0)
@@ -137,11 +134,11 @@ MESH, OBJ, LIFT = {}, {}, {}
 for it in ITEMS:
     V, Q = sheet(it); MESH[it["key"]] = (V, Q)
     ob = C.mesh_object(f"item_{it['key']}", V, Q); C.smooth_shade(ob)
-    th = (0.004 if it["kind"] == "print" else 0.0025) * max(it["w"], it["h"])
+    th = G.thickness(it)
     so = ob.modifiers.new("thick", "SOLIDIFY"); so.thickness = th; so.offset = -1.0; so.use_even_offset = True
     ob.data.materials.append(item_material(it))
     ob.location = (it["x"], it["y"], th + 0.0008); ob.rotation_euler = (0.0, 0.0, math.radians(it["rot"]))
-    OBJ[it["key"]] = ob; LIFT[it["key"]] = th + 0.0008 + float(V[:, 2].max())
+    OBJ[it["key"]] = ob; LIFT[it["key"]] = G.lift(it)
 
 
 def exact_pictures(scene, *_):
@@ -156,17 +153,26 @@ def desk_material():
     p.inputs["Coat Weight"].default_value = 0.5; p.inputs["Coat Roughness"].default_value = 0.14
     tc = N.new("ShaderNodeTexCoord")
     mp = N.new("ShaderNodeMapping"); mp.inputs["Scale"].default_value = (0.35, 3.2, 1.0); L.new(tc.outputs["Object"], mp.inputs["Vector"])
+    wn = N.new("ShaderNodeTexNoise"); wn.inputs["Scale"].default_value = 0.9; wn.inputs["Detail"].default_value = 2.0
+    L.new(tc.outputs["Object"], wn.inputs["Vector"])                 # the grain wanders gently (domain warp)
+    wc = N.new("ShaderNodeVectorMath"); wc.operation = "SUBTRACT"; L.new(wn.outputs["Color"], wc.inputs[0]); wc.inputs[1].default_value = (0.5, 0.5, 0.5)
+    ws = N.new("ShaderNodeVectorMath"); ws.operation = "SCALE"; L.new(wc.outputs[0], ws.inputs[0]); ws.inputs["Scale"].default_value = 0.45
+    wa = N.new("ShaderNodeVectorMath"); wa.operation = "ADD"; L.new(mp.outputs[0], wa.inputs[0]); L.new(ws.outputs[0], wa.inputs[1])
     nz = N.new("ShaderNodeTexNoise"); nz.inputs["Scale"].default_value = 1.6; nz.inputs["Detail"].default_value = 6.0
-    L.new(mp.outputs[0], nz.inputs["Vector"])
+    L.new(wa.outputs[0], nz.inputs["Vector"])
     wv = N.new("ShaderNodeTexWave"); wv.wave_type = "BANDS"
     try: wv.bands_direction = "Y"
     except Exception: pass
-    wv.inputs["Scale"].default_value = 2.2; wv.inputs["Distortion"].default_value = 9.0; wv.inputs["Detail"].default_value = 3.0
-    L.new(mp.outputs[0], wv.inputs["Vector"])
+    wv.inputs["Scale"].default_value = 2.2; wv.inputs["Distortion"].default_value = 7.0; wv.inputs["Detail"].default_value = 3.0
+    L.new(wa.outputs[0], wv.inputs["Vector"])
     f = M(nt, "MULTIPLY_ADD", wv.outputs["Fac"], 0.65, M(nt, "MULTIPLY", nz.outputs["Fac"], 0.35))
     cr = N.new("ShaderNodeValToRGB"); L.new(f, cr.inputs[0])
     cr.color_ramp.elements[0].color = (0.040, 0.018, 0.007, 1); cr.color_ramp.elements[1].color = (0.125, 0.058, 0.024, 1)
-    L.new(cr.outputs[0], p.inputs["Base Color"])
+    ln = N.new("ShaderNodeTexNoise"); ln.inputs["Scale"].default_value = 0.22; ln.inputs["Detail"].default_value = 1.0
+    L.new(tc.outputs["Object"], ln.inputs["Vector"])                 # slow changes of tone across the desk
+    tone = M(nt, "MULTIPLY_ADD", ln.outputs["Fac"], 0.5, 0.75)
+    tn = N.new("ShaderNodeVectorMath"); tn.operation = "SCALE"; L.new(cr.outputs[0], tn.inputs[0]); L.new(tone, tn.inputs["Scale"])
+    L.new(tn.outputs[0], p.inputs["Base Color"])
     bp = N.new("ShaderNodeBump"); bp.inputs["Strength"].default_value = 0.05; bp.inputs["Distance"].default_value = 0.002
     L.new(f, bp.inputs["Height"]); L.new(bp.outputs[0], p.inputs["Normal"])
     return m
@@ -184,9 +190,9 @@ def velvet_material():
 fl = C.mesh_object("surface", np.array([[-30, -30, 0], [30, -30, 0], [30, 30, 0], [-30, 30, 0]]), np.array([[0, 1, 2, 3]]))
 fl.data.materials.append(desk_material() if SETTING == "desk" else velvet_material())
 w = bpy.data.worlds.new("W"); sc.world = w; w.use_nodes = True
-w.node_tree.nodes["Background"].inputs[0].default_value = (0.020, 0.018, 0.016, 1) if SETTING == "desk" else (0.006, 0.006, 0.007, 1)
+w.node_tree.nodes["Background"].inputs[0].default_value = (0.0046, 0.0041, 0.0037, 1) if SETTING == "desk" else (0.0014, 0.0014, 0.0016, 1)
 if SETTING == "desk":                                               # a far warm lamp: a soft gradient across the desk
-    ld = bpy.data.lights.new("lamp", "AREA"); ld.energy = 40; ld.size = 2.5; ld.color = (1.0, 0.80, 0.58)
+    ld = bpy.data.lights.new("lamp", "AREA"); ld.energy = 9.2; ld.size = 2.5; ld.color = (1.0, 0.80, 0.58)
     lo = bpy.data.objects.new("lamp", ld); sc.collection.objects.link(lo); lo.location = (-3.0, 2.5, 3.5); C.aim(lo, (0, 0, 0))
     lo.visible_camera = False; lo.visible_glossy = False                # no grey blob on the varnish
 
@@ -213,6 +219,15 @@ def light_on(i, t):
     return ease((t - TL["t_rev"][i]) / (0.85 * G.REV)) ** 2.2
 
 
+def dim(i, t):
+    """1 while item i is the subject; DIM once the camera has moved on to the next item"""
+    if i == NI - 1: return 1.0
+    return 1.0 - (1.0 - DIM) * ease((t - TL["end"][i]) / G.ARR)
+
+
+def level(i, t): return light_on(i, t) * dim(i, t)
+
+
 def reveal_value(i, t):
     """value driving the picture: the fade (spot) or the position of the sweeping edge"""
     if MODE == "sweep":
@@ -229,34 +244,7 @@ def beam_target(i, t):
 
 
 # ------------------------------------------------------------------ camera
-VIEW = [(np.array([it["x"], it["y"], 0.0]), G.fit(it, EL, G.AZ0, LENS, FILL, lift=LIFT[it["key"]])) for it in ITEMS]
-
-
-def cam_raw(t):
-    ta, tr, te = TL["t_arr"], TL["t_rev"], TL["end"]
-    for i in range(NI):
-        if i and ta[i] <= t < tr[i]:
-            s = C.smooth((t - ta[i]) / G.ARR)
-            tg = (1 - s) * VIEW[i - 1][0] + s * VIEW[i][0]
-            d = ((1 - s) * VIEW[i - 1][1] + s * VIEW[i][1] * K1) * (1 + 0.10 * math.sin(math.pi * s))
-            return tg, d
-        st = 0.0 if i == 0 else tr[i]
-        if st <= t < te[i] or (i == NI - 1 and t >= st):
-            s = min(max((t - st) / max(te[i] - st, 1e-6), 0.0), 1.0)
-            k0 = K0 if i == 0 else K1; e_ = 0.5 - 0.5 * math.cos(math.pi * s)
-            return VIEW[i][0], VIEW[i][1] * (k0 + (1.0 - k0) * e_)
-    return VIEW[-1][0], VIEW[-1][1]
-
-
-ts = np.arange(FRAMES) / FPS
-raw = [cam_raw(t) for t in ts]
-TG = np.array([r[0] for r in raw]); DD = np.array([r[1] for r in raw])
-sig = 0.15 * FPS; kx = np.arange(-int(3 * sig), int(3 * sig) + 1); kern = np.exp(-0.5 * (kx / sig) ** 2); kern /= kern.sum()
-sm = lambda a: np.convolve(np.pad(a, len(kx) // 2, mode="edge"), kern, mode="valid")
-TG = np.column_stack([sm(TG[:, k]) for k in range(3)]); DD = sm(DD)
-
-
-def az(t): return G.AZ0 + G.ORBIT * (t / max(T, 1e-6) - 0.5)
+TG, DD, AZ, VIEW = G.camera_path(ITEMS, TL, T, EL, LENS, FILL, FPS)
 
 
 camd = bpy.data.cameras.new("cam"); camd.lens = LENS; camd.sensor_width = 36; camd.clip_start = 0.01; camd.clip_end = 200
@@ -264,15 +252,16 @@ camd.dof.use_dof = True; camd.dof.aperture_fstop = 5.6
 cam = bpy.data.objects.new("cam", camd); sc.collection.objects.link(cam); sc.camera = cam
 for fr in range(1, FRAMES + 1):
     t = (fr - 1) / FPS
-    tg = Vector(TG[fr - 1]); cam.location = tg + float(DD[fr - 1]) * Vector(G.cam_dir(EL, az(t))); C.aim(cam, tg)
+    tg = Vector(TG[fr - 1]); cam.location = tg + float(DD[fr - 1]) * Vector(G.cam_dir(EL, float(AZ[fr - 1]))); C.aim(cam, tg)
     cam.keyframe_insert("location", frame=fr); cam.keyframe_insert("rotation_euler", frame=fr)
     camd.dof.focus_distance = float(DD[fr - 1]); camd.dof.keyframe_insert("focus_distance", frame=fr)
     for i, it in enumerate(ITEMS):
         k = it["key"]; sp = SPOT[k]
-        sp.data.energy = E_SPOT * max(it["w"], it["h"]) ** 2 * light_on(i, t); sp.data.keyframe_insert("energy", frame=fr)
+        sp.data.energy = E_SPOT * max(it["w"], it["h"]) ** 2 * level(i, t); sp.data.keyframe_insert("energy", frame=fr)
         if MODE == "sweep":
             C.aim(sp, beam_target(i, t)); sp.keyframe_insert("rotation_euler", frame=fr)
         nd = REVN[k].outputs[0]; nd.default_value = reveal_value(i, t); nd.keyframe_insert("default_value", frame=fr)
+        nd = REVD[k].outputs[0]; nd.default_value = dim(i, t); nd.keyframe_insert("default_value", frame=fr)
 
 
 def linear(idb):
@@ -299,8 +288,10 @@ if O.preview:
     errors, warnings = [], []
     stats = {"credits": meta.get("credits", []), "timeline": {k: (v if not isinstance(v, list) else [None if x is None else round(x, 2) for x in v])
              for k, v in TL.items()}, "layout": [{k: (round(v, 3) if isinstance(v, float) else v) for k, v in it.items()} for it in ITEMS],
-             "camera_distance": [round(v[1], 3) for v in VIEW], "min_gap": None if MIN_GAP is None else round(MIN_GAP, 3)}
+             "camera_distance": [round(v[1], 3) for v in VIEW], "min_gap": None if MIN_GAP is None else round(MIN_GAP, 3),
+             "gap_used": GAP_USED, "slivers_planned": SLIVERS}
     if MIN_GAP is not None and MIN_GAP < 0.1: errors.append(f"items too close or overlapping on the desk (gap {MIN_GAP:.2f})")
+    sc.frame_set(1)                                                   # evaluates matrix_world of every object
     BVH = {k: BVHTree.FromPolygons([Vector(v) for v in MESH[k][0]], MESH[k][1].tolist()) for k in KEYS}
     MW = {k: OBJ[k].matrix_world.copy() for k in KEYS}
     IV = {k: (MW[k].inverted(), MW[k].inverted().to_3x3()) for k in KEYS}
@@ -318,7 +309,7 @@ if O.preview:
 
     def classify(f):
         t = (f - 1) / FPS; o, rows = C.cam_rays(sc, cam)
-        lit = [i for i in range(NI) if light_on(i, t) >= 0.9]
+        lit = [i for i in range(NI) if level(i, t) >= 0.9]
         out = []
         for row in rows:
             s = ""
@@ -336,19 +327,43 @@ if O.preview:
     def corners3(k):
         it = DI[k]; c = G.corners(it); return [Vector((x, y, LIFT[k])) for x, y in c] + [Vector((x, y, 0.0)) for x, y in c]
 
-    # labels (under the item, from the end of its reveal until the camera leaves) + framing of every hold
+    # labels: a dot under the bottom edge near its left end, the text running to the right (as the overlay draws it),
+    # from the end of the reveal until the camera leaves; the text stays inside the frame and off the other items
     LAB = [e for e in P.get("labels", []) if e[0] in KEYS]
     tracks = {e[0]: [] for e in LAB}
-    cut, small = {}, {}
+    CHW = 0.5 * 45                                                    # px per character of the label font at 1920 x 1080
+    LW = {e[0]: 18 + CHW * len(e[1] if len(e) > 1 else e[0]) for e in LAB}
+    cut, small, lout, lover, sliver = {}, {}, {}, {}, {}
+
+    def box(k):
+        vs = [world_to_camera_view(sc, cam, p) for p in corners3(k)[:4]]
+        return min(p.x for p in vs), max(p.x for p in vs), min(p.y for p in vs), max(p.y for p in vs), min(p.z for p in vs)
+
+    def crosses(k, x0, x1, y0, y1):
+        """does the text box [x0, x1] x [y0, y1] (px, y down) touch the item k as the camera sees it?"""
+        q = [(p.x * 1920, (1 - p.y) * 1080, p.z) for p in (world_to_camera_view(sc, cam, c) for c in corners3(k)[:4])]
+        if any(p[2] <= 0 for p in q): return False
+        n = len(q); area = sum(q[j][0] * q[(j + 1) % n][1] - q[(j + 1) % n][0] * q[j][1] for j in range(n))
+        for gx in np.linspace(x0, x1, 16):
+            for gy in np.linspace(y0, y1, 4):
+                if all(((q[(j + 1) % n][0] - q[j][0]) * (gy - q[j][1]) - (q[(j + 1) % n][1] - q[j][1]) * (gx - q[j][0])) * area >= 0
+                       for j in range(n)): return True
+        return False
+
     for fr in range(1, FRAMES + 1):
         sc.frame_set(fr); t = (fr - 1) / FPS
         for e in LAB:
-            i = KEYS.index(e[0]); it = ITEMS[i]; a = math.radians(it["rot"]); yy = -it["h"] / 2 - 0.012
-            pw = Vector((it["x"] - math.sin(a) * yy, it["y"] + math.cos(a) * yy, 0.0))
-            v = world_to_camera_view(sc, cam, pw)
+            i = KEYS.index(e[0]); it = ITEMS[i]; a = math.radians(it["rot"])
+            xx, yy = -0.44 * it["w"], -it["h"] / 2 - 0.012
+            pw = Vector((it["x"] + math.cos(a) * xx - math.sin(a) * yy, it["y"] + math.sin(a) * xx + math.cos(a) * yy, 0.0))
+            v = world_to_camera_view(sc, cam, pw); px, py = v.x * 1920, (1 - v.y) * 1080 + 34
             on = TL["t_rev"][i] + G.REV + 0.15 <= t < TL["end"][i] or (i == NI - 1 and t >= TL["t_rev"][i] + G.REV + 0.15)
             vis = on and 0.02 <= v.x <= 0.98 and 0.06 <= v.y <= 0.98 and v.z > 0
-            tracks[e[0]].append([round(v.x * 1920, 1), round((1 - v.y) * 1080 + 34, 1), int(vis)])
+            if vis:
+                if px + LW[e[0]] > 0.97 * 1920 or py + 20 > 0.97 * 1080: lout.setdefault(e[0], []).append(round(t, 1))
+                for k2 in KEYS:
+                    if k2 != e[0] and crosses(k2, px, px + LW[e[0]], py - 27, py + 20): lover.setdefault(e[0], set()).add(k2)
+            tracks[e[0]].append([round(px, 1), round(py, 1), int(vis)])
         if fr % 3 and fr != FRAMES: continue
         for i, k in enumerate(KEYS):
             if not (TL["t_rev"][i] + G.REV <= t < TL["end"][i] or (i == NI - 1 and t >= TL["t_rev"][i] + G.REV)): continue
@@ -357,12 +372,22 @@ if O.preview:
                 cut.setdefault(k, []).append(round(t, 1))
             span = max(max(p.x for p in vs) - min(p.x for p in vs), (max(p.y for p in vs) - min(p.y for p in vs)))
             if span < 0.45: small.setdefault(k, []).append(round(span, 2))
+        if any(TL["t_arr"][j] is not None and TL["t_arr"][j] <= t < TL["t_rev"][j] for j in range(NI)): continue
+        for i, k in enumerate(KEYS):                                  # a revealed item barely inside the frame looks like a mistake
+            if t < TL["t_rev"][i] + 0.5 * G.REV: continue
+            x0, x1, y0, y1, z0 = box(k)
+            if z0 <= 0: continue
+            fx = (min(x1, 1) - max(x0, 0)) / max(x1 - x0, 1e-6); fy = (min(y1, 1) - max(y0, 0)) / max(y1 - y0, 1e-6)
+            if (0 < fx < G.SLIVER and fy > 0) or (0 < fy < G.SLIVER and fx > 0): sliver.setdefault(k, []).append(round(t, 1))
     names = [[e[0], e[1] if len(e) > 1 else e[0], e[2] if len(e) > 2 else ""] for e in LAB]
     json.dump({"fps": FPS, "frames": FRAMES, "tracks": tracks, "names": names}, open(f"{O.out}/labels.json", "w"))
     vis_s = {k: round(sum(x[2] for x in v) / FPS, 2) for k, v in tracks.items()}
     stats["labels_visible_s"] = vis_s
     for k, s_ in vis_s.items():
         if s_ < 1.0: warnings.append(f"label {k} visible only {s_:.1f} s")
+    for k, ts_ in lout.items(): errors.append(f"label {k} runs out of the frame ({ts_[0]:.1f}-{ts_[-1]:.1f} s): shorten it")
+    for k, ks in lover.items(): errors.append(f"label {k} crosses item(s) {', '.join(sorted(ks))}")
+    for k, ts_ in sliver.items(): errors.append(f"only a thin sliver of item {k} shows at the frame edge ({ts_[0]:.1f}-{ts_[-1]:.1f} s)")
     for k, ts_ in cut.items(): errors.append(f"item {k} is cut by the frame edge while it is held ({ts_[0]:.1f}-{ts_[-1]:.1f} s)")
     for k, sp_ in small.items(): warnings.append(f"item {k} is small in the frame while held ({min(sp_):.0%} of the frame)")
 
@@ -371,7 +396,7 @@ if O.preview:
     for i in range(NI):
         a = TL["t_rev"][i] + G.REV + 0.2; b = TL["end"][i] - 0.15
         holds.append([int(round((a + q * (b - a)) * FPS)) + 1 for q in (0.6, 0.15, 0.95)])
-        revs.append(int(round((TL["t_rev"][i] + 0.95 * G.REV) * FPS)) + 1)
+        revs.append(int(round((TL["t_rev"][i] + 0.80 * G.REV) * FPS)) + 1)
     order = [h[0] for h in holds] + revs + [h[1] for h in holds] + [h[2] for h in holds]
     KEYF = []
     for f in order:
@@ -398,7 +423,7 @@ if O.preview:
         """held key frames: rendered picture pixels against the picture files, through a grid of camera rays"""
         cp = os.path.join(O.out, "check.json"); ck = json.load(open(cp))
         imgs = {k: pixels(os.path.join(DATA, IMGS[k])) for k in KEYS}
-        acc = {k: [] for k in KEYS}
+        acc = {k: [] for k in KEYS}; acc_all = {k: [] for k in KEYS}
         for f in ck["key_frames"]:
             t = (f - 1) / FPS; i = held(t)
             if i is None: continue
@@ -421,18 +446,28 @@ if O.preview:
             for dj in range(-2, 3):
                 for di in range(-2, 3):
                     ok &= pk[2 + dj:2 + dj + ny, 2 + di:2 + di + nx]
-                    if abs(dj) <= 1 and abs(di) <= 1:
-                        ok &= np.abs(pe[2 + dj:2 + dj + ny, 2 + di:2 + di + nx] - ex).max(-1) < 0.04
-            for j, i_ in zip(*np.nonzero(ok)):
+            inner = ok.copy()
+            for dj in range(-1, 2):
+                for di in range(-1, 2):
+                    ok &= np.abs(pe[2 + dj:2 + dj + ny, 2 + di:2 + di + nx] - ex).max(-1) < 0.04
+            for j, i_ in zip(*np.nonzero(inner)):
                 r_ = rend[min(int((j + 0.5) / ny * rh_), rh_ - 1), min(int((i_ + 0.5) / nx * rw_), rw_ - 1)]
-                acc[key].append((r_, ex[j, i_]))
+                acc_all[key].append((r_, ex[j, i_]))
+                if ok[j, i_]: acc[key].append((r_, ex[j, i_]))
         lin = lambda c: np.where(c <= 0.04045, c / 12.92, ((c + 0.055) / 1.055) ** 2.4)
         res, errs, warns = {}, [], []
+        yl = lambda c: lin(c) @ np.array([0.2126, 0.7152, 0.0722])
         for k, v in acc.items():
-            if len(v) < 12: warns.append(f"picture {k}: too few clear cells to measure its colours ({len(v)})"); continue
+            if len(v) < 12:                                           # a textured picture: medians over all its inner cells
+                w_ = acc_all[k]
+                if len(w_) < 40: warns.append(f"picture {k}: too few cells to measure its colours ({len(w_)})"); continue
+                r_ = np.array([a for a, _ in w_]); e_ = np.array([b for _, b in w_])
+                evo = float(np.log2(max(np.median(yl(r_)), 1e-4) / max(np.median(yl(e_)), 1e-4)))
+                res[k] = {"ev_offset": round(evo, 3), "cells": len(w_), "mode": "median"}
+                if abs(evo) > 0.25: errs.append(f"picture {k} renders off its true brightness ({evo:+.2f} EV)")
+                continue
             r_ = np.array([a for a, _ in v]); e_ = np.array([b for _, b in v])
             dmed = float(np.median(np.abs(r_ - e_).max(-1)) * 255)
-            yl = lambda c: lin(c) @ np.array([0.2126, 0.7152, 0.0722])
             evo = float(np.log2(max(np.median(yl(r_)), 1e-4) / max(np.median(yl(e_)), 1e-4)))
             res[k] = {"median_diff": round(dmed, 1), "ev_offset": round(evo, 3), "cells": len(v)}
             if dmed > 16 or abs(evo) > 0.2: errs.append(f"picture {k} renders off its true colours (median difference {dmed:.0f}/255, {evo:+.2f} EV)")
@@ -446,7 +481,7 @@ if O.preview:
         print(f"picture colours: {res}", flush=True)
 
     # exposure on the lit surface around the items (the pictures do not depend on it)
-    target = 0.26 if SETTING == "desk" else 0.09
+    target = 0.12 if SETTING == "desk" else 0.09                       # a dark desk with a warm pool of light
     EV_RANGE = (-3.0, 3.0)
     C.preview_run(sc, O, FRAMES, classify, subject=("r",), target=target, tol=round(0.25 * target, 3),
                   ev_range=EV_RANGE, stats=stats, errors=errors, warnings=warnings, dark_max=0.92 if SETTING == "desk" else 0.97)
