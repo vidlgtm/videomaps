@@ -52,6 +52,7 @@ def tail(p, n=2500):
 
 # ------------------------------------------------------------------ preflight + keys
 spec = json.load(open(ORDER / "workshop.json"))
+if spec.get("preview_only") and STAGE == "render": fail("this order is for previews only (preview_only)")
 pieces, rep = preflight.check(spec, REG)
 for n in rep.notes: print("note:", n, flush=True)
 if rep.errors:
@@ -64,9 +65,17 @@ jobs = []
 for p in pieces:
     t = REG[p["template"]]; prm = p["params"]
     prep_b = (TPL / t["prep"]).read_bytes() if t.get("prep") else b""
-    dkey = sha(p["template"], {k: prm.get(k) for k in t.get("prep_keys", [])}, prep_b)
+
+    def prep_val(k, v):
+        f = t.get("prep_fields", {}).get(k)        # only these fields of a list/object param change the data
+        if f and isinstance(v, list): return [{x: e[x] for x in f if x in e} if isinstance(e, dict) else e for e in v]
+        if f and isinstance(v, dict): return {x: v[x] for x in f if x in v}
+        return v
+
+    dkey = sha(p["template"], {k: prep_val(k, prm.get(k)) for k in t.get("prep_keys", [])}, prep_b)
     rparams = {k: v for k, v in prm.items() if k not in t.get("overlay_keys", [])}
-    vkey = sha(p["template"], rparams, p["seconds"], (TPL / t["script"]).read_bytes(), COMMON, dkey)
+    deps = b"".join((TPL / d).read_bytes() for d in t.get("deps", []))
+    vkey = sha(p["template"], rparams, p["seconds"], (TPL / t["script"]).read_bytes() + deps, COMMON, dkey)
     lkey = sha(vkey, {k: prm.get(k) for k in t.get("overlay_keys", [])}, PREV)
     alpha = bool(t.get("alpha_when")) and all(prm.get(k) == v for k, v in t["alpha_when"].items())
     jobs.append({"id": p["id"], "template": p["template"], "script": t["script"], "prep": t.get("prep"), "labels": t.get("labels", False),
@@ -162,6 +171,7 @@ for j in jobs:
     pj = get_json(pn)
     if not pj.get("ok"): missing.append(f"{j['id']}: its preview did not pass"); continue
     j["ev"] = round(float(pj["ev"]), 2)
+    j["credits_extra"] = pj.get("stats", {}).get("credits", [])
     j["hash"] = sha(j["vkey"], j["ev"], KERNEL)
     if f"{j['hash']}.json" not in have: todo.append(j)
 if missing: fail("render needs a passing preview first:\n  " + "\n  ".join(missing))
@@ -215,7 +225,8 @@ for j in jobs:
     t = REG[j["template"]]
     m = get_json(f"{j['hash']}.json")
     c = {"src": f"ws/{m['file']}", "kind": t.get("kind_alpha", "doll") if j["alpha"] else t["kind"], "segments": {t["segment"]: [0, m["seconds"]]},
-         "hash": j["hash"], "sheet": f"{j['hash']}_sheet.jpg", "credits": t.get("credits", [])}
+         "hash": j["hash"], "sheet": f"{j['hash']}_sheet.jpg",
+         "credits": t.get("credits", []) + [x for x in j.get("credits_extra", []) if x not in t.get("credits", [])]}
     if j["labels"]: c["labels"] = f"{j['lkey']}_labels.json"
     if m.get("credit"): c["credit"] = m["credit"]
     clips[j["id"]] = c

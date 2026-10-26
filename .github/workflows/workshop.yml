@@ -32,7 +32,7 @@ jobs:
       - name: Python packages
         run: |
           if [ "$STAGE" = render ]; then pip install -q "kaggle>=1.7.4"
-          else pip install -q numpy pillow requests scipy shapely geopandas; fi
+          else pip install -q numpy pillow requests scipy shapely geopandas mapbox-earcut; fi
       - name: Blender version
         id: bl
         if: inputs.stage != 'render'

@@ -38,5 +38,43 @@
    "background": "transparent"
   },
   "kind_alpha": "doll"
+ },
+ "shatter": {
+  "script": "shatter.py",
+  "prep": "shatter_prep.py",
+  "deps": [
+   "shatter_time.py"
+  ],
+  "kind": "cauc",
+  "labels": true,
+  "segment": "shot",
+  "prep_keys": [
+   "bbox",
+   "zoom",
+   "base",
+   "base_borders",
+   "pieces",
+   "union"
+  ],
+  "prep_fields": {
+   "pieces": [
+    "key",
+    "admin0",
+    "admin1",
+    "country",
+    "disputed",
+    "flag"
+   ],
+   "union": [
+    "flag"
+   ]
+  },
+  "overlay_keys": [
+   "labels"
+  ],
+  "budget_min_per_s": 1.6,
+  "credits": [
+   "Boundaries: Natural Earth"
+  ]
  }
 }

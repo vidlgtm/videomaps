@@ -1,0 +1,176 @@
+{
+ "note": "Workshop samples, second batch: the flag of Yugoslavia (budget raised) and French West Africa splitting into eight states (1958-1960, flags and names of the time).",
+ "pieces": [
+  {
+   "id": "flag_yugoslavia",
+   "template": "cloth",
+   "seconds": 9,
+   "params": {
+    "flag": {
+     "commons": "File:Flag of Yugoslavia (1946-1992).svg"
+    },
+    "action": "lower",
+    "sky": "dusk",
+    "weather": "rain",
+    "camera": "pull",
+    "wind": 0.7,
+    "focus_uv": [
+     0.5,
+     0.55
+    ],
+    "finial": "spear",
+    "background": "city"
+   },
+   "budget_min": 42
+  },
+  {
+   "id": "shatter_aof",
+   "template": "shatter",
+   "seconds": 12,
+   "params": {
+    "action": "break",
+    "bbox": [
+     -19.5,
+     18.0,
+     2.5,
+     29.5
+    ],
+    "base": "satellite",
+    "base_borders": true,
+    "union": {
+     "flag": {
+      "commons": "File:Flag of France.svg"
+     }
+    },
+    "pieces": [
+     {
+      "key": "mauritania",
+      "admin0": "MRT",
+      "flag": {
+       "commons": "File:Flag of Mauritania (1959–2017).svg"
+      }
+     },
+     {
+      "key": "senegal",
+      "admin0": "SEN",
+      "flag": {
+       "commons": "File:Flag of Senegal.svg"
+      }
+     },
+     {
+      "key": "mali",
+      "admin0": "MLI",
+      "flag": {
+       "commons": "File:Flag of Mali (1959–1961).svg"
+      }
+     },
+     {
+      "key": "guinea",
+      "admin0": "GIN",
+      "flag": {
+       "commons": "File:Flag of Guinea.svg"
+      }
+     },
+     {
+      "key": "ivory_coast",
+      "admin0": "CIV",
+      "flag": {
+       "commons": "File:Flag of Côte d'Ivoire.svg"
+      }
+     },
+     {
+      "key": "upper_volta",
+      "admin0": "BFA",
+      "flag": {
+       "commons": "File:Flag of Upper Volta.svg"
+      }
+     },
+     {
+      "key": "niger",
+      "admin0": "NER",
+      "flag": {
+       "commons": "File:Flag of Niger.svg"
+      }
+     },
+     {
+      "key": "dahomey",
+      "admin0": "BEN",
+      "flag": {
+       "commons": "File:Flag of Benin.svg"
+      },
+      "focus": [
+       0.42,
+       0.5
+      ]
+     }
+    ],
+    "order": [
+     "senegal",
+     "mauritania",
+     "guinea",
+     "ivory_coast",
+     "upper_volta",
+     "dahomey",
+     "niger",
+     "mali"
+    ],
+    "camera": {
+     "target": [
+      -0.8,
+      14.6
+     ],
+     "span": [
+      5600,
+      5000
+     ],
+     "heading": [
+      -4,
+      4
+     ],
+     "tilt": [
+      30,
+      37
+     ]
+    },
+    "thickness": 0.014,
+    "lift": 0.05,
+    "spread": 0.065,
+    "rim": 3.5,
+    "labels": [
+     [
+      "mauritania",
+      "MAURITANIA"
+     ],
+     [
+      "senegal",
+      "SENEGAL"
+     ],
+     [
+      "mali",
+      "MALI"
+     ],
+     [
+      "guinea",
+      "GUINEA"
+     ],
+     [
+      "ivory_coast",
+      "IVORY COAST"
+     ],
+     [
+      "upper_volta",
+      "UPPER VOLTA"
+     ],
+     [
+      "niger",
+      "NIGER"
+     ],
+     [
+      "dahomey",
+      "DAHOMEY"
+     ]
+    ]
+   }
+  }
+ ]
+}
