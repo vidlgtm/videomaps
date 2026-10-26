@@ -39,9 +39,12 @@ MOOD = {
                                                      ("SPOT", (0.35, 1.7, 1.1), (0.62, 0.72, 1.0), 4.0, 0.6)]),
 }
 # the light is scaled to the place's surface so that the exposure lands near 0 EV on any of them (linear albedo)
-ALBEDO = {"walnut": 0.046, "wood": 0.046, "oak": 0.167, "marble": 0.58, "stone": 0.25, "slate": 0.012, "sand": 0.3,
+ALBEDO = {"walnut": 0.06, "wood": 0.06, "oak": 0.28, "marble": 0.58, "stone": 0.25, "slate": 0.012, "sand": 0.3,
           "plaster": 0.52, "velvet": 0.011}
 A_REF = 0.045
+# a document or picture is shown in its exact colours; the light on it is the light under which white paper is exactly
+# white at 0 EV, so whatever lies on it or beside it (a seal, a hand, a pen) is lit as the picture appears
+PAPER_LIGHT = math.pi / 0.8 * 4 * math.pi                          # spot power = PAPER_LIGHT x distance^2
 GLOW = {"warm": (1.0, 0.72, 0.40), "gold": (1.0, 0.78, 0.35), "red": (1.0, 0.25, 0.15), "blue": (0.45, 0.65, 1.0), "white": (1.0, 0.97, 0.92)}
 
 
@@ -184,7 +187,7 @@ class Stage:
         sc.frame_start, sc.frame_end = 1, self.n
         try: bpy.context.preferences.edit.keyframe_new_interpolation_type = "LINEAR"
         except Exception as e: print("interpolation preference:", e, flush=True)
-        self.pics, self.objs, self.root, self.mats, self.nodes, self.lights = [], {}, {}, {}, {}, []
+        self.pics, self.objs, self.root, self.mats, self.nodes, self.lights, self.cones = [], {}, {}, {}, {}, [], []
         self.items = meta.get("items", {})
         self.make_cast()
         self.make_place()
@@ -438,13 +441,16 @@ class Stage:
         for n, c in self.cast.items():
             if n in self.spots or not (c["is"] in ("sheet", "print", "canvas") or (c["is"] == "block" and self.src(n)[0] == "store")): continue
             m = self.L[n]; Lm = max(0.25, max(m["w"], m["d"]))
-            cc = Vector((m["x"], m["y"], m["z"] + m["h"]))
-            self.spot(f"{n}_own", cc + Vector((-0.35, -0.8, 2.2)) * Lm, cc, warm, self.k * 12.0 * Lm * Lm, Lm, 0.5)
+            cc = Vector((m["x"], m["y"], m["z"] + m["h"])); at = cc + Vector((-0.35, -0.8, 2.2)) * Lm
+            ob = self.spot(f"{n}_own", at, cc, warm, PAPER_LIGHT * (at - cc).length_squared, Lm, 0.3)
+            self.cones.append((n, ob, at, (cc - at).normalized(), ob.data.spot_size / 2))
         for n, sp in self.spots.items():
             m = self.L[n]; Lm = max(0.25, max(m["w"], m["d"]))
-            c = Vector((m["x"], m["y"], m["z"] + m["h"]))
-            ob = self.spot(f"{n}_spot", c + Vector((-0.35, -0.8, 2.2)) * Lm, c, (1.0, 0.9, 0.76), self.k * 32.0 * Lm * Lm, Lm, 0.35)
-            keys(ob.data, "energy", self.k * 32.0 * Lm * Lm * sp["level"])
+            c = Vector((m["x"], m["y"], m["z"] + m["h"])); at = c + Vector((-0.35, -0.8, 2.2)) * Lm
+            P0 = PAPER_LIGHT * (at - c).length_squared
+            ob = self.spot(f"{n}_spot", at, c, (1.0, 0.9, 0.76), P0, Lm, 0.3)
+            keys(ob.data, "energy", P0 * sp["level"])
+            self.cones.append((n, ob, at, (c - at).normalized(), ob.data.spot_size / 2))
 
     # ---------------------------------------------------------- camera
     def make_camera(self):
@@ -528,6 +534,8 @@ class Stage:
                     s += "k" if self.backdrop else "v"; continue
                 q = o + d * (-o.z / d.z)
                 if (Vector((q.x, q.y, 0)) - self.center).length > 0.93 * self.R: s += "k"; continue
+                if any(self.lit_level(n, fi) > 0.05 and (q - at).normalized().dot(ax) > math.cos(half) for n, _, at, ax, half in self.cones):
+                    s += "p"; continue
                 near = any((q.x - self.L[n]["x"]) ** 2 + (q.y - self.L[n]["y"]) ** 2 <
                            (0.5 * max(self.L[n]["w"], self.L[n]["d"]) + 0.25 * self.L0) ** 2 for n in lit)
                 s += "r" if near else "d"
