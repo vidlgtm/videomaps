@@ -1,4 +1,4 @@
-// Sound map (constitution "sound"): SFX for every event, accents chosen by the brain, one continuous music bed that
+// Sound map (constitution "sound"): SFX for every event, accents chosen in the order, one continuous music bed that
 // cross-fades between chapter cues under the voice.
 import type {Director} from './plan';
 import {r3} from './util';

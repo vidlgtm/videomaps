@@ -1,4 +1,4 @@
-// THE AUTOMATIC DIRECTOR: the brain's beats (WHAT, pinned to words) -> every element of the film (HOW: exact times,
+// THE AUTOMATIC DIRECTOR: the order's beats (WHAT, pinned to words) -> every element of the film (HOW: exact times,
 // camera, positions, sizes, colours, sides, sound). Rules come from factory/rules/constitution.json and our film v5.
 import {Cues} from './cues';
 import {Gazetteer, Place, PATHS, unionBox, Box, lonlat, px, hasLabel} from './geo';

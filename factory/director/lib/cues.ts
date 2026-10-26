@@ -1,4 +1,4 @@
-// Word-accurate times from the voice timeline. The brain writes EXACT words of the narration; the factory finds them.
+// Word-accurate times from the voice timeline. The order gives EXACT words of the narration; the factory finds them.
 import {fail} from './util';
 
 export type Word = {w: string; n: string; c: number; k: number; t0: number; t1: number};

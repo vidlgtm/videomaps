@@ -1,4 +1,4 @@
-// Camera: an exact copy of the renderer's camera path (engine src/lib/camera.ts) + the planner that turns the brain's
+// Camera: an exact copy of the renderer's camera path (engine src/lib/camera.ts) + the planner that turns the order's
 // "go" beats into keyframes (framing that fits the places, tilt by distance, eased moves, wide chapter openings,
 // no view held over 10 s, no repeated framing within 60 s).
 import {px, project, meridian, PERSP, KM_PER_PX, WORLD_W, WORLD_H, CamState} from '../../engine/src/lib/proj';

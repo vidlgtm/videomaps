@@ -1,4 +1,4 @@
-// Places the brain names -> world geometry of the engine basemap (same projection as the renderer).
+// Places named in the order -> world geometry of the engine basemap (same projection as the renderer).
 import geoRaw from '../../engine/src/data/geo.json';
 import {px, KM_PER_PX, WORLD_W, WORLD_H} from '../../engine/src/lib/proj';
 import {fail, arr} from './util';

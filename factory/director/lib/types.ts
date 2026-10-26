@@ -1,4 +1,4 @@
-// Order formats (written by the brain) and the asset manifest (written by the processing station / the order).
+// Order formats and the asset manifest (written by the processing station / the order).
 export type Beat = {cue: string; until?: string; [k: string]: any};
 export type Storyboard = {paragraphs: {id: string; beats: Beat[]}[]};
 export type Chapter = {n?: string | null; title: string; paragraphs: string[]; music: string; card?: boolean};

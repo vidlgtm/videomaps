@@ -1,4 +1,4 @@
-// PROJECT CREATIVE LAYER (free zone for the third model's own creative touches - see 07 and 03).
+// PROJECT CREATIVE LAYER (free zone for project-specific creative touches).
 // ExtrasMap renders above the map stage (under cards); ExtrasTop renders above everything except the audio.
 // Use cameraAt(t) + project(cam, ...px(lon, lat)) to attach elements to the map. Must pass the quality gate (06).
 import React from 'react';

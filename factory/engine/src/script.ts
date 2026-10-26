@@ -1,5 +1,5 @@
 // FACTORY ENGINE - generic score loader. Nothing here is written by hand for a film: every array comes from
-// data/film.json, which the automatic director (factory/director) builds from the brain's order + the voice timeline.
+// data/film.json, which the automatic director (factory/director) builds from the order + the voice timeline.
 import film from './data/film.json';
 import {TOTAL} from './lib/cues';
 import {CITIES} from './lib/paths';
@@ -9,7 +9,7 @@ import type {CamKey, Fill, Stroke, Label, Marker, Flag, Line, Ring, Card, Portra
 export type {CamKey, Fill, Stroke, Label, Marker, Flag, Line, Ring, Card, Portrait, Step, Clip, Sfx, Music} from './types';
 
 const F: any = film;
-// places the brain named that are not in geo.json cities (lon/lat from the order's gazetteer) -> usable by markers
+// places named in the order that are not in geo.json cities (lon/lat from the order's gazetteer) -> usable by markers
 Object.entries((F.extra_cities ?? {}) as Record<string, [number, number]>).forEach(([n, ll]) => {
   if (!CITIES[n]) (CITIES as any)[n] = {lonlat: ll, px: px(ll[0], ll[1])};
 });

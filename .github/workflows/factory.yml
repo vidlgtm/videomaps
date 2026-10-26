@@ -1,6 +1,6 @@
 name: factory
 # MAP FILM FACTORY (folder factory/): order in -> film out.
-#   station : PROCESSING STATION (phase 2) - the brain's picks (sources.json: Commons photos, document texts, signatures,
+#   station : PROCESSING STATION (phase 2) - the order's picks (sources.json: Commons photos, document texts, signatures,
 #             extra flags) -> licence gate, super-resolution, levels, depth + near layer, focus, cut-outs, Manim documents,
 #             credits, review sheets (artifact "pack")
 #   direct  : AUTOMATIC DIRECTOR (phase 1) - order (storyboard + voice timeline + pack) -> film.json (camera, every element, sound) -> engine audit
@@ -9,7 +9,7 @@ name: factory
 #   stills  : verification stills rendered like the film + side-by-side sheets with a reference release (v5)
 # Never touches our production releases: result tags must start with factory_.
 on:
-  # started on purpose only (API / Actions tab): the brain or a test dispatches it with the order name and a result tag
+  # started on purpose only (API / Actions tab): dispatched with the order name and a result tag
   workflow_dispatch:
     inputs:
       order: { description: 'order folder (factory/orders/<name>)', default: 'ussr15' }
@@ -44,13 +44,13 @@ jobs:
             ~/.cache/huggingface
             factory/station/cache
           key: station-models-v1
-      - name: Processing station - the brain's photos, signatures and flags -> film-ready assets + credits
+      - name: Processing station - photos, signatures and flags -> film-ready assets + credits
         run: |
           set -e
           pip install -q torch torchvision --index-url https://download.pytorch.org/whl/cpu
           pip install -q "transformers==4.57.6" "rembg[cpu]" spandrel "pillow==11.2.1" requests numpy scipy opencv-python-headless cairosvg
           python -u factory/station/station.py process factory/orders/$ORDER
-      - name: Manim documents from the brain's texts (official Manim image)
+      - name: Manim documents from the order's texts (official Manim image)
         run: |
           set -e
           mkdir -p out/pack/clips

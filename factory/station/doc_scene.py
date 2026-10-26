@@ -1,4 +1,4 @@
-"""FACTORY - Manim document from the brain's text (processing station). Aged paper, hand-written reveal, full frame;
+"""FACTORY - Manim document from the order's text (processing station). Aged paper, hand-written reveal, full frame;
 the film plays it as a full-frame clip (the director stretches it 0.8-1.3x to the narration).
 One JSON per document (written by station.py from sources.json "documents"):
   layout "article": {"head": "CONSTITUTION OF THE USSR · 1977", "title": "Article 72", "title_font": "serif" | "script",

@@ -1,4 +1,4 @@
-// FACTORY ENGINE - era-correct names on the map, from the brain's name sets and eras (data/film.json "names").
+// FACTORY ENGINE - era-correct names on the map, from the order's name sets and eras (data/film.json "names").
 // nameFor(id, t): the name shown on a FILLED region at time t (null = none). ctxNamesOn(t): neighbour names now?
 import film from './data/film.json';
 

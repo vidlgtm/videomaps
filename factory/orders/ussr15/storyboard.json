@@ -1,5 +1,5 @@
 {
- "note": "Storyboard of the acceptance test (brain format v1): every beat = exact words of the narration + WHAT happens. No times, no coordinates, no sizes.",
+ "note": "Storyboard of the acceptance test (order format v1): every beat = exact words of the narration + WHAT happens. No times, no coordinates, no sizes.",
  "paragraphs": [
   {
    "id": "01",

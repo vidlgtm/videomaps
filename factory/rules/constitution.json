@@ -1,6 +1,6 @@
 {
-  "name": "FACTORY CONSTITUTION - the fixed things of every film (from our accepted film v5). The factory applies them; the brain never re-decides them.",
-  "principle": "Everything that needs thinking is decided by the brain (third model) in the order. Everything mechanical (exact positions, timing, camera maths, styling, rhythm, sound mapping, quality checks) is done by the factory with these rules.",
+  "name": "FACTORY CONSTITUTION - the fixed things of every film (from our accepted film v5). The factory applies them; an order never re-decides them.",
+  "principle": "Everything that needs a decision is in the order. Everything mechanical (exact positions, timing, camera maths, styling, rhythm, sound mapping, quality checks) is done by the factory with these rules.",
 
   "look": {
     "palette": {"GOLD": "#E2BF6A", "INK": "#0E1A24", "TXT": "#F4EFE6", "RED": "#D2434E", "TEAL": "#4FA39E", "UNION": "#8E3741", "page_bg": "#0c1822"},
@@ -75,7 +75,7 @@
   },
 
   "sound": {
-    "voice": "platform voice made in the chat, one take per paragraph, matched by voice_master.py",
+    "voice": "one take per paragraph, matched by voice_master.py",
     "lufs": -14, "dbtp": -1.5, "vo_over_music_db": 12, "music_xfade_s": 5,
     "joins": {"lead_s": 1.2, "title_gap_s": 1.6, "gap_s": 0.85, "tail_s": 3.4},
     "music_roles": {"c1_hook": "opening", "c2_origins": "background history", "c3_annex": "dark chapter", "c4_collapse": "fast change", "c5_resolution": "ending"},
@@ -95,7 +95,5 @@
     "big_moments": "Blender templates on Kaggle GPU (each film changes the object, the place and the choreography)",
     "small_icons": "TripoSR on Kaggle + Blender renders, only for small icons",
     "never_repeat": "projects/IDEAS_USED.txt"
-  },
-
-  "kaggle_key": "never stored in GitHub: the brain injects KAGGLE_API_TOKEN + KAGGLE_USERNAME as temporary repo secrets, dispatches, withdraws them as soon as the Kaggle job has started, and checks the secret list is empty"
+  }
 }

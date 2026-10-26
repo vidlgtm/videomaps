@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""FACTORY - PROCESSING STATION (phase 2). The brain picks, the station makes them film-ready in our identity.
+"""FACTORY - PROCESSING STATION (phase 2). Makes the order's picks film-ready in our identity.
 
-in : factory/orders/<order>/sources.json   (the brain's picks: Wikimedia Commons files + document texts, see ORDER_SPEC.txt)
+in : factory/orders/<order>/sources.json   (the order's picks: Wikimedia Commons files + document texts)
 out: out/pack/   archive/<id>.jpg (+ _depth.png, _fg.png, _cut.png), sig/, flags/, clips/ (Manim documents, made by the
                  workflow with doc_scene.py), pack.json (what the director reads), CREDITS.txt, station_report.txt, sheets/
 
@@ -119,7 +119,7 @@ def author(ii, override=None):
 # ------------------------------------------------------------------ order
 def load_sources(order):
     p = os.path.join(order, "sources.json")
-    if not os.path.exists(p): err(f"{p} is missing (the brain's picks: photos, documents, signatures, flags)"); return {}
+    if not os.path.exists(p): err(f"{p} is missing (photos, documents, signatures, flags)"); return {}
     try: S = json.load(open(p))
     except Exception as e: err(f"sources.json is not valid JSON: {e}"); return {}
     for k in S:
@@ -544,7 +544,7 @@ def finish(order):
         row = Image.new("RGB", (W, RH), (14, 22, 30)); dr = ImageDraw.Draw(row); x = 16
         for q, fr in zip(("30 %", "65 %", "END"), frames):
             t = fit(fr, 440, RH - 64); row.paste(t, (x, 40)); dr.text((x, 12), f"MANIM DOCUMENT · {q}", font=F(17), fill=(226, 191, 106)); x += t.width + 18
-        dr.text((16, RH - 22), f"{i}  ·  Manim document from the brain's text  ·  {L:.2f} s", font=F(17), fill=(244, 239, 230)); rows.append(row)
+        dr.text((16, RH - 22), f"{i}  ·  Manim document  ·  {L:.2f} s", font=F(17), fill=(244, 239, 230)); rows.append(row)
     sig = [(k, f"{OUT}/{v}") for k, v in pack["sig"].items()] + [(k, f"{OUT}/{v['file']}") for k, v in pack["flags"].items()]
     if sig:
         row = Image.new("RGB", (W, RH), (234, 222, 192)); dr = ImageDraw.Draw(row); x = 16
