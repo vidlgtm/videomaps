@@ -1,5 +1,5 @@
 {
- "note": "Workshop samples, second batch: the flag of Yugoslavia (budget raised) and French West Africa splitting into eight states (1958-1960, flags and names of the time).",
+ "note": "Workshop samples, second batch: the flag of Yugoslavia (budget raised), French West Africa splitting into eight states (1958-1960, flags and names of the time), and the flags of Egypt nested in four levels (1922-1984).",
  "pieces": [
   {
    "id": "flag_yugoslavia",
@@ -168,6 +168,63 @@
      [
       "dahomey",
       "DAHOMEY"
+     ]
+    ]
+   }
+  },
+  {
+   "id": "nest_egypt",
+   "template": "nest",
+   "seconds": 14,
+   "params": {
+    "shape": "doll",
+    "levels": [
+     {
+      "key": "kingdom",
+      "image": {
+       "commons": "File:Flag of Egypt (1922–1958).svg"
+      },
+      "color": "#18305C"
+     },
+     {
+      "key": "uar",
+      "image": {
+       "commons": "File:Flag of the United Arab Republic.svg"
+      },
+      "color": "#123E33"
+     },
+     {
+      "key": "far",
+      "image": {
+       "commons": "File:Flag of Egypt (1972–1984).svg"
+      },
+      "color": "#5A1E4F"
+     },
+     {
+      "key": "today",
+      "image": {
+       "commons": "File:Flag of Egypt.svg"
+      },
+      "color": "#7E1A26"
+     }
+    ],
+    "background": "studio",
+    "labels": [
+     [
+      "kingdom",
+      "Kingdom of Egypt · 1922"
+     ],
+     [
+      "uar",
+      "United Arab Republic · 1958"
+     ],
+     [
+      "far",
+      "Federation of Arab Republics · 1972"
+     ],
+     [
+      "today",
+      "Arab Republic of Egypt · 1984"
      ]
     ]
    }

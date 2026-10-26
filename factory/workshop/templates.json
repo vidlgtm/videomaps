@@ -76,5 +76,32 @@
   "credits": [
    "Boundaries: Natural Earth"
   ]
+ },
+ "nest": {
+  "script": "nest.py",
+  "prep": "nest_prep.py",
+  "deps": [
+   "nest_geo.py"
+  ],
+  "kind": "cauc",
+  "labels": true,
+  "segment": "shot",
+  "prep_keys": [
+   "levels"
+  ],
+  "prep_fields": {
+   "levels": [
+    "key",
+    "image"
+   ]
+  },
+  "overlay_keys": [
+   "labels"
+  ],
+  "budget_min_per_s": 2.6,
+  "alpha_when": {
+   "background": "transparent"
+  },
+  "kind_alpha": "doll"
  }
 }

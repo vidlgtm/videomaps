@@ -359,7 +359,68 @@ def check_shatter(c, sec):
     p["zoom"] = int(p.get("zoom") or auto_zoom_base(lon0, lon1, lat0, lat1))
 
 
-CHECKS = {"fly": check_fly, "cloth": check_cloth, "shatter": check_shatter}
+NEST_KEYS = {"shape", "profile", "seam", "panel", "levels", "ratio", "background", "camera", "labels", "samples"}
+HEX6 = lambda s: isinstance(s, str) and len(s) == 7 and s[0] == "#" and all(ch in "0123456789abcdefABCDEF" for ch in s[1:])
+
+
+def check_nest(c, sec):
+    import sys, os
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates"))
+    import nest_geo as NG
+    p = c.p; n0 = len(c.rep.errors)
+    c.known(NEST_KEYS)
+    if "profile" in p:
+        pr = p["profile"]
+        if "shape" in p: c.bad("give 'shape' or 'profile', not both")
+        if not (isinstance(pr, list) and 4 <= len(pr) <= 40 and all(isinstance(q, list) and len(q) == 2 and all(_num(v) for v in q) for q in pr)):
+            c.bad("'profile' must be a list of 4..40 [z, r] points"); return
+        zs, rs = [q[0] for q in pr], [q[1] for q in pr]
+        if abs(zs[0]) > 1e-9 or abs(zs[-1] - 1) > 1e-9 or any(b <= a for a, b in zip(zs, zs[1:])): c.bad("profile: z must rise strictly from 0 to 1")
+        if any(not 0 <= r <= 0.6 for r in rs) or rs[0] < 0.08: c.bad("profile: r in [0, 0.6], and a foot (r at z = 0) of at least 0.08")
+        c.number("seam", 0.3, 0.75, required=True); c.number("panel", 0.1, 0.6)
+        spec = {"profile": pr, "seam": p.get("seam", 0.5), "panel": p.get("panel")}
+    else:
+        spec = c.choice("shape", tuple(NG.PRESETS)) or "doll"
+        for k in ("seam", "panel"):
+            if k in p: c.bad(f"'{k}' only goes with a custom 'profile'")
+    lv = p.get("levels")
+    if not (isinstance(lv, list) and 2 <= len(lv) <= 6): c.bad("'levels' must be a list of 2..6 levels (outermost first)"); return
+    keys = []
+    for i, e in enumerate(lv):
+        if not isinstance(e, dict): c.bad(f"level {i}: must be an object"); continue
+        if set(e) - {"key", "image", "color"}: c.bad(f"level {i}: unknown field(s) {sorted(set(e) - {'key', 'image', 'color'})}")
+        k = e.get("key")
+        if not (isinstance(k, str) and k and set(k) <= set("abcdefghijklmnopqrstuvwxyz0123456789_")): c.bad(f"level {i}: key must be lowercase letters, digits, _")
+        elif k in keys: c.bad(f"level {i}: duplicate key {k}")
+        else: keys.append(k)
+        if not _flag_ok(e.get("image")): c.bad(f"level {i}: 'image' must be {{commons: File:...}} or {{url: https://...}}")
+        if "color" in e and not HEX6(e["color"]): c.bad(f"level {i}: color must be #RRGGBB")
+    c.number("ratio", 0.55, 0.85); c.choice("background", ("studio", "transparent")); c.number("samples", 16, 256)
+    cam = p.get("camera", {})
+    if not isinstance(cam, dict) or set(cam) - {"elevation", "lens", "orbit", "fill"}: c.bad("'camera' takes elevation, lens, orbit, fill")
+    else:
+        c.number("elevation", 0, 30, src=cam); c.number("lens", 35, 135, src=cam); c.number("orbit", 0, 20, src=cam); c.number("fill", 0.4, 0.75, src=cam)
+    lab = p.get("labels", [])
+    if not (isinstance(lab, list) and all(isinstance(e, list) and 1 <= len(e) <= 3 and all(isinstance(x, str) for x in e) for e in lab)):
+        c.bad("'labels' must be [[key, display, style], ...]")
+    else:
+        for e in lab:
+            if e[0] not in keys: c.bad(f"label {e[0]!r} is not a level key")
+    if len(c.rep.errors) > n0: return
+    try: g = NG.profile(spec)
+    except Exception as ex: c.bad(f"the profile cannot be built: {ex}"); return
+    k = NG.solve_k(g)
+    if k is None: c.bad("this profile cannot nest: no size step lets a level rest inside and pass through the opening"); return
+    if p.get("ratio") and p["ratio"] > k: c.bad(f"ratio {p['ratio']} is larger than this shape allows ({k})")
+    need = NG.timeline(sec, len(lv))["need"]
+    if sec < need: c.bad(f"{len(lv)} levels need at least {need:.1f} s (got {sec:g})")
+    kk = min(k, p.get("ratio", 0.8)); inner = kk ** (len(lv) - 1)
+    if inner < 0.25: c.bad(f"the innermost level would be {inner:.0%} of the outer one - fewer levels or a bigger ratio")
+    c.note(f"size step {kk} (fit {k}); the innermost level is {inner:.0%} of the outer one; opens at "
+           f"{', '.join(f'{x:.1f}' for x in NG.timeline(sec, len(lv))['t_open'])} s")
+
+
+CHECKS = {"fly": check_fly, "cloth": check_cloth, "shatter": check_shatter, "nest": check_nest}
 
 
 def check(spec, reg):
