@@ -1,7 +1,7 @@
 """Workshop template 'cloth' - fetches the flag picture (Wikimedia Commons file, rendered to PNG by Commons, or a
 direct PNG/JPG url) + its licence for the credits.  usage: python3 cloth_prep.py <params.json> <out_dir>"""
 import json, os, sys, time, io, re
-import requests
+import numpy as np, requests
 from PIL import Image
 
 P = json.load(open(sys.argv[1])); OUT = sys.argv[2]; os.makedirs(OUT, exist_ok=True)
@@ -36,6 +36,8 @@ else:
 im = Image.open(io.BytesIO(get(url).content)).convert("RGB")
 if im.width < 2000: im = im.resize((2000, round(im.height * 2000 / im.width)), Image.LANCZOS)
 im.save(f"{OUT}/flag.png")
-meta.update({"aspect": im.width / im.height, "size": im.size})
+a = np.asarray(im, np.float32) / 255
+meta.update({"aspect": im.width / im.height, "size": im.size,
+             "luma": round(float((0.2126 * a[..., 0] + 0.7152 * a[..., 1] + 0.0722 * a[..., 2]).mean()), 4)})
 json.dump(meta, open(f"{OUT}/meta.json", "w"))
 print("flag", im.size, meta.get("license", ""), flush=True)

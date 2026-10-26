@@ -1,7 +1,42 @@
 {
- "fly": {"script": "fly.py", "prep": "fly_prep.py", "kind": "cauc", "labels": true, "segment": "fly",
-         "credits": ["Sentinel-2 cloudless 2016 by EOX IT Services GmbH (contains modified Copernicus Sentinel data 2016), CC BY 4.0",
-                     "Terrain: AWS Terrain Tiles (SRTM, ETOPO)", "Boundaries: Natural Earth"]},
- "cloth": {"script": "cloth.py", "prep": "cloth_prep.py", "kind": "cauc", "labels": false, "segment": "shot",
-           "alpha_when": {"background": "transparent"}, "kind_alpha": "doll"}
+ "fly": {
+  "script": "fly.py",
+  "prep": "fly_prep.py",
+  "kind": "cauc",
+  "labels": true,
+  "segment": "fly",
+  "prep_keys": [
+   "bbox",
+   "zoom",
+   "sea",
+   "borders",
+   "highlight"
+  ],
+  "overlay_keys": [
+   "labels",
+   "places"
+  ],
+  "budget_min_per_s": 2.5,
+  "credits": [
+   "Sentinel-2 cloudless 2016 by EOX IT Services GmbH (contains modified Copernicus Sentinel data 2016), CC BY 4.0",
+   "Terrain: AWS Terrain Tiles (SRTM, ETOPO)",
+   "Boundaries: Natural Earth"
+  ]
+ },
+ "cloth": {
+  "script": "cloth.py",
+  "prep": "cloth_prep.py",
+  "kind": "cauc",
+  "labels": false,
+  "segment": "shot",
+  "prep_keys": [
+   "flag"
+  ],
+  "overlay_keys": [],
+  "budget_min_per_s": 3.0,
+  "alpha_when": {
+   "background": "transparent"
+  },
+  "kind_alpha": "doll"
+ }
 }

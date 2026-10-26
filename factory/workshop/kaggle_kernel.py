@@ -1,8 +1,10 @@
-# Kaggle GPU kernel (2x T4, Cycles OptiX): renders a batch of workshop pieces of the factory.
-# Per piece: <hash>.mp4 (or .webm with alpha) + <hash>_sheet.jpg (+ <hash>_labels.json) + <hash>.json in /kaggle/working.
-# Placeholders filled by factory/workshop/run.py: __REPO_URL__ __SHA__ __BATCH__
+# Kaggle GPU kernel (2x T4, Cycles OptiX): renders a batch of workshop pieces whose CPU preview passed.
+# Per piece: its data (prepared once, from the release) -> frames within the piece's time budget (a piece over budget
+# stops after a few frames instead of using the GPU for hours) -> <hash>.mp4 (or .webm with alpha) + <hash>_sheet.jpg
+# + <hash>.json in /kaggle/working.
+# Placeholders filled by factory/workshop/run.py: __REPO_URL__ __SHA__ __BATCH__ __DATA_URL__
 import subprocess, os, time, glob, json, base64, shutil
-REPO, SHA, BATCH = "__REPO_URL__", "__SHA__", "__BATCH__"
+REPO, SHA, BATCH, DATA_URL = "__REPO_URL__", "__SHA__", "__BATCH__", "__DATA_URL__"
 JOBS = json.loads(base64.b64decode(BATCH).decode())
 W = "/kaggle/working"; T0 = time.time()
 TPL = "factory/workshop/templates"
@@ -26,11 +28,9 @@ def tail(p, n=2500):
     except Exception: return ""
 
 
-log("workshop batch:", [j["id"] for j in JOBS])
+log("workshop batch:", [(j["id"], j["budget_min"]) for j in JOBS])
 sh(f"git clone -q {REPO} /tmp/vm && cd /tmp/vm && git checkout -q {SHA}")
 os.chdir("/tmp/vm")
-if sh("python3 -c 'import geopandas, shapely, scipy'", check=False).returncode:
-    sh("pip install -q geopandas shapely scipy")
 sh("apt-get -qq install -y libxi6 libxxf86vm1 libxfixes3 libxrender1 libgl1 libegl1 libxkbcommon0 libsm6 libice6 > /dev/null 2>&1 || true", check=False)
 sh("F=$(curl -s https://download.blender.org/release/Blender4.5/ | grep -oE 'blender-4\\.5\\.[0-9]+-linux-x64\\.tar\\.xz' | sort -V | uniq | tail -1); "
    "curl -sfL --retry 3 -o /tmp/b.tar.xz https://download.blender.org/release/Blender4.5/$F && mkdir -p /tmp/blender && "
@@ -49,20 +49,19 @@ for j in JOBS:
     json.dump({**j["params"], "seconds": j["seconds"]}, open(f"{d}/params.json", "w"))
     t1 = time.time()
     try:
-        if j.get("prep"):
-            r = sh(f"python3 {TPL}/{j['prep']} {d}/params.json {d}/data > {d}/prep.log 2>&1", check=False)
-            if r.returncode: raise Fail("prep failed\n" + tail(f"{d}/prep.log"))
-            log(j["id"], "prep done")
-        base = f"/tmp/blender/blender -b --python-exit-code 1 -P {TPL}/{j['script']} -- --params {d}/params.json --data {d}/data --out {d}/frames"
-        if j.get("labels"):
-            r = sh(base + f" --labels-only > {d}/labels.log 2>&1", check=False)
-            if r.returncode: raise Fail("labels pass failed\n" + tail(f"{d}/labels.log"))
-        p = subprocess.Popen(base + f" --start 1 --end {frames} --gpu OPTIX > {d}/render.log 2>&1", shell=True)
+        sh(f"curl -sfL --retry 5 -o {d}/data.tar {DATA_URL}{j['dkey']}_data.tar && tar -xf {d}/data.tar -C {d} && rm {d}/data.tar")
+        log(j["id"], "data ready")
+        cmd = (f"/tmp/blender/blender -b --python-exit-code 1 -P {TPL}/{j['script']} -- --params {d}/params.json --data {d}/data "
+               f"--out {d}/frames --start 1 --end {frames} --gpu OPTIX --ev {j['ev']} --budget-min {j['budget_min']}")
+        p = subprocess.Popen(cmd + f" > {d}/render.log 2>&1", shell=True)
         count = lambda: len(glob.glob(f"{d}/frames/f_*.jpg")) + len(glob.glob(f"{d}/frames/f_*.png"))
         while p.poll() is None:
             time.sleep(60); log(j["id"], f"rendered {count()}/{frames}")
         for l in open(f"{d}/render.log", errors="replace"):
-            if "GPU devices" in l or "built:" in l: log(l.strip()[:300])
+            if l.startswith(("GPU devices", "built:", "budget:", "weather", "BUDGET")): log(l.strip()[:300])
+        if "BUDGET EXCEEDED" in tail(f"{d}/render.log", 4000):
+            raise Fail(f"over budget, stopped after {count()} frames ({(time.time() - t1) / 60:.1f} min): "
+                       + [l for l in tail(f"{d}/render.log", 4000).splitlines() if "BUDGET EXCEEDED" in l][-1])
         if p.returncode or count() != frames: raise Fail(f"render rc {p.returncode}, frames {count()}/{frames}\n" + tail(f"{d}/render.log"))
         pngs = sorted(glob.glob(f"{d}/frames/f_*.png"))
         if j.get("alpha"):
@@ -75,10 +74,10 @@ for j in JOBS:
             sh(f"ffmpeg -v error -y -framerate 30 -start_number 1 -i {d}/frames/f_%04d.{ext} -c:v libx264 -crf 12 -preset slow -pix_fmt yuv420p {out}")
         k = max(1, frames // 6)
         sh(f"ffmpeg -v error -y -i {out} -vf \"select='not(mod(n\\,{k}))',scale=640:-1,tile=3x2\" -frames:v 1 {W}/{h}_sheet.jpg", check=False)
-        if os.path.exists(f"{d}/frames/labels.json"): shutil.copy(f"{d}/frames/labels.json", f"{W}/{h}_labels.json")
         credit = json.load(open(f"{d}/data/meta.json")) if os.path.exists(f"{d}/data/meta.json") else {}
         meta = {"hash": h, "id": j["id"], "template": j["template"], "seconds": j["seconds"], "frames": frames, "fps": 30,
-                "file": os.path.basename(out), "labels": os.path.exists(f"{W}/{h}_labels.json"), "minutes": round((time.time() - t1) / 60, 1),
+                "file": os.path.basename(out), "lkey": j["lkey"], "ev": j["ev"], "budget_min": j["budget_min"],
+                "minutes": round((time.time() - t1) / 60, 1),
                 "credit": {k2: credit[k2] for k2 in ("what", "license", "author", "page") if k2 in credit}}
         json.dump(meta, open(f"{W}/{h}.json", "w")); results.append(meta)
         log(j["id"], "done", meta["file"], os.path.getsize(out), "bytes", meta["minutes"], "min")

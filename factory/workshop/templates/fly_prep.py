@@ -1,80 +1,128 @@
-"""Workshop template 'fly' - region data: terrain (AWS terrarium DEM) + colour (EOX Sentinel-2 cloudless 2016,
-CC BY 4.0) on the same web-mercator grid, border lines (Natural Earth 10m), places.
+"""Workshop template 'fly' - region data on one web-mercator grid: terrain (AWS terrarium DEM) + colour (EOX Sentinel-2
+cloudless 2016, CC BY 4.0) for the region, and a coarse ring of both around it out to the horizon (3 zoom levels lower).
+Open sea is forced well below the water plane: the DEM has flat 0 m patches at sea that would otherwise sit exactly at
+water level and show as pale slabs. Border lines (Natural Earth 10m) clipped to the region.
 usage: python3 fly_prep.py <params.json> <out_dir>
-params: bbox [lon0, lon1, lat0, lat1]; zoom (optional); borders.countries [ISO3...] (shared borders inside the bbox);
-        highlight [{key, admin0 | admin1 + country | disputed}]; places {name: [lon, lat]}"""
+params: bbox [lon0, lon1, lat0, lat1]; zoom; sea (m); borders.countries [ISO3...];
+        highlight [{key, admin0 | admin1 + country | disputed}]"""
 import json, math, os, io, sys, time, itertools
 import concurrent.futures as cf
 import numpy as np, requests
 from PIL import Image
+from scipy import ndimage
 
 P = json.load(open(sys.argv[1])); OUT = sys.argv[2]; os.makedirs(OUT, exist_ok=True)
 LON0, LON1, LAT0, LAT1 = [float(v) for v in P["bbox"]]
 Z = int(P.get("zoom") or max(6, min(12, math.floor(math.log2(9000 * 360 / (256 * (LON1 - LON0)))))))
+SEA = float(P.get("sea", 0.0))
 N = 256 * 2 ** Z
 mx = lambda lon: (lon + 180) / 360 * N
 my = lambda lat: (1 - math.log(math.tan(math.radians(lat)) + 1 / math.cos(math.radians(lat))) / math.pi) / 2 * N
 x0, x1, y0, y1 = mx(LON0), mx(LON1), my(LAT1), my(LAT0)
-tx0, tx1, ty0, ty1 = int(x0 // 256), int(x1 // 256), int(y0 // 256), int(y1 // 256)
-print("zoom", Z, "grid", round(x1 - x0), "x", round(y1 - y0), flush=True)
+W, H = int(round(x1 - x0)), int(round(y1 - y0))
+Image.MAX_IMAGE_PIXELS = None
+SESSION = requests.Session()
+SESSION.headers["User-Agent"] = "videomaps-workshop/1.1"
+print("zoom", Z, "region", W, "x", H, flush=True)
 
 
 def fetch(url):
     for i in range(7):
         try:
-            r = requests.get(url, timeout=60, headers={"User-Agent": "videomaps-workshop/1.0"}); r.raise_for_status(); return r.content
+            r = SESSION.get(url, timeout=60); r.raise_for_status(); return r.content
         except Exception:
             time.sleep(2 + 3 * i)
     raise RuntimeError(url)
 
 
-mos = np.zeros(((ty1 - ty0 + 1) * 256, (tx1 - tx0 + 1) * 256), np.float32)
+def mosaic(kind, z, px0, py0, w, h):
+    """w x h pixels from (px0, py0) at zoom z: 'dem' -> float32 metres, 's2' -> uint8 RGB"""
+    nt = 2 ** z
+    tx0, ty0 = int(px0 // 256), int(py0 // 256)
+    tx1, ty1 = int((px0 + w - 1e-6) // 256), int((py0 + h - 1e-6) // 256)
+    arr = np.zeros(((ty1 - ty0 + 1) * 256, (tx1 - tx0 + 1) * 256) + ((3,) if kind == "s2" else ()), np.uint8 if kind == "s2" else np.float32)
+
+    def one(t):
+        tx, ty = t
+        if not (0 <= ty < nt): return
+        txw = tx % nt
+        if kind == "dem":
+            a = np.asarray(Image.open(io.BytesIO(fetch(f"https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{txw}/{ty}.png"))).convert("RGB")).astype(np.float32)
+            v = a[..., 0] * 256 + a[..., 1] + a[..., 2] / 256 - 32768
+        else:
+            v = np.asarray(Image.open(io.BytesIO(fetch(f"https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless_3857/default/g/{z}/{ty}/{txw}.jpg"))).convert("RGB"))
+        arr[(ty - ty0) * 256:(ty - ty0 + 1) * 256, (tx - tx0) * 256:(tx - tx0 + 1) * 256] = v
+
+    tiles = [(tx, ty) for ty in range(ty0, ty1 + 1) for tx in range(tx0, tx1 + 1)]
+    with cf.ThreadPoolExecutor(24) as ex:
+        list(ex.map(one, tiles))
+    r0, c0 = int(round(py0 - ty0 * 256)), int(round(px0 - tx0 * 256))
+    print(f"  {kind} z{z}: {len(tiles)} tiles", flush=True)
+    return arr[r0:r0 + h, c0:c0 + w]
 
 
-def dem_tile(t):
-    tx, ty = t
-    a = np.asarray(Image.open(io.BytesIO(fetch(f"https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{Z}/{tx}/{ty}.png"))).convert("RGB")).astype(np.float32)
-    mos[(ty - ty0) * 256:(ty - ty0 + 1) * 256, (tx - tx0) * 256:(tx - tx0 + 1) * 256] = a[..., 0] * 256 + a[..., 1] + a[..., 2] / 256 - 32768
+def sea_fix(h, rgb, sea_level, border_seed=True):
+    """open sea (low + water-coloured + connected to deep water or the edge) -> 400 m under the water plane;
+    other ground at or below the water level -> 1 m above it (no surface exactly at water level)"""
+    if rgb.shape[:2] != h.shape:
+        rgb = np.asarray(Image.fromarray(rgb).resize((h.shape[1], h.shape[0]), Image.BILINEAR))
+    r, g, b = [rgb[..., i].astype(np.float32) for i in range(3)]
+    luma = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
+    low = h <= sea_level + 0.5
+    cand = low & (b >= r - 6) & (luma < 0.30)
+    lab, n = ndimage.label(cand)
+    seed = cand & (h < sea_level - 5)
+    if border_seed:
+        edge = np.zeros_like(cand); edge[0, :] = edge[-1, :] = True; edge[:, 0] = edge[:, -1] = True
+        seed |= cand & edge
+    keep = np.zeros(n + 1, bool); keep[np.unique(lab[seed])] = True; keep[0] = False
+    sea = keep[lab]
+    h = h.copy()
+    h[sea] = sea_level - 400.0
+    rest = low & ~sea
+    h[rest] = np.maximum(h[rest], sea_level + 1.0)
+    return h, float(sea.mean()), int(rest.sum())
 
 
-with cf.ThreadPoolExecutor(24) as ex:
-    list(ex.map(dem_tile, [(tx, ty) for ty in range(ty0, ty1 + 1) for tx in range(tx0, tx1 + 1)]))
-print("DEM mosaic", mos.shape, flush=True)
-
-Z2, S = Z + 1, 2
-sx0, sx1, sy0, sy1 = x0 * S, x1 * S, y0 * S, y1 * S
-stx0, stx1, sty0, sty1 = int(sx0 // 256), int(sx1 // 256), int(sy0 // 256), int(sy1 // 256)
-smos = np.zeros(((sty1 - sty0 + 1) * 256, (stx1 - stx0 + 1) * 256, 3), np.uint8)
-
-
-def s2_tile(t):
-    tx, ty = t
-    a = np.asarray(Image.open(io.BytesIO(fetch(f"https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless_3857/default/g/{Z2}/{ty}/{tx}.jpg"))).convert("RGB"))
-    smos[(ty - sty0) * 256:(ty - sty0 + 1) * 256, (tx - stx0) * 256:(tx - stx0 + 1) * 256] = a
-
-
-with cf.ThreadPoolExecutor(24) as ex:
-    list(ex.map(s2_tile, [(tx, ty) for ty in range(sty0, sty1 + 1) for tx in range(stx0, stx1 + 1)]))
-tex = smos[int(sy0 - sty0 * 256):int(sy1 - sty0 * 256), int(sx0 - stx0 * 256):int(sx1 - stx0 * 256)]
-Image.MAX_IMAGE_PIXELS = None
+# ---------------------------------------------------------------- region at full detail
+hm = mosaic("dem", Z, x0, y0, W, H)
+tex = mosaic("s2", Z + 1, 2 * x0, 2 * y0, 2 * W, 2 * H)
+hm, sea_frac, lifted = sea_fix(hm, tex[::2, ::2], SEA)
+hm = ndimage.gaussian_filter(hm, 1.0)
+print(f"region: sea {sea_frac:.1%}, low ground lifted {lifted} px", flush=True)
 ti = Image.fromarray(tex)
 if ti.width > 16384: ti = ti.resize((16384, round(ti.height * 16384 / ti.width)), Image.LANCZOS)
 ti.save(f"{OUT}/texture.jpg", quality=93)
-print("S2 texture", ti.size, flush=True)
-del smos, tex
+print("texture", ti.size, flush=True)
+del tex, ti
 
-ox, oy = tx0 * 256, ty0 * 256
-hm = mos[int(y0 - oy):int(y1 - oy), int(x0 - ox):int(x1 - ox)]
-from scipy.ndimage import gaussian_filter
-hm = gaussian_filter(hm, 1.0)
-np.save(f"{OUT}/height.npy", hm.astype(np.float32))
-H, W = hm.shape
+# ---------------------------------------------------------------- coarse ring out to the horizon
+ZF = max(3, Z - 3); F = 2 ** (Z - ZF)
+span = max(W, H); M = 2.5 * span
+fx0, fx1 = x0 - M, x1 + M
+fy0, fy1 = max(my(84.0), y0 - M), min(my(-84.0), y1 + M)
+fw, fh = int(round((fx1 - fx0) / F)), int(round((fy1 - fy0) / F))
+fx1, fy1 = fx0 + fw * F, fy0 + fh * F
+hf = mosaic("dem", ZF, fx0 / F, fy0 / F, fw, fh)
+tf = mosaic("s2", ZF, fx0 / F, fy0 / F, fw, fh)
+hf, far_sea, _ = sea_fix(hf, tf, SEA)
+hf = ndimage.gaussian_filter(hf, 0.7)
+fi = Image.fromarray(tf)
+if fi.width > 8192: fi = fi.resize((8192, round(fi.height * 8192 / fi.width)), Image.LANCZOS)
+fi.save(f"{OUT}/far.jpg", quality=90)
+print(f"ring: {fw} x {fh} px at z{ZF}, sea {far_sea:.1%}", flush=True)
+del tf, fi
+
+SCALE, OFFSET = 10.0, SEA - 500.0
+enc = lambda a: np.clip(np.round((a - OFFSET) * SCALE), 0, 65535).astype(np.uint16)
+np.savez_compressed(f"{OUT}/height.npz", main=enc(hm), far=enc(hf), scale=SCALE, offset=OFFSET)
 mpp = 40075016.686 * math.cos(math.radians((LAT0 + LAT1) / 2)) / N
 meta = {"u": 400.0, "lon0": LON0, "lon1": LON1, "lat0": LAT0, "lat1": LAT1, "zoom": Z, "w": W, "h": H, "m_per_px": mpp,
-        "hmin": float(hm.min()), "hmax": float(hm.max())}
+        "sea": SEA, "hmin": float(hm.min()), "hmax": float(hm.max()), "sea_frac": sea_frac,
+        "far": {"x0": fx0 - x0, "x1": fx1 - x0, "y0": fy0 - y0, "y1": fy1 - y0, "f": F, "zoom": ZF, "w": fw, "h": fh}}
 g2px = lambda lon, lat: (mx(lon) - x0, my(lat) - y0)
 
-# ---- lines: shared borders of the listed countries + highlighted outlines (all clipped to the bbox)
+# ---------------------------------------------------------------- lines: shared borders + highlighted outlines
 lines = {}
 countries = list(P.get("borders", {}).get("countries", []))
 hl = P.get("highlight", [])
@@ -123,7 +171,6 @@ if countries or hl:
             g = None
         lines[key] = to_list(g.boundary.intersection(bb)) if g is not None else []
         if not lines[key]: print("WARNING: highlight", key, "found nothing inside the region", flush=True)
-meta["places"] = {k: list(g2px(float(v[0]), float(v[1]))) for k, v in P.get("places", {}).items()}
 meta["lines"] = lines
 json.dump(meta, open(f"{OUT}/meta.json", "w"))
-print({k: len(v) for k, v in lines.items()}, "places", len(meta["places"]), flush=True)
+print({k: len(v) for k, v in lines.items()}, flush=True)
