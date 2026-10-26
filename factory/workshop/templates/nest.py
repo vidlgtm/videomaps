@@ -508,6 +508,9 @@ if O.preview:
             res[k] = {"median_diff": round(dmed, 1), "ev_offset": round(evo, 3), "cells": len(v)}
             if dmed > 16 or abs(evo) > 0.2: errs.append(f"picture {k} renders off its true colours (median difference {dmed:.0f}/255, {evo:+.2f} EV)")
             elif dmed > 9: warns.append(f"picture {k} colours slightly off (median difference {dmed:.0f}/255)")
+        lo_, hi_ = EV_RANGE
+        if min(abs(ck["ev"] - lo_), abs(ck["ev"] - hi_)) < 0.02:
+            errs.append(f"the exposure stopped at its limit ({ck['ev']:+.2f} EV): the light levels are off for this scene")
         ck["errors"] = ck.get("errors", []) + errs; ck["warnings"] = ck.get("warnings", []) + warns
         ck.setdefault("stats", {})["picture_fidelity"] = res
         json.dump(ck, open(cp, "w"))
@@ -516,8 +519,9 @@ if O.preview:
     # exposure on the lacquer (visible in every frame); the pictures do not depend on it
     lac_l = [0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2] for c in (hexrgb(lv.get("color", PALETTE[i % len(PALETTE)])) for i, lv in enumerate(LV))]
     target = round(0.85 * float(np.mean(lac_l)), 3)
+    EV_RANGE = (-2.5, 2.0)
     C.preview_run(sc, O, FRAMES, classify, subject=("o",), target=target, tol=max(0.025, round(0.25 * target, 3)),
-                  ev_range=(-2.5, 2.0), stats=stats, errors=errors, warnings=warnings, dark_max=1.0 if TRANSP else 0.92)
+                  ev_range=EV_RANGE, stats=stats, errors=errors, warnings=warnings, dark_max=1.0 if TRANSP else 0.92)
     picture_fidelity()
     sys.exit(0)
 
