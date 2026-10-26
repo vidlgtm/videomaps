@@ -9,7 +9,7 @@ usage: blender -b -P fly.py -- --params p.json --data <prep dir> --out <dir> [--
        --budget-min M | --preview]
 params: seconds; path [{t, cam: [lon, lat, alt_km], look: [lon, lat, alt_km]}...]; exaggeration; sea; snow [m0, m1];
         sun {elevation, azimuth}; styles {line key: preset | [r, g, b, strength, width]}; places {name: [lon, lat]};
-        labels [[place, display, style]]; lens; samples; haze 0.2..1; saturation; look punchy | base"""
+        labels [[place, display, style]]; lens; samples; haze 0.2..1; saturation; look punchy | base; fill 1..2.5"""
 import bpy, os, sys, json, math, gc
 import numpy as np
 from mathutils import Vector
@@ -102,6 +102,12 @@ wd = bpy.data.worlds.new("W"); sc.world = wd; wd.use_nodes = True
 wsky = sky_node(wd.node_tree)
 wd.node_tree.links.new(wsky.outputs["Color"], wd.node_tree.nodes["Background"].inputs["Color"])
 wd.node_tree.nodes["Background"].inputs["Strength"].default_value = WSTR
+# shadow fill: diffuse light from the sky is FILL x stronger (lighter shadows); the visible sky, the haze and the water
+# reflections keep their values
+FILLK = float(P.get("fill", 1.45))
+lpw = wd.node_tree.nodes.new("ShaderNodeLightPath"); mw = wd.node_tree.nodes.new("ShaderNodeMath"); mw.operation = "MULTIPLY_ADD"
+wd.node_tree.links.new(lpw.outputs["Is Diffuse Ray"], mw.inputs[0]); mw.inputs[1].default_value = WSTR * (FILLK - 1); mw.inputs[2].default_value = WSTR
+wd.node_tree.links.new(mw.outputs[0], wd.node_tree.nodes["Background"].inputs["Strength"])
 sun = bpy.data.objects.new("Sun", bpy.data.lights.new("Sun", "SUN")); sc.collection.objects.link(sun)
 sun.data.energy = 4.0; sun.data.angle = math.radians(0.9); sun.data.color = (1.0, 0.95, 0.88)
 sun.rotation_euler = (math.radians(90 - el), 0, math.radians(az - 130))
