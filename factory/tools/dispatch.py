@@ -34,7 +34,8 @@ def secret_names():
 def withdraw():
     for n in NAMES: api(f"actions/secrets/{n}", "DELETE")
     for _ in range(10):
-        left = [n for n in (secret_names() or NAMES) if n in NAMES]
+        names = secret_names()
+        left = [n for n in (NAMES if names is None else names) if n in NAMES]
         if not left: print("key withdrawn: no Kaggle secret left in the repository", flush=True); return True
         for n in left: api(f"actions/secrets/{n}", "DELETE")
         time.sleep(3)
