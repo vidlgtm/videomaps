@@ -50,8 +50,8 @@ RIM = float(P.get("rim", 3.5)) * PX_FRAME
 AA = 0.7 * PX_FRAME
 CW = 1.25 * RIM + 0.5 * AA
 SAT = meta["base"] == "satellite"
-DIM = float(P.get("base_dim", 0.62 if SAT else 1.0))
-VIG = 0.6 if SAT else 0.5
+DIM = float(P.get("base_dim", 0.72 if SAT else 1.0))
+VIG = 0.45 if SAT else 0.4
 LENS = float(P.get("lens", 45))
 rnd = lambda key, salt: (zlib.crc32(f"{key}/{salt}".encode()) % 10007) / 10007.0
 
@@ -125,6 +125,15 @@ def scale_color(N, L, col, f):
     return m.outputs[2]
 
 
+def base_color(N, L, col):
+    """base map colour: dark water lifted a little (gamma), dimmed, vignette toward the edges of the view"""
+    g = N.new("ShaderNodeGamma"); g.inputs["Gamma"].default_value = 0.85; L.new(col, g.inputs["Color"])
+    c = scale_color(N, L, scale_color(N, L, g.outputs["Color"], DIM), vignette(N, L))
+    m = N.new("ShaderNodeMix"); m.data_type = "RGBA"; m.blend_type = "ADD"; m.inputs[0].default_value = 1.0
+    L.new(c, m.inputs[6]); m.inputs[7].default_value = (0.004, 0.0045, 0.006, 1)
+    return m.outputs[2]
+
+
 def keyval(node, v, f):
     node.outputs[0].default_value = v; node.outputs[0].keyframe_insert("default_value", frame=f)
 
@@ -139,14 +148,23 @@ def load(path, color=True):
 
 
 def float_image(name, arr):
+    """float data -> OpenEXR file -> image (an image only made in memory renders black)"""
     h, w = arr.shape[:2]
-    img = bpy.data.images.new(name, w, h, alpha=True, float_buffer=True)
+    tmp = bpy.data.images.new(name + "_tmp", w, h, alpha=True, float_buffer=True)
     rgba = np.ones((h, w, 4), np.float32); rgba[..., :3] = arr[::-1]
-    img.pixels.foreach_set(rgba.ravel())
+    tmp.pixels.foreach_set(rgba.ravel())
+    path = os.path.abspath(os.path.join(DATA, f"{name}.exr"))
+    tmp.filepath_raw = path; tmp.file_format = "OPEN_EXR"; tmp.save()
+    bpy.data.images.remove(tmp)
+    img = bpy.data.images.load(path, check_existing=False)
     try: img.colorspace_settings.name = "Non-Color"
     except Exception: pass
-    img.update()
+    px = np.empty(w * h * 4, np.float32); img.pixels.foreach_get(px)
+    SDF_MAX[name] = round(float(px.reshape(-1, 4)[:, 0].max()), 2)
     return img
+
+
+SDF_MAX = {}
 
 
 BASE_IMG = load(f"{DATA}/base.jpg")
@@ -159,7 +177,7 @@ uvl = base.data.uv_layers.new(name="UVMap"); uvl.data.foreach_set("uv", np.array
 bm = bpy.data.materials.new("base"); bm.use_nodes = True
 N_, L_, out = nodes_of(bm)
 bt = image(N_, L_, BASE_IMG, uvmap(N_, "UVMap"), "Cubic")
-bcol = scale_color(N_, L_, scale_color(N_, L_, bt.outputs["Color"], DIM), vignette(N_, L_))
+bcol = base_color(N_, L_, bt.outputs["Color"])
 dif = N_.new("ShaderNodeBsdfDiffuse"); L_.new(bcol, dif.inputs["Color"]); dif.inputs["Roughness"].default_value = 0.8
 L_.new(dif.outputs[0], out.inputs["Surface"])
 C.put(base, bm)
@@ -214,7 +232,7 @@ def top_material(k, pc, pm, own_img, sdf_img):
     elif ACT == "rise":
         land = image(N_, L_, BASE_IMG, uvmap(N_, "UVbase"), "Cubic")
         pold = N_.new("ShaderNodeBsdfDiffuse"); pold.inputs["Roughness"].default_value = 0.8
-        L_.new(scale_color(N_, L_, scale_color(N_, L_, land.outputs["Color"], DIM), vignette(N_, L_)), pold.inputs["Color"])
+        L_.new(base_color(N_, L_, land.outputs["Color"]), pold.inputs["Color"])
     else:
         pold = pnew
     flagmix = N_.new("ShaderNodeMixShader"); L_.new(fac, flagmix.inputs[0]); L_.new(pold.outputs[0], flagmix.inputs[1]); L_.new(pnew.outputs[0], flagmix.inputs[2])
@@ -277,6 +295,10 @@ for pc in PIECES:
     quads = np.concatenate(quads)
     ob = C.mesh_object(f"piece_{k}", co, quads=quads, tris=T)
     me = ob.data
+    try: me.shade_flat()
+    except Exception:
+        at = me.attributes.get("sharp_face") or me.attributes.new("sharp_face", "BOOLEAN", "FACE")
+        at.data.foreach_set("value", np.ones(len(me.polygons), bool))
     nt_ = len(T)
     mi = np.zeros(len(me.polygons), np.int32)
     sizes = np.zeros(len(me.polygons), np.int32); me.polygons.foreach_get("loop_total", sizes)
@@ -378,23 +400,41 @@ RANK = {k: i for i, k in enumerate(order)}
 dist = {k: math.hypot(CEN[k][0] - CU[0], CEN[k][1] - CU[1]) for k in PK}
 dmax = max(dist.values()) or 1.0
 FLOAT = 0.0045 * SPAN0
+# pieces rising side by side keep one height (their shared walls stay hidden); split pieces vary
+LIFTK = {k: LIFT * ((0.8 + 0.4 * rnd(k, "lift")) if ACT == "break" else 1.0) for k in PK}
+OFF = {k: ((CEN[k][0] - CU[0]) / dmax * SPREAD, (CEN[k][1] - CU[1]) / dmax * SPREAD) if ACT == "break" else (0.0, 0.0) for k in PK}
+RAISED = {}
+if ACT == "break":
+    def end_bvh(k):
+        v = LOCAL[k][0].astype(np.float64) + np.array([CEN[k][0] + OFF[k][0], CEN[k][1] + OFF[k][1], LIFTK[k]])
+        return BVHTree.FromPolygons([Vector(x) for x in v], LOCAL[k][1])
+    for _ in range(12):
+        bvs = {k: end_bvh(k) for k in PK}; moved = False
+        for i_, a_ in enumerate(PK):
+            for b_ in PK[i_ + 1:]:
+                if not bvs[a_].overlap(bvs[b_]): continue
+                lo, hi = (a_, b_) if LIFTK[a_] <= LIFTK[b_] else (b_, a_)
+                need = LIFTK[lo] + 1.3 * THICK + 2 * FLOAT
+                if LIFTK[hi] < need - 1e-9:
+                    LIFTK[hi] = need; moved = True; RAISED[hi] = round(LIFTK[hi] / LIFT, 2)
+        if not moved: break
+    if RAISED: print("separation: raised", RAISED, flush=True)
 
 
 def state(k, t):
     """(dx, dy, z, quaternion, wipe, show, crack, alpha, socket, ring radius, ring alpha) of piece k at time t"""
     i = RANK[k]; s = SCH
     dx = dy = 0.0; z = 0.0; q = Quaternion(); wipe, show, crack, alpha, sock, rr, ra = 2.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0
-    lift = LIFT * (0.75 + 0.5 * rnd(k, "lift"))
+    lift = LIFTK[k]
     ph = 2 * math.pi * rnd(k, "phase")
     if ACT in ("break", "rise"):
         t0 = (s["split"] if ACT == "break" else s["rise"]) + s["stagger"] * i
         p = (t - t0) / s["move"]
         if ACT == "break":
-            vx, vy = CEN[k][0] - CU[0], CEN[k][1] - CU[1]; L = math.hypot(vx, vy)
+            vx, vy = OFF[k]; L = math.hypot(vx, vy)
             ux, uy = (vx / L, vy / L) if L > 1e-9 else (0.0, 0.0)
-            amt = SPREAD * (0.45 + 0.55 * (dist[k] / dmax) ** 0.7)
             e = ST.ease_out_back(p, 1.2)
-            dx, dy = ux * amt * e, uy * amt * e
+            dx, dy = vx * e, vy * e
             z = lift * ST.ease_out_back(p, 0.9)
             if 0 < p < 1 and L > 1e-9:
                 q = Quaternion((-uy, ux, 0.0), math.radians(7.0) * math.sin(math.pi * p) * (1 - ST.smooth(p)))
@@ -438,7 +478,8 @@ for fr in range(1, FRAMES + 1):
         if ACT == "drop": keyval(h["alpha"], alpha, fr); keyval(h["salpha"], alpha, fr); keyval(RING[k][0], rr, fr); keyval(RING[k][1], ra, fr)
         if ACT == "rise": keyval(SOCK[k], sock, fr)
 sc.frame_start, sc.frame_end = 1, FRAMES
-C.setup_cycles(sc, O, samples=int(P.get("samples", 64)), look="AgX - Medium High Contrast")
+C.setup_cycles(sc, O, samples=int(P.get("samples", 64)), look="AgX - Base Contrast")
+print(f"built: distance fields max {SDF_MAX}", flush=True)
 print(f"built: {n} pieces, {tri_total} top triangles, action {ACT}, end of animation {SCH['end']:.1f} s, base {W}x{H} px "
       f"({meta['base']}), rim {RIM:.1f} base px", flush=True)
 
@@ -446,7 +487,10 @@ print(f"built: {n} pieces, {tri_total} top triangles, action {ACT}, end of anima
 if O.preview:
     BVH = {k: BVHTree.FromPolygons([Vector(v) for v in LOCAL[k][0]], LOCAL[k][1]) for k in PK}
     bx_lo, bx_hi, by_lo, by_hi = wx(0), wx(W), wy(H), wy(0)
-    errors, warnings, stats = [], [], {"credits": meta.get("credits", []), "pieces": n, "triangles": tri_total}
+    errors, warnings, stats = [], [], {"credits": meta.get("credits", []), "pieces": n, "triangles": tri_total,
+                                       "sdf_max": SDF_MAX, "raised": RAISED}
+    for k_, v_ in SDF_MAX.items():
+        if v_ < 0.5: errors.append(f"distance field {k_} reads empty (max {v_}) - rims and cracks would cover the whole top")
 
     def mats():
         M = {k: OBJ[k].matrix_world.copy() for k in PK}
