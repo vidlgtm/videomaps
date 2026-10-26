@@ -1,0 +1,336 @@
+{
+ "preview_only": true,
+ "scenes": {
+  "treaty_seals": {
+   "idea": "On an oak desk lit by a single candle, a blank parchment receives four red wax seals, one for each founding republic, beside a photograph of the 1922 signing: the moment four states became one Union.",
+   "seconds": 10,
+   "output": "film",
+   "place": {
+    "kind": "desk",
+    "surface": "oak"
+   },
+   "light": {
+    "mood": "candle"
+   },
+   "cast": {
+    "treaty": {
+     "is": "sheet",
+     "from": "none",
+     "material": "parchment",
+     "size": 0.42
+    },
+    "photo": {
+     "is": "print",
+     "from": "store:treaty1922",
+     "where": [
+      "left_of",
+      "treaty"
+     ]
+    },
+    "rsfsr": {
+     "is": "disc",
+     "material": "wax",
+     "size": 0.045,
+     "where": [
+      "on",
+      "treaty"
+     ]
+    },
+    "ukr": {
+     "is": "disc",
+     "material": "wax",
+     "size": 0.045,
+     "where": [
+      "on",
+      "treaty"
+     ]
+    },
+    "byel": {
+     "is": "disc",
+     "material": "wax",
+     "size": 0.045,
+     "where": [
+      "on",
+      "treaty"
+     ]
+    },
+    "zsfsr": {
+     "is": "disc",
+     "material": "wax",
+     "size": 0.045,
+     "where": [
+      "on",
+      "treaty"
+     ]
+    },
+    "flame": {
+     "is": "candle",
+     "where": [
+      "behind",
+      "treaty"
+     ]
+    }
+   },
+   "beats": [
+    {
+     "t": 1.6,
+     "do": "stamp",
+     "who": "rsfsr",
+     "with": "text:RSFSR"
+    },
+    {
+     "t": 2.7,
+     "do": "stamp",
+     "who": "ukr",
+     "with": "text:UkSSR"
+    },
+    {
+     "t": 3.8,
+     "do": "stamp",
+     "who": "byel",
+     "with": "text:BSSR"
+    },
+    {
+     "t": 4.9,
+     "do": "stamp",
+     "who": "zsfsr",
+     "with": "text:ZSFSR"
+    },
+    {
+     "t": 6.2,
+     "do": "label",
+     "who": "treaty",
+     "text": "Treaty of Union, 1922",
+     "dur": 3.6
+    }
+   ],
+   "camera": [
+    {
+     "t": 0,
+     "move": "top"
+    },
+    {
+     "t": 0.8,
+     "move": "push",
+     "to": "treaty",
+     "dur": 4.6
+    },
+    {
+     "t": 6.0,
+     "move": "tilt",
+     "deg": -30,
+     "dur": 3.0
+    }
+   ]
+  },
+  "constitution_glow": {
+   "idea": "In a dark museum hall one page of the 1936 Constitution rests on a marble plinth; Article 17, the right to leave the Union, glows like a promise, then the page burns away, because that promise was never meant to be used.",
+   "seconds": 9,
+   "output": "film",
+   "place": {
+    "kind": "museum",
+    "surface": "marble"
+   },
+   "light": {
+    "mood": "museum"
+   },
+   "cast": {
+    "stand": {
+     "is": "plinth",
+     "material": "marble"
+    },
+    "page": {
+     "is": "sheet",
+     "from": "store:const1936_a17",
+     "size": 0.36,
+     "where": [
+      "on",
+      "stand"
+     ]
+    }
+   },
+   "beats": [
+    {
+     "t": 0.3,
+     "do": "light",
+     "who": "page",
+     "dur": 1.6
+    },
+    {
+     "t": 3.0,
+     "do": "glow",
+     "who": "page",
+     "color": "gold",
+     "dur": 1.4
+    },
+    {
+     "t": 3.4,
+     "do": "label",
+     "who": "page",
+     "text": "Article 17",
+     "dur": 2.4
+    },
+    {
+     "t": 6.0,
+     "do": "burn",
+     "who": "page",
+     "from": "bottom",
+     "dur": 2.8
+    }
+   ],
+   "camera": [
+    {
+     "t": 0,
+     "move": "wide"
+    },
+    {
+     "t": 1.0,
+     "move": "crane",
+     "to": "page",
+     "h": 0.6,
+     "dur": 3.2
+    },
+    {
+     "t": 5.6,
+     "move": "orbit",
+     "deg": 25,
+     "dur": 3.2
+    }
+   ]
+  },
+  "central_asia_blocks": {
+   "idea": "Five granite blocks carved with the names of the Central Asian republics drop one after another onto a slate floor at dusk, then drift apart, five nations that never asked to leave suddenly standing alone.",
+   "seconds": 10,
+   "output": "film",
+   "place": {
+    "kind": "floor",
+    "surface": "slate"
+   },
+   "light": {
+    "mood": "dusk"
+   },
+   "cast": {
+    "kz": {
+     "is": "block",
+     "from": "text:KAZAKHSTAN",
+     "material": "stone"
+    },
+    "uz": {
+     "is": "block",
+     "from": "text:UZBEKISTAN",
+     "material": "stone"
+    },
+    "tm": {
+     "is": "block",
+     "from": "text:TURKMENISTAN",
+     "material": "stone"
+    },
+    "kg": {
+     "is": "block",
+     "from": "text:KYRGYZSTAN",
+     "material": "stone"
+    },
+    "tj": {
+     "is": "block",
+     "from": "text:TAJIKISTAN",
+     "material": "stone"
+    }
+   },
+   "beats": [
+    {
+     "t": 0.5,
+     "do": "drop",
+     "who": "kz"
+    },
+    {
+     "t": 1.2,
+     "do": "drop",
+     "who": "uz"
+    },
+    {
+     "t": 1.9,
+     "do": "drop",
+     "who": "tm"
+    },
+    {
+     "t": 2.6,
+     "do": "drop",
+     "who": "kg"
+    },
+    {
+     "t": 3.3,
+     "do": "drop",
+     "who": "tj"
+    },
+    {
+     "t": 6.0,
+     "do": "slide",
+     "who": "kz",
+     "to": [
+      -0.22,
+      0.1
+     ],
+     "dur": 2.2
+    },
+    {
+     "t": 6.0,
+     "do": "slide",
+     "who": "uz",
+     "to": [
+      -0.1,
+      -0.12
+     ],
+     "dur": 2.2
+    },
+    {
+     "t": 6.0,
+     "do": "slide",
+     "who": "tm",
+     "to": [
+      0.0,
+      0.14
+     ],
+     "dur": 2.2
+    },
+    {
+     "t": 6.0,
+     "do": "slide",
+     "who": "kg",
+     "to": [
+      0.1,
+      -0.12
+     ],
+     "dur": 2.2
+    },
+    {
+     "t": 6.0,
+     "do": "slide",
+     "who": "tj",
+     "to": [
+      0.22,
+      0.1
+     ],
+     "dur": 2.2
+    }
+   ],
+   "camera": [
+    {
+     "t": 0,
+     "move": "low"
+    },
+    {
+     "t": 3.8,
+     "move": "crane",
+     "h": 0.8,
+     "dur": 2.6
+    },
+    {
+     "t": 7.0,
+     "move": "orbit",
+     "deg": 20,
+     "dur": 2.8
+    }
+   ]
+  }
+ }
+}

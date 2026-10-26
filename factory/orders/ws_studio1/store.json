@@ -1,0 +1,35 @@
+{
+ "release": "store_ussr15",
+ "items": {
+  "treaty1922": {
+   "file": "treaty1922.jpg",
+   "sha256": "dad8c58db1bae79255ce28bc86342bf5a8f3ff9ed23eea3eabd7cd6ccf139242",
+   "bytes": 134147,
+   "mime": "image/jpeg",
+   "width": 900,
+   "height": 575,
+   "licence": "Public domain",
+   "author": "Stepan Dudnik",
+   "source": "https://commons.wikimedia.org/wiki/File:Treaty_on_the_Creation_of_the_Union_of_Soviet_Socialist_Republics.jpg",
+   "title": "Treaty on the Creation of the Union of Soviet Socialist Republics.jpg",
+   "page": null,
+   "from": "https://upload.wikimedia.org/wikipedia/commons/3/36/Treaty_on_the_Creation_of_the_Union_of_Soviet_Socialist_Republics.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+   "stored": "2026-10-26"
+  },
+  "const1936_a17": {
+   "file": "const1936_a17.jpg",
+   "sha256": "874a87c9dab6291dfab29f784f6f98817fc7982027093bf230026b35b1fb70a7",
+   "bytes": 221998,
+   "mime": "image/jpeg",
+   "width": 960,
+   "height": 1579,
+   "licence": "Public domain",
+   "author": "SSSR",
+   "source": "https://commons.wikimedia.org/wiki/File:The_Soviet_Socialist_Constitution_of_december_5,_1936.djvu",
+   "title": "The Soviet Socialist Constitution of december 5, 1936.djvu",
+   "page": 11,
+   "from": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d0/The_Soviet_Socialist_Constitution_of_december_5%2C_1936.djvu/page11-960px-The_Soviet_Socialist_Constitution_of_december_5%2C_1936.djvu.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "stored": "2026-10-26"
+  }
+ }
+}

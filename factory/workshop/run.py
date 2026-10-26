@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""Workshop: the 3D pieces of an order.
-stage preview (no GPU): preflight -> data of each piece (cached by content) -> CPU preview with exposure calibration and
-              automatic checks -> <lkey>_preview.jpg/.json (+ <lkey>_labels.json) in the release
-stage render : only pieces whose current preview passed -> Kaggle GPU within each piece's time budget -> <rkey>.mp4|.webm,
+"""Workshop: the 3D scenes of an order (<orderDir>/scenes.json - every scene described in the order, built from the
+general tools of kit/; there are no ready-made scenes).
+stage preview (no GPU): scene check (spec.py) + no repeats (novelty.py) -> data of each scene (its order-store pictures,
+              cached by content) -> CPU preview with exposure calibration and automatic checks -> <lkey>_preview.jpg/.json
+              (+ <lkey>_labels.json) in the release
+stage render : only scenes whose current preview passed -> Kaggle GPU within each scene's time budget -> <rkey>.mp4,
               <rkey>_sheet.jpg, <rkey>.json -> <orderDir>/out/workshop.json (clip assets for the director)
-keys: dkey = data (prep params + prep script); vkey = look (render params + template code + dkey);
-      lkey = preview (vkey + labels/places + preview code); rkey = clip (vkey + exposure + kernel code)
+keys: dkey = data (store files + prep code); vkey = look (scene + kit code + dkey);
+      lkey = preview (vkey + preview code); rkey = clip (vkey + exposure + kernel code)
 usage: python3 factory/workshop/run.py <orderDir> --stage preview|render [--blender PATH] [--release TAG] [--sha SHA] [--repo o/n] [--dry]
 env  : GH_TOKEN; KAGGLE_API_TOKEN + KAGGLE_USERNAME when the render stage has pieces to render"""
 import base64, hashlib, json, os, re, shutil, subprocess, sys, tarfile, time
@@ -13,7 +15,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-import preflight
+import novelty, prep, spec
 
 ROOT = HERE.parents[1]
 a = sys.argv[1:]
@@ -23,8 +25,7 @@ STAGE = opt("--stage", "preview")
 TAG, REPO = opt("--release", "factory_ws_cache"), opt("--repo", "vidlgtm/videomaps")
 BLENDER = opt("--blender", "blender")
 SHA = opt("--sha") or subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, cwd=ROOT).stdout.strip()
-REG = json.load(open(HERE / "templates.json"))
-TPL = HERE / "templates"
+KIT = HERE / "kit"
 OUT = ORDER / "out"; REV = OUT / "ws_review"
 WORKD = Path("/tmp/ws_run")
 
@@ -50,36 +51,31 @@ def tail(p, n=2500):
     except Exception: return ""
 
 
-# ------------------------------------------------------------------ preflight + keys
-spec = json.load(open(ORDER / "workshop.json"))
-if spec.get("preview_only") and STAGE == "render": fail("this order is for previews only (preview_only)")
-pieces, rep = preflight.check(spec, REG)
-for n in rep.notes: print("note:", n, flush=True)
-if rep.errors:
-    print("PREFLIGHT FAILED - nothing was downloaded or rendered:", flush=True)
-    for e in rep.errors: print("  -", e, flush=True)
+# ------------------------------------------------------------------ scene check + keys
+errs, S = spec.check(str(ORDER))
+if errs:
+    print("SCENE CHECK FAILED - nothing was downloaded or rendered:", flush=True)
+    for e in errs: print("  -", e, flush=True)
     sys.exit(2)
-print(f"preflight ok: {len(pieces)} pieces", flush=True)
-COMMON, PREV, KERNEL = (TPL / "common.py").read_bytes() + (TPL / "terrain_mesh.py").read_bytes(), (HERE / "preview.py").read_bytes(), (HERE / "kaggle_kernel.py").read_bytes()
+if novelty.main(str(ORDER)): fail("a scene repeats an earlier one (see REPEATED above): describe a new idea")
+print(f"scene check ok: {len(S)} scenes, no repeats", flush=True)
+meta_o = json.load(open(ORDER / "scenes.json", encoding="utf-8"))
+if meta_o.get("preview_only") and STAGE == "render": fail("this order is for previews only (preview_only)")
+store = json.load(open(ORDER / "store.json", encoding="utf-8")).get("items", {}) if (ORDER / "store.json").exists() else {}
+KITCODE = b"".join((KIT / f).read_bytes() for f in sorted(os.listdir(KIT)) if f.endswith(".py"))
+PREP, PREV, KERNEL = (HERE / "prep.py").read_bytes(), (HERE / "preview.py").read_bytes(), (HERE / "kaggle_kernel.py").read_bytes()
+GPU_S_PER_FRAME = 9.0                # T4 OptiX, 1920x1080, 160 samples + denoise (measured once, raised when a scene needs it)
 jobs = []
-for p in pieces:
-    t = REG[p["template"]]; prm = p["params"]
-    prep_b = (TPL / t["prep"]).read_bytes() if t.get("prep") else b""
-
-    def prep_val(k, v):
-        f = t.get("prep_fields", {}).get(k)        # only these fields of a list/object param change the data
-        if f and isinstance(v, list): return [{x: e[x] for x in f if x in e} if isinstance(e, dict) else e for e in v]
-        if f and isinstance(v, dict): return {x: v[x] for x in f if x in v}
-        return v
-
-    dkey = sha(p["template"], {k: prep_val(k, prm.get(k)) for k in t.get("prep_keys", [])}, prep_b)
-    rparams = {k: v for k, v in prm.items() if k not in t.get("overlay_keys", [])}
-    deps = b"".join((TPL / d).read_bytes() for d in t.get("deps", []))
-    vkey = sha(p["template"], rparams, p["seconds"], (TPL / t["script"]).read_bytes() + deps, COMMON, dkey)
-    lkey = sha(vkey, {k: prm.get(k) for k in t.get("overlay_keys", [])}, PREV)
-    alpha = bool(t.get("alpha_when")) and all(prm.get(k) == v for k, v in t["alpha_when"].items())
-    jobs.append({"id": p["id"], "template": p["template"], "script": t["script"], "prep": t.get("prep"), "labels": t.get("labels", False),
-                 "alpha": alpha, "seconds": p["seconds"], "params": prm, "budget_min": p["budget_min"],
+for sid, sc in S.items():
+    files = {k: store[k]["sha256"] for k in prep.used(sc)}
+    look = {k: v for k, v in sc.items() if k not in ("note", "idea")}
+    dkey = sha(files, PREP)
+    vkey = sha(look, KITCODE, dkey)
+    lkey = sha(vkey, PREV)
+    frames = int(round(float(sc["seconds"]) * 30))
+    budget = max(12.0, round(frames * GPU_S_PER_FRAME / 60 * 1.6 + 4))
+    jobs.append({"id": sid, "script": "build.py", "labels": any(b.get("do") == "label" for b in sc.get("beats", [])),
+                 "alpha": sc.get("output") == "over_map", "seconds": sc["seconds"], "params": sc, "budget_min": budget,
                  "dkey": dkey, "vkey": vkey, "lkey": lkey})
 for j in jobs: print(f"  {j['id']:24s} data {j['dkey']}  preview {j['lkey']}  budget {j['budget_min']:.0f} min", flush=True)
 if "--dry" in a: sys.exit(0)
@@ -123,8 +119,8 @@ if STAGE == "preview":
             with tarfile.open(wd / dname) as tf: tf.extractall(wd)
             (wd / dname).unlink()
             print(f"{j['id']}: data from the cache", flush=True)
-        elif j["prep"]:
-            r = run([sys.executable, str(TPL / j["prep"]), str(wd / "params.json"), str(dd)], check=False)
+        else:
+            r = run([sys.executable, str(HERE / "prep.py"), str(ORDER), j["id"], str(dd)], check=False)
             (wd / "prep.log").write_text(r.stdout + r.stderr)
             if r.returncode:
                 pj = {"ok": False, "errors": ["data preparation failed:\n" + (r.stdout + r.stderr)[-2000:]], "warnings": []}
@@ -133,15 +129,17 @@ if STAGE == "preview":
             upload(wd / dname); (wd / dname).unlink()
             print(f"{j['id']}: data prepared in {time.time() - t0:.0f}s\n{r.stdout[-600:]}", flush=True)
         t1 = time.time()
-        cmd = [BLENDER, "-b", "--python-exit-code", "1", "-P", str(TPL / j["script"]), "--", "--params", str(wd / "params.json"),
+        cmd = [BLENDER, "-b", "--python-exit-code", "1", "-P", str(KIT / j["script"]), "--", "--params", str(wd / "params.json"),
                "--data", str(dd), "--out", str(od), "--preview"]
         with open(wd / "blender.log", "w") as lf: rc = subprocess.run(cmd, stdout=lf, stderr=subprocess.STDOUT).returncode
-        if rc or not (od / "check.json").exists():
+        if not (od / "check.json").exists() or (rc and not json.load(open(od / "check.json")).get("fatal")):
             pj = {"ok": False, "errors": [f"preview render failed (rc {rc}):\n" + tail(wd / "blender.log", 3000)], "warnings": []}
             summary.append((j["id"], pj, "failed")); any_bad = True; continue
         for l in tail(wd / "blender.log", 20000).splitlines():
-            if l.startswith(("built:", "weather", "exposure", "check grid", "preview written", "streak")): print(f"  {j['id']}: {l}", flush=True)
+            if l.startswith(("SCENE ERROR", "exposure", "check grid", "preview written", "picture colours", "preview:")): print(f"  {j['id']}: {l}", flush=True)
         pj, sheet = preview.evaluate(str(od), j["seconds"])
+        if sheet is None:
+            summary.append((j["id"], pj, "failed")); any_bad = True; continue
         pj.update({"id": j["id"], "lkey": j["lkey"], "vkey": j["vkey"], "dkey": j["dkey"], "preview_s": round(time.time() - t1),
                    "data_s": round(t1 - t0)})
         sheet.save(wd / f"{j['lkey']}_preview.jpg", quality=90)
@@ -170,6 +168,8 @@ for j in jobs:
     if pn not in have: missing.append(f"{j['id']}: no preview of the current version"); continue
     pj = get_json(pn)
     if not pj.get("ok"): missing.append(f"{j['id']}: its preview did not pass"); continue
+    if not pj.get("approved") and not meta_o.get("approved", {}).get(j["id"]) == j["lkey"]:
+        missing.append(f"{j['id']}: its preview {j['lkey']} is not approved yet (scenes.json \"approved\": {{\"{j['id']}\": \"{j['lkey']}\"}})"); continue
     j["ev"] = round(float(pj["ev"]), 2)
     j["credits_extra"] = pj.get("stats", {}).get("credits", [])
     j["hash"] = sha(j["vkey"], j["ev"], KERNEL)
@@ -222,13 +222,10 @@ clips = {}
 REV.mkdir(parents=True, exist_ok=True)
 for j in jobs:
     if f"{j['hash']}.json" not in have: continue
-    t = REG[j["template"]]
     m = get_json(f"{j['hash']}.json")
-    c = {"src": f"ws/{m['file']}", "kind": t.get("kind_alpha", "doll") if j["alpha"] else t["kind"], "segments": {t["segment"]: [0, m["seconds"]]},
-         "hash": j["hash"], "sheet": f"{j['hash']}_sheet.jpg",
-         "credits": t.get("credits", []) + [x for x in j.get("credits_extra", []) if x not in t.get("credits", [])]}
+    c = {"src": f"ws/{m['file']}", "kind": "over_map" if j["alpha"] else "film", "segments": {"shot": [0, m["seconds"]]},
+         "hash": j["hash"], "sheet": f"{j['hash']}_sheet.jpg", "credits": j.get("credits_extra", [])}
     if j["labels"]: c["labels"] = f"{j['lkey']}_labels.json"
-    if m.get("credit"): c["credit"] = m["credit"]
     clips[j["id"]] = c
     run(["gh", "release", "download", TAG, "-R", REPO, "-p", c["sheet"], "-O", str(REV / f"{j['id']}_sheet.jpg")], check=False)
 json.dump({"release": TAG, "clips": clips}, open(OUT / "workshop.json", "w"), indent=1)

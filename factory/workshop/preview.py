@@ -1,7 +1,7 @@
-"""Evaluates the CPU preview a template wrote in --preview mode (check.json + 6 key frames + labels.json):
+"""Evaluates the CPU preview the workshop wrote in --preview mode (check.json + 6 key frames + labels.json):
 automatic checks -> preview.json, and the review sheet (3 x 2 key frames, label positions drawn, problem frames framed red).
 checks: void (empty background where ground should be), low-detail ground close to the lens, exposure of the subject
-against the template target, crushed shadows, blown highlights, plus the template's own errors and warnings."""
+against the scene's target, crushed shadows, blown highlights, plus the scene build's own errors and warnings."""
 import json, os
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
@@ -17,6 +17,8 @@ def _mask(grid, codes, h, w):
 def evaluate(odir, seconds):
     ck = json.load(open(os.path.join(odir, "check.json")))
     errors, warnings = list(ck.get("errors", [])), list(ck.get("warnings", []))
+    if ck.get("fatal"):
+        return {"ok": False, "errors": errors, "warnings": warnings, "key_frames": []}, None
     bad_frames = set()
     for f, c in ck["counts"].items():
         tot = max(1, sum(c.values()))
@@ -34,14 +36,16 @@ def evaluate(odir, seconds):
         g = ck["grids"][str(f)]
         m = _mask(g, ck["subject"], 360, 640)
         if m.mean() < 0.08 and ck.get("subject_fallback"): m = _mask(g, ck["subject_fallback"], 360, 640)
-        lum.append(float(y[m].mean()) if m.mean() > 0.02 else float(y.mean()))
+        if m.mean() >= 0.08: lum.append(float(y[m].mean()))          # frames without the subject say nothing about exposure
         dark, blown = float((y < 0.06).mean()), float((y > 0.985).mean())
         if dark > ck.get("dark_max", 0.15): errors.append(f"too dark at {(f - 1) / 30:.1f}s: {dark:.0%} of the frame almost black"); bad_frames.add(f)
         if blown > 0.03: warnings.append(f"blown highlights at {(f - 1) / 30:.1f}s ({blown:.1%})")
         tiles.append((f, im))
     tgt, tol = ck["luma_target"], ck["luma_tol"]
-    mean = float(np.mean(lum))
-    if abs(mean - tgt) > tol: errors.append(f"exposure off: subject brightness {mean:.2f}, target {tgt:.2f} +/- {tol:.2f} (ev {ck['ev']:+.2f})")
+    if lum:
+        mean = float(np.mean(lum))
+        if abs(mean - tgt) > tol: errors.append(f"exposure off: subject brightness {mean:.2f}, target {tgt:.2f} +/- {tol:.2f} (ev {ck['ev']:+.2f})")
+    else: warnings.append("no key frame shows a lit surface or prop: exposure not measured")
     lab = None
     lp = os.path.join(odir, "labels.json")
     if os.path.exists(lp): lab = json.load(open(lp))

@@ -1,9 +1,9 @@
-"""Shared Blender helpers of the workshop templates (Blender 4.5, Cycles).
-Every template runs in one of two modes:
+"""Shared Blender helpers of the workshop (Blender 4.5, Cycles).
+Every scene build runs in one of two modes:
   render  : --start/--end frames at 1920x1080 (GPU), exposure --ev, time budget --budget-min (stops early when the
             projected time is over it, exit code 3)
   preview : --preview, CPU: check grid (rays through 48x27 image points on sampled frames), exposure calibration
-            towards the template's target, 6 key frames at 640x360 + check.json for factory/workshop/preview.py"""
+            towards the scene's target, 6 key frames at 640x360 + check.json for factory/workshop/preview.py"""
 import bpy, gc, json, math, os, shutil, struct, sys, time
 import numpy as np
 from mathutils import Vector
@@ -313,8 +313,8 @@ def image_luma(path, grid=None, codes=None):
 
 
 def preview_run(sc, O, n_frames, classify, subject, target, tol, ev_range=(-1.0, 1.5), stats=None, errors=None,
-                warnings=None, dark_max=0.15, every=15, after_checks=None, fallback_subject=None):
-    key = key_frames(n_frames)
+                warnings=None, dark_max=0.15, every=15, after_checks=None, fallback_subject=None, key=None, calibrate=True):
+    key = sorted(key) if key else key_frames(n_frames)
     sampled = sorted(set(key) | set(range(1, n_frames + 1, every)) | {n_frames})
     grids, counts = {}, {}
     t0 = time.time()
@@ -336,12 +336,18 @@ def preview_run(sc, O, n_frames, classify, subject, target, tol, ev_range=(-1.0,
         return subject if n >= 0.08 * NX * NY or not fallback_subject else fallback_subject
 
     tmp = os.path.join(O.out, "_calib"); os.makedirs(tmp, exist_ok=True)
-    cal = [key[1], key[3], key[5]] if len(key) >= 6 else key
+
+    def share(f, codes): return sum(sum(ch in codes for ch in row) for row in grids[str(f)]) / (NX * NY)
+
+    good = [f for f in key if share(f, subject) >= 0.08] or [f for f in key if fallback_subject and share(f, fallback_subject) >= 0.08]
+    cal = [good[round(i * (len(good) - 1) / 2)] for i in range(3)] if len(good) >= 3 else good
+    cal = sorted(set(cal))
+    if not cal: calibrate = False                                      # nothing on screen depends on the exposure
     base = sc.cycles.samples
     sc.render.resolution_x, sc.render.resolution_y, sc.render.resolution_percentage = 320, 180, 100
     sc.cycles.samples = 8
     ev, hist = float(O.ev), []
-    for it in range(3):
+    for it in range(3 if calibrate else 0):
         sc.view_settings.exposure = ev
         ls = []
         for f in cal:
@@ -359,7 +365,7 @@ def preview_run(sc, O, n_frames, classify, subject, target, tol, ev_range=(-1.0,
         nxt = float(np.clip(nxt, *ev_range))
         if abs(nxt - ev) < 0.02: break
         ev = nxt
-    ev = min(hist, key=lambda h: abs(h[1] - target))[0]
+    ev = min(hist, key=lambda h: abs(h[1] - target))[0] if hist else ev
     sc.view_settings.exposure = ev
     sc.render.resolution_x, sc.render.resolution_y = 640, 360
     sc.cycles.samples = min(base, 16)

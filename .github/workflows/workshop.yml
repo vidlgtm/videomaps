@@ -1,7 +1,8 @@
 name: workshop
-# 3D pieces of an order (factory/orders/<order>/workshop.json).
-# stage preview: preflight + data + CPU key-frame previews with automatic checks on this runner (no GPU).
-# stage render : Kaggle GPU render of the pieces whose current preview passed, cached by content in factory_ws_cache.
+# 3D scenes of an order (factory/orders/<order>/scenes.json: each scene described in the order, built from the kit tools).
+# stage preview: scene check + no repeats + data (order store) + CPU key-frame previews with automatic checks (no GPU).
+# stage render : Kaggle GPU render of the scenes whose current preview passed and was approved, cached by content in
+#                factory_ws_cache.
 on:
   workflow_dispatch:
     inputs:
@@ -29,10 +30,22 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: '3.11' }
+      - name: Hermetic check - pictures only from the order store
+        run: python3 factory/rules/hermetic.py
       - name: Python packages
         run: |
-          if [ "$STAGE" = render ]; then pip install -q "kaggle>=1.7.4"
-          else pip install -q numpy pillow requests scipy shapely geopandas mapbox-earcut; fi
+          pip install -q numpy pillow
+          if [ "$STAGE" = render ]; then pip install -q "kaggle>=1.7.4"; fi
+      - name: Order store - the order's pictures with their licences
+        if: inputs.stage != 'render'
+        run: |
+          set -e
+          S=factory/orders/$ORDER/store.json
+          if [ ! -f "$S" ]; then echo "no order store (scenes without pictures)"; exit 0; fi
+          R=$(python3 -c "import json; print(json.load(open('$S'))['release'])")
+          mkdir -p factory/orders/$ORDER/store_files
+          gh release download "$R" -R ${{ github.repository }} -D factory/orders/$ORDER/store_files --clobber
+          echo "order store $R: $(ls factory/orders/$ORDER/store_files | wc -l) files"
       - name: Blender version
         id: bl
         if: inputs.stage != 'render'

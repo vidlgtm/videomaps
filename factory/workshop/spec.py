@@ -17,9 +17,11 @@ scenes.json
 }}}
 usage: python spec.py <orderDir>     exit 2 = the description has errors (all listed at once)"""
 import json, os, re, sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "kit"))
+from plan import BUILT          # the part of the vocabulary the kit has built so far
 
 NOUNS = {   # what a cast member is -> the sources it can be made from
-    "sheet": {"store"}, "print": {"store"}, "canvas": {"store"}, "cutout": {"store"}, "cloth": {"store", "none"},
+    "sheet": {"store", "none"}, "print": {"store"}, "canvas": {"store"}, "cutout": {"store"}, "cloth": {"store", "none"},
     "tile": {"map"}, "block": {"store", "text", "none"}, "book": {"store", "none"}, "box": {"store", "none"},
     "disc": {"store", "none"}, "globe": {"none"}, "model": {"store"}, "terrain": {"terrain"}, "text": {"text"},
     "pole": {"none"}, "table": {"none"}, "plinth": {"none"}, "frame": {"none"}, "wall": {"none"}, "candle": {"none"},
@@ -135,6 +137,18 @@ def check(order):
             for k in c:
                 if k not in MOVES[mv] | {"t", "move", "to", "note"}: E(f'{cw}: "{mv}" has no parameter "{k}"')
             if mv == "fly" and pl.get("kind") != "terrain": E(f"{cw}: fly is over terrain")
+        # tools of the vocabulary that the kit has not built yet: refused now, before anything runs
+        nb = lambda what, x: E(f'{w}: {what} "{x}" - this tool is not built yet in the workshop (added on request)')
+        if pl.get("kind") in PLACES and pl["kind"] not in BUILT["places"]: nb("place", pl["kind"])
+        if wx in WEATHER and wx not in BUILT["weather"]: nb("weather", wx)
+        if sc.get("output", "film") not in BUILT["output"]: nb("output", sc.get("output"))
+        for n, c in cast.items():
+            if c.get("is") in NOUNS and c["is"] not in BUILT["nouns"]: nb(f"cast {n}: noun", c["is"])
+        for b in sc.get("beats") or []:
+            if b.get("do") in VERBS and b["do"] not in BUILT["verbs"]: nb("verb", b["do"])
+            if b.get("do") == "stamp" and not str(b.get("with", "")).startswith("text:"): nb("stamp with", b.get("with"))
+        for c in cams:
+            if c.get("move") in MOVES and c["move"] not in BUILT["moves"]: nb("camera move", c["move"])
     return errs, S
 
 
