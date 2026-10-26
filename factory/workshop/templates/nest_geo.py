@@ -13,7 +13,7 @@ PRESETS = {
                 "seam": .62, "panel": .33},
     "barrel":  {"pts": [(0, .27), (.02, .29), (.25, .322), (.5, .335), (.75, .322), (.98, .29), (1, .27)], "seam": .5, "panel": .27},
 }
-TW, CL, LIP, GAP = 0.022, 0.010, 0.035, 0.004       # wall, clearance between levels, lip height, seam gap
+TW, CL, LIP, GAP = 0.022, 0.010, 0.0, 0.004         # wall, clearance between levels, lip (none: butt joint), seam gap
 REST = TW + 0.004                                    # an inner level rests just above the cavity floor (no touching faces)
 BANDS_BASE = [(0.030, 0.042)]                        # gold bands (relative height); seam bands added from the seam
 D_OPEN, H_FIRST, H_MID, H_LAST = 2.7, 1.4, 1.1, 1.8  # seconds: one opening, first hold, hold between, last hold
@@ -73,8 +73,6 @@ def profile(spec):
     g["Rz"] = zs; g["R"] = np.interp(zs, c[:, 1], c[:, 0])
     g["RS"] = float(np.interp(seam, c[:, 1], c[:, 0])); g["Rmax"] = float(c[:, 0].max())
     g["cav_seam"] = float(np.interp(seam, inner[:, 1], inner[:, 0]))
-    g["RL"] = (g["RS"] + g["cav_seam"]) / 2                        # lip outer radius (half the wall)
-    g["RR"] = g["RL"] + GAP                                       # lid rebate radius
     g["ceil"] = float(inner[-1, 1])
     return g
 
@@ -82,14 +80,17 @@ def profile(spec):
 def R(g, z): return np.interp(z, g["Rz"], g["R"])
 
 
+def min_wall(g):
+    """thinnest wall (radial) of the hollow parts, between the cavity floor and just under the ceiling"""
+    zz = np.linspace(TW, g["ceil"] - 0.02, 400)
+    return float((R(g, zz) - np.interp(zz, g["inner"][:, 1], g["inner"][:, 0])).min())
+
+
 def cavity(g, z, part):
     """free radius inside the closed level at height z: base (floor .. lip top) or lid (seam .. ceiling)"""
     inner = g["inner"]; zs = g["seam"]
     r = np.interp(z, inner[:, 1], inner[:, 0], left=0.0, right=0.0)
-    if part == "base":
-        r = np.where(z > zs, g["cav_seam"], r)                   # inside the lip
-        return np.where((z < TW) | (z > zs + LIP), np.inf, r)
-    r = np.where(z < zs + LIP + GAP, g["RR"], r)                 # the rebate that takes the lip
+    if part == "base": return np.where((z < TW) | (z > zs), np.inf, r)
     return np.where(z < zs, np.inf, r)
 
 
@@ -158,27 +159,23 @@ def _dedupe(p, eps=1e-5):
 def runs(g, part):
     """smooth runs of the cross-section (r, z), counter-clockwise around the solid, with material 0 lacquer / 1 wood.
     part: base | lid | solid (the innermost level)"""
-    zs, RS, RL, RR, cs = g["seam"], g["RS"], g["RL"], g["RR"], g["cav_seam"]
+    zs, RS, cs = g["seam"], g["RS"], g["cav_seam"]
     out, inn = g["outer"], g["inner"]; r0 = out[0, 0]
-    zr = zs + LIP + 2 * GAP                                        # rebate ceiling of the lid
     top_runs = [] if not g["flat_top"] else [(np.array([[out[-1, 0], 1.0], [0.0, 1.0]]), 0)]
     if part == "solid":
         return [(np.array([[0.0, 0.0], [r0, 0.0]]), 1), (_dedupe(out), 0)] + top_runs
     if part == "base":
         ob = np.vstack([out[out[:, 1] < zs], [[RS, zs]]])
-        ib = inn[inn[:, 1] < zs][::-1]
-        wall = _dedupe(np.vstack([[[cs, zs + LIP], [cs, zs]], ib]))
-        return [(np.array([[0.0, 0.0], [r0, 0.0]]), 1), (_dedupe(ob), 0), (np.array([[RS, zs], [RL, zs]]), 1),
-                (np.array([[RL, zs], [RL, zs + LIP]]), 1), (np.array([[RL, zs + LIP], [cs, zs + LIP]]), 1),
+        wall = _dedupe(np.vstack([[[cs, zs]], inn[inn[:, 1] < zs][::-1]]))
+        return [(np.array([[0.0, 0.0], [r0, 0.0]]), 1), (_dedupe(ob), 0), (np.array([[RS, zs], [cs, zs]]), 1),
                 (wall, 1), (np.array([[wall[-1, 0], wall[-1, 1]], [0.0, wall[-1, 1]]]), 1)]
-    zb = zs + GAP
+    zb = zs + GAP                                                  # the lid sits on the base with a hairline seam
     ol = np.vstack([[[float(np.interp(zb, out[:, 1], out[:, 0])), zb]], out[out[:, 1] > zb]])
-    il = inn[inn[:, 1] > zr][::-1]                                 # ceiling (axis) down to the rebate ceiling
-    rc_ = float(np.interp(zr, inn[:, 1], inn[:, 0]))
-    cav = _dedupe(np.vstack([il, [[rc_, zr]]]))
-    res = [(np.array([[RR, zb], [ol[0, 0], zb]]), 1), (_dedupe(ol), 0)] + top_runs
+    rc_ = float(np.interp(zb, inn[:, 1], inn[:, 0]))
+    cav = _dedupe(np.vstack([inn[inn[:, 1] > zb][::-1], [[rc_, zb]]]))   # ceiling (axis) down to the rim
+    res = [(np.array([[rc_, zb], [ol[0, 0], zb]]), 1), (_dedupe(ol), 0)] + top_runs
     if g["flat_top"]: res.append((np.array([[0.0, g["ceil"]], [cav[0, 0], g["ceil"]]]), 1))
-    res += [(cav, 1), (np.array([[rc_, zr], [RR, zr]]), 1), (np.array([[RR, zr], [RR, zb]]), 1)]
+    res.append((cav, 1))
     return res
 
 

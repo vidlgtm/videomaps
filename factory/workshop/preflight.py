@@ -409,6 +409,7 @@ def check_nest(c, sec):
     if len(c.rep.errors) > n0: return
     try: g = NG.profile(spec)
     except Exception as ex: c.bad(f"the profile cannot be built: {ex}"); return
+    if NG.min_wall(g) < 0.5 * NG.TW: c.bad(f"the profile is too steep for its wall: thinnest wall {NG.min_wall(g):.3f} (minimum {0.5 * NG.TW:.3f})")
     k = NG.solve_k(g)
     if k is None: c.bad("this profile cannot nest: no size step lets a level rest inside and pass through the opening"); return
     if p.get("ratio") and p["ratio"] > k: c.bad(f"ratio {p['ratio']} is larger than this shape allows ({k})")
