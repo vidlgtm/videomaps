@@ -14,6 +14,7 @@ GAP = 0.22                    # free space between two cast members side by side
 ELEV = {"desk": 52.0, "museum": 48.0, "floor": 38.0, "wall": 8.0, "void": 30.0, "sky": 12.0, "terrain": 35.0, "sea": 20.0}
 LENS, SENSOR, ASPECT = 50.0, 36.0, 16 / 9
 DRIFT = 0.012                 # the camera never stops: a slow push-in of 1.2 % of the distance per 5 s while it holds
+SAFE = (0.03, 0.97, 0.05, 0.96)   # safe area of the frame (u0, u1, v0, v1; v up): held things stay inside it or wholly out
 BUILT = {"nouns": {"sheet", "print", "canvas", "disc", "block", "text", "pole", "plinth", "table", "frame", "candle"},
          "verbs": {"appear", "vanish", "drop", "rise", "slide", "turn", "flip", "stamp", "light", "label", "glow", "burn"},
          "moves": {"wide", "close", "top", "low", "push", "pull", "orbit", "crane", "dolly", "tilt", "hold", "rack", "track"},
@@ -261,8 +262,9 @@ def fit(pts, tgt, el, az, margin=0.08, lens=LENS):
     return hi
 
 
-def camera(entries, M, C, T, place):
-    """per-frame camera: target, distance, azimuth, elevation, focus point, f-stop"""
+def camera(entries, M, C, T, place, labels=()):
+    """per-frame camera: target, distance, azimuth, elevation, focus point, f-stop
+    labels: cast members that carry a label (the framing keeps room for it under them)"""
     n = int(round(T * FPS)); t = np.arange(n) / FPS
     names = list(M)
     E0 = ELEV.get(place, 40.0); A0 = -90.0 + jitter("camera", place, 7.0)
@@ -274,6 +276,8 @@ def camera(entries, M, C, T, place):
             ch, m = C[k], M[k]
             frs = [fi for fi in list(range(0, n, 15)) + [n - 1] if ch["presence"][fi] >= 0.5 and abs(ch["dz"][fi]) < 0.05 + 0.2 * m["h"]]
             out += [box_points(m, ch, fi) for fi in frs] or [box_points(m)]
+            if k in labels:                                         # the label sits under the member's front edge
+                q = box_points(m); q[:, 1] -= 0.18 * max(m["d"], 0.1); out.append(q)
         return np.concatenate(out)
 
     def center(p): return 0.5 * (p.min(0) + p.max(0))
@@ -330,13 +334,13 @@ def camera(entries, M, C, T, place):
             if C[k]["presence"][fi] < 0.5: continue
             uv, z = project(box_points(M[k], C[k], fi), pos, st["T"])
             if (z <= 0.02).any(): return False
-            subject = st.get("pts") in (None, k)
-            if subject:
-                if (uv < 0.03).any() or (uv > 0.97).any(): return False
+            safe = ((uv[:, 0] >= SAFE[0]) & (uv[:, 0] <= SAFE[1]) & (uv[:, 1] >= SAFE[2]) & (uv[:, 1] <= SAFE[3])).all()
+            if st.get("pts") in (None, k):
+                if not safe: return False
                 continue
-            inside = ((uv >= 0) & (uv <= 1)).all(1)
+            seen = ((uv >= 0) & (uv <= 1)).all(1).any() or not (uv[:, 0].max() < 0 or uv[:, 0].min() > 1 or uv[:, 1].max() < 0 or uv[:, 1].min() > 1)
             span = uv.max(0) - uv.min(0)
-            if inside.any() and not inside.all() and (span < 0.5).all(): bad += 1
+            if seen and not safe and (span < 0.5).all(): bad += 1
         return bad == 0
 
     for i, (t0, dur, a, b) in enumerate(states):

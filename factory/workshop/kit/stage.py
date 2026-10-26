@@ -21,18 +21,27 @@ MATERIAL = {"sheet": "paper", "print": "paper", "canvas": "gold", "frame": "gold
 # centre of the cast, colour, power / L0^2, size / L0 or spot blend)
 MOOD = {
     "lamp": (0.12, 0.92, (0.0046, 0.0041, 0.0037), [("KEY", (-0.45, -1.0, 2.0), (1.0, 0.86, 0.68), 32.0, 0.45),
-                                                     ("AREA", (2.4, 3.0, 2.2), (1.0, 0.82, 0.62), 25.0, 1.2)]),
-    "museum": (0.09, 0.97, (0.0014, 0.0014, 0.0016), [("KEY", (-0.2, -0.5, 2.4), (1.0, 0.94, 0.86), 28.0, 0.25)]),
-    "candle": (0.08, 0.95, (0.0012, 0.0009, 0.0006), [("CANDLE", (-0.55, -0.25, 0.35), (1.0, 0.55, 0.25), 3.0, 0.0)]),
+                                                     ("AREA", (2.4, 3.0, 2.2), (1.0, 0.82, 0.62), 25.0, 1.2),
+                                                     ("SPOT", (0.35, 1.7, 1.1), (1.0, 0.88, 0.72), 10.0, 0.6)]),
+    "museum": (0.09, 0.97, (0.0014, 0.0014, 0.0016), [("KEY", (-0.2, -0.5, 2.4), (1.0, 0.94, 0.86), 25.0, 0.25),
+                                                       ("SPOT", (0.3, 1.8, 1.4), (0.92, 0.95, 1.0), 9.0, 0.5)]),
+    "candle": (0.08, 0.95, (0.0012, 0.0009, 0.0006), [("CANDLE", (-0.55, -0.25, 0.35), (1.0, 0.55, 0.25), 11.1, 0.0)]),
     "studio": (0.16, 0.50, (0.010, 0.010, 0.011), [("AREA", (-1.2, -1.4, 1.8), (1.0, 0.97, 0.92), 12.4, 1.0),
                                                    ("AREA", (1.4, -1.0, 1.0), (0.92, 0.95, 1.0), 2.5, 1.4),
                                                    ("SPOT", (0.3, 1.6, 1.3), (1.0, 0.98, 0.95), 19.0, 0.5)]),
-    "dawn": (0.14, 0.60, (0.012, 0.010, 0.010), [("AREA", (-2.4, 0.8, 1.3), (1.0, 0.80, 0.62), 26.0, 2.0)]),
+    "dawn": (0.14, 0.60, (0.012, 0.010, 0.010), [("AREA", (-2.4, 0.8, 1.3), (1.0, 0.80, 0.62), 24.0, 2.0),
+                                                 ("AREA", (1.8, -1.2, 1.0), (0.80, 0.86, 1.0), 3.0, 1.5)]),
     "noon": (0.16, 0.50, (0.020, 0.020, 0.021), [("AREA", (-1.6, 0.6, 2.2), (1.0, 0.97, 0.92), 26.0, 2.0)]),
-    "dusk": (0.13, 0.65, (0.010, 0.007, 0.006), [("AREA", (-2.4, 0.8, 1.1), (1.0, 0.60, 0.34), 26.0, 2.0)]),
+    "dusk": (0.13, 0.65, (0.010, 0.007, 0.006), [("AREA", (-2.4, 0.8, 1.1), (1.0, 0.60, 0.34), 23.4, 2.0),
+                                                 ("AREA", (1.8, -1.2, 1.0), (0.70, 0.80, 1.0), 3.0, 1.5)]),
     "overcast": (0.15, 0.50, (0.030, 0.032, 0.036), [("AREA", (-2.0, 0.6, 1.8), (0.86, 0.90, 1.0), 30.0, 3.0)]),
-    "night": (0.07, 0.95, (0.0015, 0.0020, 0.0040), [("AREA", (-2.2, 1.2, 1.6), (0.62, 0.72, 1.0), 10.0, 1.6)]),
+    "night": (0.07, 0.95, (0.0015, 0.0020, 0.0040), [("AREA", (-2.2, 1.2, 1.6), (0.62, 0.72, 1.0), 10.0, 1.6),
+                                                     ("SPOT", (0.35, 1.7, 1.1), (0.62, 0.72, 1.0), 4.0, 0.6)]),
 }
+# the light is scaled to the place's surface so that the exposure lands near 0 EV on any of them (linear albedo)
+ALBEDO = {"walnut": 0.046, "wood": 0.046, "oak": 0.167, "marble": 0.58, "stone": 0.25, "slate": 0.012, "sand": 0.3,
+          "plaster": 0.52, "velvet": 0.011}
+A_REF = 0.045
 GLOW = {"warm": (1.0, 0.72, 0.40), "gold": (1.0, 0.78, 0.35), "red": (1.0, 0.25, 0.15), "blue": (0.45, 0.65, 1.0), "white": (1.0, 0.97, 0.92)}
 
 
@@ -227,16 +236,19 @@ class Stage:
         kind, val = self.src(n); mat = c.get("material", MATERIAL.get(noun, "painted"))
         objs, mats = [], []
         if noun in ("sheet", "print"):
+            pk = "parchment" if mat == "parchment" else "paper"
             if kind == "store":
                 path = os.path.join(self.data, self.items[val]["file"])
-                pm, nd = M.picture(n, path, m["w"], m["d"], m["iw"], m["ih"], kind="parchment" if mat == "parchment" else
-                                   ("print" if noun == "print" else "paper"), sheen=noun == "print", burn_from=self.burn_from(n))
-                back = M.solid(f"{n}_back", "parchment" if mat == "parchment" else "paper")
+                pm, nd = M.picture(n, path, m["w"], m["d"], m["iw"], m["ih"], kind=pk if noun == "sheet" else "print",
+                                   sheen=noun == "print", burn_from=self.burn_from(n))
+                back, bnd = M.paper(f"{n}_back", pk, m["w"], m["d"], self.burn_from(n))
                 ob = sheet_mesh(n, m, e, [pm, back]); objs.append((ob, "i")); mats += [pm, back]
                 self.pics.append({"member": n, "obj": ob, "iw": m["iw"], "ih": m["ih"], "path": path})
-                self.nodes.setdefault(n, []).append(nd)
+                self.nodes.setdefault(n, []).extend([nd, bnd])
             else:
-                pm = M.solid(n, mat); ob = sheet_mesh(n, m, e, [pm, pm]); objs.append((ob, "o")); mats.append(pm)
+                pm, nd = M.paper(n, pk, m["w"], m["d"], self.burn_from(n))
+                ob = sheet_mesh(n, m, e, [pm, pm]); objs.append((ob, "o")); mats.append(pm)
+                self.nodes.setdefault(n, []).append(nd)
         elif noun in ("canvas", "frame"):
             fm = M.solid(f"{n}_frame", mat if mat in M.METALS or mat in ("walnut", "oak", "wood") else "gold"); mats.append(fm)
             b = 0.07 * m["L"]; hh = m["h"]
@@ -262,8 +274,9 @@ class Stage:
                 k2, v2 = str(stamp["with"]).partition(":")[::2]
                 if k2 == "text" and v2:
                     rr = 0.4 * m["w"] if wax else 0.5 * m["w"]
-                    to = text_object(f"{n}_mark", v2, 1.25 * rr / max(1.0, 0.62 * len(v2)), e, wm, 0.08 * m["h"])
-                    to.location.z = m["h"] + 0.02 * m["h"]; objs.append((to, "o"))
+                    mk = M.solid(f"{n}_mark", mat, color=(0.80, 0.13, 0.09) if wax else None); mats.append(mk)
+                    to = text_object(f"{n}_mark", v2, 1.25 * rr / max(1.0, 0.62 * len(v2)), e, mk, 0.12 * m["h"])
+                    to.location.z = m["h"] + 0.04 * m["h"]; objs.append((to, "o"))
                 else:
                     self.errors.append(f'cast {n}: a stamp "with" a picture mark is not built yet in the workshop (use "text:...")')
         elif noun == "block":
@@ -276,10 +289,13 @@ class Stage:
                 self.pics.append({"member": n, "obj": ob, "iw": m["iw"], "ih": m["ih"], "path": path})
                 self.nodes.setdefault(n, []).append(nd)
             elif kind == "text":
-                gm = M.solid(f"{n}_letters", "gold"); mats.append(gm)
-                to = text_object(f"{n}_text", val, 0.16 * m["L"], e, gm, 0.01 * m["L"])
-                lo, hi = local_size([to]); s = min(1.0, 0.86 * m["w"] / max(hi[0] - lo[0], 1e-6))
-                to.scale = (s, s, 1.0); to.location.z = m["h"] + 0.012 * m["L"]; objs.append((to, "o"))
+                light = mat in ("marble", "stone", "plaster", "sand", "paper", "parchment", "silver", "glass")
+                gm = M.solid(f"{n}_letters", "painted", color=(0.045, 0.045, 0.05)) if light else M.solid(f"{n}_letters", "gold")
+                mats.append(gm); dep = (0.0012 if light else 0.008) * m["L"]
+                to = text_object(f"{n}_text", val, 0.24 * m["L"], e, gm, dep)
+                lo, hi = local_size([to])
+                s = min(1.0, 0.9 * m["w"] / max(hi[0] - lo[0], 1e-6), 0.62 * m["d"] / max(hi[1] - lo[1], 1e-6))
+                to.scale = (s, s, 1.0); to.location.z = m["h"] + 1.12 * dep; objs.append((to, "o"))
         elif noun == "pole":
             pm = M.solid(n, mat); mats.append(pm)
             objs.append((cylinder(n, 0.016, m["h"], e, pm, seg=24), "o"))
@@ -302,9 +318,12 @@ class Stage:
             km = M.solid(f"{n}_wick", "painted", color=(0.03, 0.03, 0.03)); mats.append(km)
             objs.append((cylinder(f"{n}_wick", 0.0012, 0.012, e, km, z0=m["h"], seg=8), "o"))
             fl = M.flame(f"{n}_flame"); mats.append(fl)
-            objs.append((sphere(f"{n}_flame", 0.006, e, fl, at=(0, 0, m["h"] + 0.022), scale=(1, 1, 2.6)), "o"))
-            ld = bpy.data.lights.new(f"{n}_light", "POINT"); ld.color = (1.0, 0.62, 0.30); ld.shadow_soft_size = 0.01
-            lo_ = bpy.data.objects.new(f"{n}_light", ld); link(lo_, e); lo_.location = (0, 0, m["h"] + 0.03)
+            fo = sphere(f"{n}_flame", 0.006, e, fl, at=(0, 0, m["h"] + 0.022), scale=(1, 1, 2.6)); objs.append((fo, "o"))
+            for vis in ("visible_shadow", "visible_diffuse", "visible_glossy", "visible_transmission"):
+                try: setattr(fo, vis, False)
+                except Exception: pass
+            ld = bpy.data.lights.new(f"{n}_light", "POINT"); ld.color = (1.0, 0.62, 0.30); ld.shadow_soft_size = 0.008
+            lo_ = bpy.data.objects.new(f"{n}_light", ld); link(lo_, e); lo_.location = (0, 0, m["h"] + 0.045)
             self.lights.append(("candle", n, lo_))
         else:
             self.errors.append(f'cast {n}: the workshop has no "{noun}" tool built yet')
@@ -321,8 +340,12 @@ class Stage:
         wd = bpy.data.worlds.new("world"); self.sc.world = wd; wd.use_nodes = True
         bg = wd.node_tree.nodes["Background"]; bg.inputs["Color"].default_value = (*MOOD[self.mood][2], 1); bg.inputs["Strength"].default_value = 1.0
         self.surface = None; self.backdrop = None
+        self.k = 1.0
         if self.place == "void": return
-        sm = M.surface(self.S["place"].get("surface") or SURFACE[self.place])
+        sname = self.S["place"].get("surface") or SURFACE[self.place]
+        self.k = float(np.clip(A_REF / ALBEDO.get(sname, 0.1), 1 / 16, 16))
+        bg.inputs["Strength"].default_value = self.k
+        sm = M.surface(sname)
         self.surface = quad("surface", 2 * self.R, 2 * self.R, 0.0, None, sm, self.center.x, self.center.y)
         wm = M.Graph("room"); p = wm.node("ShaderNodeBsdfPrincipled", Roughness=0.9)
         p.inputs["Base Color"].default_value = (*lin((0.06, 0.058, 0.055) if self.place != "museum" else (0.07, 0.075, 0.085)), 1)
@@ -353,14 +376,15 @@ class Stage:
         has_candle = any(x[0] == "candle" for x in self.lights)
         for i, (kind, pos, col, pw, sz) in enumerate(Ls):
             at = c + Vector(pos) * L0
+            k = self.k
             if kind == "KEY":
                 if not steady: continue
                 at = kc + Vector(pos) * kL
-                self.spot(f"key{i}", at, kc, col, pw * kL * kL, kL, sz)
+                self.spot(f"key{i}", at, kc, col, k * pw * kL * kL, kL, sz)
             elif kind == "SPOT":
-                self.spot(f"rim{i}", at, c, col, pw * L0 * L0, L0, sz)
+                self.spot(f"rim{i}", at, c, col, k * pw * L0 * L0, L0, sz)
             elif kind == "AREA":
-                ld = bpy.data.lights.new(f"area{i}", "AREA"); ld.color = col; ld.energy = pw * L0 * L0; ld.shape = "DISK"; ld.size = sz * L0
+                ld = bpy.data.lights.new(f"area{i}", "AREA"); ld.color = col; ld.energy = k * pw * L0 * L0; ld.shape = "DISK"; ld.size = sz * L0
                 ob = bpy.data.objects.new(f"area{i}", ld); link(ob); ob.location = at; C.aim(ob, c)
             elif kind == "CANDLE":
                 if has_candle: continue                                 # the candle on the stage is the light
@@ -370,7 +394,7 @@ class Stage:
         t = np.arange(self.n) / P.FPS
         for kind, n, ob in self.lights:
             if kind == "candle":                                        # a living flame: slow sway + quick flicker
-                base = (MOOD["candle"][3][0][3] if self.mood == "candle" else 0.6) * L0 * L0
+                base = self.k * (MOOD["candle"][3][0][3] if self.mood == "candle" else 2.0) * L0 * L0
                 fl = 1 + 0.07 * np.sin(2 * np.pi * 1.3 * t) + 0.05 * np.sin(2 * np.pi * 3.7 * t + 1.1) + 0.03 * np.sin(2 * np.pi * 9.1 * t + 2.3)
                 keys(ob.data, "energy", base * fl)
 
@@ -389,25 +413,25 @@ class Stage:
             if np.ptp(ch["glow"]) > 0:
                 col = next((GLOW.get(b.get("color", "warm"), GLOW["warm"]) for b in self.beats if b["who"] == n and b["do"] == "glow"), GLOW["warm"])
                 for mt in self.mats.get(n, []):
-                    if mt.name.startswith("pic_"): continue
+                    if mt.name.startswith(("pic_", "paper_")): continue
                     v = M.add_glow(mt, col); key_socket(v, 2.5 * ch["glow"])
                 Lm = max(0.25, max(m["w"], m["d"]))
                 ld = bpy.data.lights.new(f"{n}_glow", "POINT"); ld.color = col; ld.shadow_soft_size = 0.3 * Lm
                 ob = bpy.data.objects.new(f"{n}_glow", ld); link(ob, e); ob.location = (0, 0, m["h"] + 0.5 * Lm)
-                keys(ld, "energy", 6.0 * Lm * Lm * ch["glow"])
+                keys(ld, "energy", self.k * 0.7 * Lm * Lm * ch["glow"])
             if np.ptp(ch["burn"]) > 0:                                 # the fire lights the room while it eats the sheet
                 Lm = max(0.25, max(m["w"], m["d"]))
                 ld = bpy.data.lights.new(f"{n}_fire", "POINT"); ld.color = (1.0, 0.45, 0.12); ld.shadow_soft_size = 0.05
-                ob = bpy.data.objects.new(f"{n}_fire", ld); link(ob, e); ob.location = (0, 0, m["h"] + 0.12 * Lm)
+                ob = bpy.data.objects.new(f"{n}_fire", ld); link(ob, e); ob.location = (0, 0, m["h"] + 0.35 * Lm)
                 t = np.arange(self.n) / P.FPS; b = ch["burn"]
                 on = ((b > 0.002) & (b < 0.995)).astype(float)
                 fl = 1 + 0.25 * np.sin(2 * np.pi * 7.3 * t) + 0.15 * np.sin(2 * np.pi * 13.1 * t + 0.7)
-                keys(ld, "energy", 3.0 * Lm * Lm * on * fl * np.sin(np.pi * np.clip(b, 0, 1)) ** 0.5)
+                keys(ld, "energy", self.k * 0.4 * Lm * Lm * on * fl * np.sin(np.pi * np.clip(b, 0, 1)) ** 0.5)
         for n, sp in self.spots.items():
             m = self.L[n]; Lm = max(0.25, max(m["w"], m["d"]))
             c = Vector((m["x"], m["y"], m["z"] + m["h"]))
-            ob = self.spot(f"{n}_spot", c + Vector((-0.35, -0.8, 2.2)) * Lm, c, (1.0, 0.9, 0.76), 32.0 * Lm * Lm, Lm, 0.35)
-            keys(ob.data, "energy", 32.0 * Lm * Lm * sp["level"])
+            ob = self.spot(f"{n}_spot", c + Vector((-0.35, -0.8, 2.2)) * Lm, c, (1.0, 0.9, 0.76), self.k * 32.0 * Lm * Lm, Lm, 0.35)
+            keys(ob.data, "energy", self.k * 32.0 * Lm * Lm * sp["level"])
 
     # ---------------------------------------------------------- camera
     def make_camera(self):
@@ -415,7 +439,7 @@ class Stage:
         cd.clip_start = 0.01; cd.clip_end = 4 * self.R
         cam = bpy.data.objects.new("cam", cd); link(cam); self.sc.camera = cam; self.cam = cam
         cam.rotation_mode = "QUATERNION"
-        plan = P.camera(self.cams, self.L, self.ch, self.T, self.place)
+        plan = P.camera(self.cams, self.L, self.ch, self.T, self.place, labels={x["who"] for x in self.labels})
         self.plan = plan
         loc, rot, fd = [], [], []
         prev = None
@@ -547,7 +571,7 @@ class Stage:
                 x0, x1 = min(p.x for p in vs), max(p.x for p in vs); y0, y1 = min(p.y for p in vs), max(p.y for p in vs)
                 small = (x1 - x0) < 0.5 and (y1 - y0) < 0.5
                 if not (subj in (None, n) or small): continue
-                if x0 < 0.03 or x1 > 0.97 or y0 < 0.05 or y1 > 0.96:
+                if x0 < P.SAFE[0] or x1 > P.SAFE[1] or y0 < P.SAFE[2] or y1 > P.SAFE[3]:
                     fx = (min(x1, 1) - max(x0, 0)) / max(x1 - x0, 1e-6); fy = (min(y1, 1) - max(y0, 0)) / max(y1 - y0, 1e-6)
                     if 0 < min(fx, fy) < 0.35: sliver.setdefault(n, []).append(round(t, 1))
                     elif min(fx, fy) > 0: cut.setdefault(n, []).append(round(t, 1))

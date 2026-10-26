@@ -313,7 +313,8 @@ def image_luma(path, grid=None, codes=None):
 
 
 def preview_run(sc, O, n_frames, classify, subject, target, tol, ev_range=(-1.0, 1.5), stats=None, errors=None,
-                warnings=None, dark_max=0.15, every=15, after_checks=None, fallback_subject=None, key=None, calibrate=True):
+                warnings=None, dark_max=0.15, every=15, after_checks=None, fallback_subject=None, key=None, calibrate=True,
+                calm=None):
     key = sorted(key) if key else key_frames(n_frames)
     sampled = sorted(set(key) | set(range(1, n_frames + 1, every)) | {n_frames})
     grids, counts = {}, {}
@@ -340,6 +341,7 @@ def preview_run(sc, O, n_frames, classify, subject, target, tol, ev_range=(-1.0,
     def share(f, codes): return sum(sum(ch in codes for ch in row) for row in grids[str(f)]) / (NX * NY)
 
     good = [f for f in key if share(f, subject) >= 0.08] or [f for f in key if fallback_subject and share(f, fallback_subject) >= 0.08]
+    if calm: good = [f for f in good if f in calm] or good           # exposure from the steady scene, not from fire or glow
     cal = [good[round(i * (len(good) - 1) / 2)] for i in range(3)] if len(good) >= 3 else good
     cal = sorted(set(cal))
     if not cal: calibrate = False                                      # nothing on screen depends on the exposure
@@ -379,5 +381,6 @@ def preview_run(sc, O, n_frames, classify, subject, target, tol, ev_range=(-1.0,
                "subject": "".join(subject), "subject_fallback": "".join(fallback_subject or ""),
                "luma_target": target, "luma_tol": tol, "dark_max": dark_max, "ev": ev, "calibration": hist,
                "stats": st, "errors": errors or [], "warnings": warnings or [], "cpu_s_per_frame": round(cpu, 1),
+               "calm_frames": sorted(calm) if calm else [],
                "build_s": round(t0 - T_PROC, 1)}, open(os.path.join(O.out, "check.json"), "w"))
     print(f"preview written: ev {ev:+.2f}, {cpu:.1f} s per key frame (CPU)", flush=True)

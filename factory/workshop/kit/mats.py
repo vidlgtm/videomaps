@@ -76,32 +76,38 @@ def presence_node(m):
 
 # ------------------------------------------------------------------ surfaces
 def wood(kind="walnut", presence=False):
+    """polished wood veneer: fine grain along x (lines about 6 mm apart, warped), slow colour drift, pores, clear coat"""
     g = Graph(f"wood_{kind}")
-    p = g.node("ShaderNodeBsdfPrincipled", Roughness=0.42)
-    p.inputs["Coat Weight"].default_value = 0.5; p.inputs["Coat Roughness"].default_value = 0.14
-    mp = g.node("ShaderNodeMapping"); mp.inputs["Scale"].default_value = (0.35, 3.2, 1.0); g.L.new(g.tc.outputs["Object"], mp.inputs["Vector"])
-    wn = g.node("ShaderNodeTexNoise", Scale=0.9, Detail=2.0); g.L.new(g.tc.outputs["Object"], wn.inputs["Vector"])
+    p = g.node("ShaderNodeBsdfPrincipled", Roughness=0.36)
+    p.inputs["Coat Weight"].default_value = 0.6; p.inputs["Coat Roughness"].default_value = 0.1
+    co = g.tc.outputs["Object"]
+    wn = g.node("ShaderNodeTexNoise", Scale=2.2, Detail=3.0); g.L.new(co, wn.inputs["Vector"])
     wc = g.N.new("ShaderNodeVectorMath"); wc.operation = "SUBTRACT"; g.L.new(wn.outputs["Color"], wc.inputs[0]); wc.inputs[1].default_value = (0.5, 0.5, 0.5)
-    wa = g.N.new("ShaderNodeVectorMath"); wa.operation = "ADD"; g.L.new(mp.outputs[0], wa.inputs[0]); g.L.new(g.scale(wc.outputs[0], 0.45), wa.inputs[1])
-    nz = g.node("ShaderNodeTexNoise", Scale=1.6, Detail=6.0); g.L.new(wa.outputs[0], nz.inputs["Vector"])
+    wa = g.N.new("ShaderNodeVectorMath"); wa.operation = "ADD"; g.L.new(co, wa.inputs[0]); g.L.new(g.scale(wc.outputs[0], 0.06), wa.inputs[1])
+    mp = g.node("ShaderNodeMapping"); mp.inputs["Scale"].default_value = (5.0, 160.0, 1.0); g.L.new(wa.outputs[0], mp.inputs["Vector"])
     wv = g.N.new("ShaderNodeTexWave"); wv.wave_type = "BANDS"
     try: wv.bands_direction = "Y"
     except Exception: pass
-    wv.inputs["Scale"].default_value = 2.2; wv.inputs["Distortion"].default_value = 7.0; wv.inputs["Detail"].default_value = 3.0
-    g.L.new(wa.outputs[0], wv.inputs["Vector"])
-    f = g.math("MULTIPLY_ADD", wv.outputs["Fac"], 0.65, g.math("MULTIPLY", nz.outputs["Fac"], 0.35))
+    wv.inputs["Scale"].default_value = 1.0; wv.inputs["Distortion"].default_value = 3.5; wv.inputs["Detail"].default_value = 2.5
+    wv.inputs["Detail Scale"].default_value = 0.6
+    g.L.new(mp.outputs[0], wv.inputs["Vector"])
+    gr = g.math("POWER", wv.outputs["Fac"], 1.8)                         # thin dark latewood lines on lighter wood
+    mp2 = g.node("ShaderNodeMapping"); mp2.inputs["Scale"].default_value = (12.0, 420.0, 1.0); g.L.new(co, mp2.inputs["Vector"])
+    po = g.node("ShaderNodeTexNoise", Scale=1.0, Detail=1.0); g.L.new(mp2.outputs[0], po.inputs["Vector"])
+    pores = g.math("GREATER_THAN", po.outputs["Fac"], 0.68)
+    f = g.math("SUBTRACT", g.math("MULTIPLY_ADD", gr, -0.55, 1.0), g.math("MULTIPLY", pores, 0.18))
     cr = g.N.new("ShaderNodeValToRGB"); g.L.new(f, cr.inputs[0])
-    lo, hi = {"walnut": ((0.040, 0.018, 0.007), (0.125, 0.058, 0.024)), "oak": ((0.16, 0.085, 0.035), (0.36, 0.21, 0.10))}.get(kind, ((0.040, 0.018, 0.007), (0.125, 0.058, 0.024)))
+    lo, hi = {"walnut": ((0.030, 0.014, 0.006), (0.105, 0.050, 0.021)), "oak": ((0.17, 0.095, 0.042), (0.42, 0.26, 0.13))}.get(kind, ((0.030, 0.014, 0.006), (0.105, 0.050, 0.021)))
     cr.color_ramp.elements[0].color = (*lo, 1); cr.color_ramp.elements[1].color = (*hi, 1)
-    ln = g.node("ShaderNodeTexNoise", Scale=0.22, Detail=1.0); g.L.new(g.tc.outputs["Object"], ln.inputs["Vector"])
-    g.L.new(g.scale(cr.outputs[0], g.math("MULTIPLY_ADD", ln.outputs["Fac"], 0.5, 0.75)), p.inputs["Base Color"])
-    bp = g.node("ShaderNodeBump", Strength=0.05, Distance=0.002); g.L.new(f, bp.inputs["Height"]); g.L.new(bp.outputs[0], p.inputs["Normal"])
+    ln = g.node("ShaderNodeTexNoise", Scale=0.9, Detail=2.0); g.L.new(co, ln.inputs["Vector"])
+    g.L.new(g.scale(cr.outputs[0], g.math("MULTIPLY_ADD", ln.outputs["Fac"], 0.36, 0.82)), p.inputs["Base Color"])
+    bp = g.node("ShaderNodeBump", Strength=0.035, Distance=0.0008); g.L.new(f, bp.inputs["Height"]); g.L.new(bp.outputs[0], p.inputs["Normal"])
     return g.finish(p.outputs[0], presence=presence)
 
 
 def stone(kind="stone", presence=False):
     """stone, marble, slate, sand, plaster: procedural, low gloss, fine relief"""
-    base = {"stone": ((0.36, 0.33, 0.29), (0.52, 0.48, 0.42), 0.75), "marble": ((0.70, 0.69, 0.66), (0.86, 0.85, 0.82), 0.25),
+    base = {"stone": ((0.40, 0.385, 0.36), (0.66, 0.64, 0.60), 0.6), "marble": ((0.70, 0.69, 0.66), (0.86, 0.85, 0.82), 0.25),
             "slate": ((0.07, 0.075, 0.08), (0.13, 0.135, 0.14), 0.55), "sand": ((0.55, 0.45, 0.31), (0.68, 0.57, 0.40), 0.95),
             "plaster": ((0.70, 0.67, 0.61), (0.80, 0.77, 0.71), 0.9)}[kind]
     g = Graph(f"surface_{kind}")
@@ -109,6 +115,11 @@ def stone(kind="stone", presence=False):
     nz = g.node("ShaderNodeTexNoise", Scale=3.5 if kind != "sand" else 40.0, Detail=8.0, Roughness=0.62)
     g.L.new(g.tc.outputs["Object"], nz.inputs["Vector"])
     f = nz.outputs["Fac"]
+    if kind in ("stone", "slate"):                             # crystals: dark and light specks over the base tone
+        sp = g.node("ShaderNodeTexVoronoi", Scale=380.0 if kind == "stone" else 240.0); g.L.new(g.tc.outputs["Object"], sp.inputs["Vector"])
+        sc_ = g.N.new("ShaderNodeSeparateColor"); g.L.new(sp.outputs["Color"], sc_.inputs[0])
+        dk = g.math("LESS_THAN", sc_.outputs[0], 0.24); lt = g.math("GREATER_THAN", sc_.outputs[1], 0.88)
+        f = g.math("ADD", g.math("MULTIPLY_ADD", dk, -0.4, nz.outputs["Fac"]), g.math("MULTIPLY", lt, 0.35))
     if kind == "marble":                                       # soft veins
         wv = g.N.new("ShaderNodeTexWave"); wv.inputs["Scale"].default_value = 1.4; wv.inputs["Distortion"].default_value = 9.0
         wv.inputs["Detail"].default_value = 6.0; g.L.new(g.tc.outputs["Object"], wv.inputs["Vector"])
@@ -148,7 +159,7 @@ def solid(name, kind, color=None):
         nz = g.node("ShaderNodeTexNoise", Scale=60.0, Detail=4.0); g.L.new(g.tc.outputs["Object"], nz.inputs["Vector"])
         g.L.new(g.math("MULTIPLY_ADD", nz.outputs["Fac"], 0.18, 0.26), p.inputs["Roughness"])
     elif kind == "wax":
-        p.inputs["Base Color"].default_value = (*lin3(color or (0.50, 0.04, 0.04)), 1); p.inputs["Roughness"].default_value = 0.28
+        p.inputs["Base Color"].default_value = (*lin3(color or (0.62, 0.05, 0.04)), 1); p.inputs["Roughness"].default_value = 0.2
         try:
             p.inputs["Subsurface Weight"].default_value = 0.25; p.inputs["Subsurface Radius"].default_value = (0.004, 0.001, 0.001)
         except Exception: pass
@@ -186,6 +197,55 @@ def add_glow(m, color=(1.0, 0.75, 0.3)):
 
 
 # ------------------------------------------------------------------ pictures
+def burn_mask(g, x, y, w, h, burn, burn_from="left"):
+    """an edge of fire crossing a sheet of w x h from one side (burn value node: 0 = whole, 1 = gone)
+    returns sockets: gone (1 behind the front), char (dark band ahead of it), ember (glowing rim)"""
+    bn = g.node("ShaderNodeTexNoise", Scale=9.0, Detail=6.0, Roughness=0.6); g.L.new(g.tc.outputs["Object"], bn.inputs["Vector"])
+    side = {"left": (x, 1.0 / w), "right": (x, -1.0 / w), "bottom": (y, 1.0 / h), "top": (y, -1.0 / h)}.get(burn_from, (x, 1.0 / w))
+    edge = g.math("MULTIPLY_ADD", side[0], side[1], 0.5)                # 0 at the edge the fire starts from, 1 at the other
+    front = g.math("SUBTRACT", g.math("MULTIPLY_ADD", bn.outputs["Fac"], 0.35, g.math("MULTIPLY", edge, 0.82)), g.math("MULTIPLY_ADD", burn.outputs[0], 1.4, -0.18))
+    on = g.math("GREATER_THAN", burn.outputs[0], 0.001)
+    gone = g.math("LESS_THAN", front, 0.0)
+    char = g.math("MULTIPLY", g.math("SUBTRACT", 1.0, g.math("DIVIDE", front, 0.06, clamp=True)), on)
+    ember = g.math("MULTIPLY", g.math("POWER", g.math("SUBTRACT", 1.0, g.math("DIVIDE", front, 0.018, clamp=True)), 2.0), on)
+    return gone, char, ember
+
+
+def paper(name, kind="paper", w=0.3, h=0.42, burn_from="left"):
+    """blank paper or parchment: mottling, fibres, darker aged edges; burn, glow and presence like a picture
+    returns (material, nodes)"""
+    g = Graph(f"paper_{name}")
+    sx = g.node("ShaderNodeSeparateXYZ"); g.L.new(g.tc.outputs["Object"], sx.inputs[0]); x, y = sx.outputs[0], sx.outputs[1]
+    parch = kind == "parchment"
+    mo = g.node("ShaderNodeTexNoise", Scale=30.0, Detail=8.0, Roughness=0.65); g.L.new(g.tc.outputs["Object"], mo.inputs["Vector"])
+    mpf = g.node("ShaderNodeMapping"); mpf.inputs["Scale"].default_value = (90.0, 900.0, 1.0); g.L.new(g.tc.outputs["Object"], mpf.inputs["Vector"])
+    fb = g.node("ShaderNodeTexNoise", Scale=1.0, Detail=2.0); g.L.new(mpf.outputs[0], fb.inputs["Vector"])
+    ex_ = g.math("SUBTRACT", 1.0, g.math("ABSOLUTE", g.math("MULTIPLY", x, 2.0 / w)))
+    ey_ = g.math("SUBTRACT", 1.0, g.math("ABSOLUTE", g.math("MULTIPLY", y, 2.0 / h)))
+    age = g.math("SUBTRACT", 1.0, g.math("DIVIDE", g.math("MINIMUM", ex_, ey_), 0.14, clamp=True))
+    tone = g.math("MULTIPLY", g.math("MULTIPLY_ADD", mo.outputs["Fac"], 0.22 if parch else 0.08, 0.89 if parch else 0.96),
+                  g.math("MULTIPLY_ADD", fb.outputs["Fac"], 0.06, 0.97))
+    tone = g.math("MULTIPLY", tone, g.math("MULTIPLY_ADD", g.math("POWER", age, 2.0), -0.45 if parch else -0.12, 1.0))
+    pap = g.node("ShaderNodeCombineXYZ")
+    for i, c in enumerate(PAPER.get(kind, PAPER["paper"])): pap.inputs[i].default_value = srgb2lin(c)
+    col = g.scale(pap.outputs[0], tone)
+    burn = g.value(0.0); glow = g.value(0.0)
+    gone, char, ember = burn_mask(g, x, y, w, h, burn, burn_from)
+    col = g.mix_rgb(g.math("MULTIPLY", char, 0.85), col, (0.012, 0.008, 0.005))
+    p = g.node("ShaderNodeBsdfPrincipled", Roughness=0.62 if parch else 0.75); g.L.new(col, p.inputs["Base Color"])
+    try: p.inputs["Sheen Weight"].default_value = 0.25
+    except Exception: pass
+    bp = g.node("ShaderNodeBump", Strength=0.04, Distance=0.0005); g.L.new(mo.outputs["Fac"], bp.inputs["Height"]); g.L.new(bp.outputs[0], p.inputs["Normal"])
+    ex = g.value(1.0); EXACT.append(ex)
+    fire = g.node("ShaderNodeEmission", Color=(1.0, 0.36, 0.06)); g.L.new(g.math("MULTIPLY", ember, g.math("MULTIPLY", ex.outputs[0], 6.0)), fire.inputs["Strength"])
+    gl = g.node("ShaderNodeEmission"); g.L.new(col, gl.inputs["Color"]); g.L.new(g.math("MULTIPLY", glow.outputs[0], g.math("MULTIPLY", ex.outputs[0], 0.9)), gl.inputs["Strength"])
+    a1 = g.node("ShaderNodeAddShader"); g.L.new(p.outputs[0], a1.inputs[0]); g.L.new(fire.outputs[0], a1.inputs[1])
+    a2 = g.node("ShaderNodeAddShader"); g.L.new(a1.outputs[0], a2.inputs[0]); g.L.new(gl.outputs[0], a2.inputs[1])
+    tr = g.node("ShaderNodeBsdfTransparent")
+    m = g.finish(g.mix_shader(gone, a2.outputs[0], tr.outputs[0]))
+    return m, {"reveal": None, "burn": burn, "glow": glow, "presence": presence_node(m)}
+
+
 def picture(name, path, w, h, iw, ih, kind="paper", sheen=False, burn_from="left"):
     """a picture of iw x ih (object units, centred) on a sheet of w x h whose margin is paper of the given kind.
     returns (material, nodes) - nodes: reveal (DARK..1), burn (0..1), glow (0..1), presence (value nodes)"""
@@ -205,15 +265,7 @@ def picture(name, path, w, h, iw, ih, kind="paper", sheen=False, burn_from="left
     col = g.mix_rgb(inside, g.scale(pap.outputs[0], grain), img.outputs["Color"])
     # burn: an edge of fire crosses the sheet from one side (value 0 = whole, 1 = gone)
     burn = g.value(0.0)
-    bn = g.node("ShaderNodeTexNoise", Scale=9.0, Detail=6.0, Roughness=0.6); g.L.new(g.tc.outputs["Object"], bn.inputs["Vector"])
-    side = {"left": (x, 1.0 / w), "right": (x, -1.0 / w), "bottom": (y, 1.0 / h), "top": (y, -1.0 / h)}.get(burn_from, (x, 1.0 / w))
-    edge = g.math("MULTIPLY_ADD", side[0], side[1], 0.5)                # 0 at the edge the fire starts from, 1 at the other
-    front = g.math("SUBTRACT", g.math("MULTIPLY_ADD", bn.outputs["Fac"], 0.35, g.math("MULTIPLY", edge, 0.82)), g.math("MULTIPLY_ADD", burn.outputs[0], 1.4, -0.18))
-    gone = g.math("LESS_THAN", front, 0.0)                              # behind the fire front: the sheet is gone
-    char = g.math("SUBTRACT", 1.0, g.math("DIVIDE", front, 0.06, clamp=True))     # a dark band just ahead of the front
-    ember = g.math("POWER", g.math("SUBTRACT", 1.0, g.math("DIVIDE", front, 0.018, clamp=True)), 2.0)
-    ember = g.math("MULTIPLY", ember, g.math("GREATER_THAN", burn.outputs[0], 0.001))
-    char = g.math("MULTIPLY", char, g.math("GREATER_THAN", burn.outputs[0], 0.001))
+    gone, char, ember = burn_mask(g, x, y, w, h, burn, burn_from)
     col = g.mix_rgb(g.math("MULTIPLY", char, 0.85), col, (0.012, 0.008, 0.005))
     # reveal: before its light comes on, a picture is almost dark (driven by the light verb; 1 = lit)
     rev = g.value(1.0); glow = g.value(0.0)

@@ -36,7 +36,8 @@ def evaluate(odir, seconds):
         g = ck["grids"][str(f)]
         m = _mask(g, ck["subject"], 360, 640)
         if m.mean() < 0.08 and ck.get("subject_fallback"): m = _mask(g, ck["subject_fallback"], 360, 640)
-        if m.mean() >= 0.08: lum.append(float(y[m].mean()))          # frames without the subject say nothing about exposure
+        calm = ck.get("calm_frames") or ck["key_frames"]
+        if m.mean() >= 0.08 and f in calm: lum.append(float(y[m].mean()))   # only frames that show the steady subject
         dark, blown = float((y < 0.06).mean()), float((y > 0.985).mean())
         if dark > ck.get("dark_max", 0.15): errors.append(f"too dark at {(f - 1) / 30:.1f}s: {dark:.0%} of the frame almost black"); bad_frames.add(f)
         if blown > 0.03: warnings.append(f"blown highlights at {(f - 1) / 30:.1f}s ({blown:.1%})")
