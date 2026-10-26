@@ -353,7 +353,7 @@ for pc in PIECES:
         ring = math_node(N_, L_, "EXPONENT", math_node(N_, L_, "MULTIPLY", math_node(N_, L_, "MULTIPLY", q, q), -1.0))
         ring = math_node(N_, L_, "MULTIPLY", ring, smoothstep(N_, L_, B, 0.2 * PX_FRAME, 1.2 * PX_FRAME))
         fa = math_node(N_, L_, "MULTIPLY", ring, ra.outputs[0])
-        em = N_.new("ShaderNodeEmission"); em.inputs["Color"].default_value = (1.0, 0.85, 0.58, 1); em.inputs["Strength"].default_value = 4.0
+        em = N_.new("ShaderNodeEmission"); em.inputs["Color"].default_value = (1.0, 0.85, 0.58, 1); em.inputs["Strength"].default_value = 2.8
         tr = N_.new("ShaderNodeBsdfTransparent")
         am = N_.new("ShaderNodeMixShader"); L_.new(fa, am.inputs[0]); L_.new(tr.outputs[0], am.inputs[1]); L_.new(em.outputs[0], am.inputs[2])
         L_.new(am.outputs[0], out.inputs["Surface"]); C.put(ro, m3); RING[k] = (rad, ra, 0.85 * (mnx - bx0))
@@ -480,7 +480,11 @@ for fr in range(1, FRAMES + 1):
         if ACT == "drop": keyval(h["alpha"], alpha, fr); keyval(h["salpha"], alpha, fr); keyval(RING[k][0], rr, fr); keyval(RING[k][1], ra, fr)
         if ACT == "rise": keyval(SOCK[k], sock, fr)
 sc.frame_start, sc.frame_end = 1, FRAMES
-C.setup_cycles(sc, O, samples=int(P.get("samples", 64)), look="AgX - Base Contrast")
+C.setup_cycles(sc, O, samples=int(P.get("samples", 64)), look="None")
+# flags keep their exact colours: no tone-mapping curve (AgX desaturates and shifts saturated colours)
+sc.view_settings.view_transform = "Standard"
+try: sc.view_settings.look = "None"
+except Exception: pass
 print(f"built: distance fields max {SDF_MAX}", flush=True)
 print(f"built: {n} pieces, {tri_total} top triangles, action {ACT}, end of animation {SCH['end']:.1f} s, base {W}x{H} px "
       f"({meta['base']}), rim {RIM:.1f} base px", flush=True)
@@ -540,7 +544,7 @@ if O.preview:
             pl = Vector((wx(pm["label"][0]) - CEN[k][0], wy(pm["label"][1]) - CEN[k][1], THICK + 0.002 * SPAN0))
             pw = M[k] @ pl
             v = world_to_camera_view(sc, cam, pw)
-            vis = 0.0 <= v.x <= 1.0 and 0.0 <= v.y <= 1.0 and v.z > 0
+            vis = 0.0 <= v.x <= 1.0 and 0.0 <= v.y <= 1.0 and v.z > 0 and state(k, t)[7] >= 0.5
             if vis:
                 dvec = pw - co_; code, dd = cast(co_, dvec.normalized(), Mi)
                 vis = dd >= dvec.length - 0.004 * SPAN0
@@ -594,7 +598,7 @@ if O.preview:
     fl = [PM[k]["flag"]["luma"] for k in PK]
     lum = float(np.mean(fl))
     if ACT == "break": lum = 0.35 * meta["union"]["flag"]["luma"] + 0.65 * lum
-    target = float(np.clip(0.85 * lum + 0.03, 0.28, 0.62))
+    target = float(np.clip(0.95 * lum, 0.25, 0.7))
     C.preview_run(sc, O, FRAMES, classify, subject=("p",), fallback_subject=("p", "s"), target=target, tol=0.09,
                   ev_range=(-1.2, 1.5), stats=stats, errors=errors, warnings=warnings, dark_max=0.35 if SAT else 0.85)
     sys.exit(0)
