@@ -97,7 +97,7 @@ p = nt.nodes["Principled BSDF"]; out = nt.nodes["Material Output"]
 tex = nt.nodes.new("ShaderNodeTexImage"); tex.image = bpy.data.images.load(os.path.abspath(f"{DATA}/flag.png")); tex.interpolation = "Cubic"
 nt.links.new(tex.outputs["Color"], p.inputs["Base Color"])
 p.inputs["Roughness"].default_value = 0.58
-for k, val in (("Sheen Weight", 0.6), ("Sheen Roughness", 0.35)):
+for k, val in (("Sheen Weight", 0.22), ("Sheen Roughness", 0.6)):     # strong sheen draws bright bands along the folds
     if k in p.inputs: p.inputs[k].default_value = val
 tc = nt.nodes.new("ShaderNodeTexCoord")
 weave = nt.nodes.new("ShaderNodeTexWave"); weave.inputs["Scale"].default_value = 900; weave.wave_type = "BANDS"
