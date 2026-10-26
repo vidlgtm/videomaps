@@ -1,8 +1,9 @@
 name: factory
 # MAP FILM FACTORY (folder factory/): order in -> film out.
-#   station : PROCESSING STATION (phase 2) - the order's picks (sources.json: Commons photos, document texts, signatures,
-#             extra flags) -> licence gate, super-resolution, levels, depth + near layer, focus, cut-outs, Manim documents,
-#             credits, review sheets (artifact "pack")
+#   station : PROCESSING STATION (phase 2) - the order's picks (sources.json: photos, signatures and extra flags from the
+#             order store - release store_<order>, listed in store.json - and document texts) -> sha256 + licence gate,
+#             super-resolution, levels, depth + near layer, focus, cut-outs, Manim documents, credits, review sheets
+#             (artifact "pack"). Hermetic: pictures come only from the order store (factory/rules/hermetic.py).
 #   direct  : AUTOMATIC DIRECTOR (phase 1) - order (storyboard + voice timeline + pack) -> film.json (camera, every element, sound) -> engine audit
 #             (overlaps that stay visible, text cut by the frame) -> feedback passes until clean
 #   tiles   : the UHD/HD map tiles that exactly this camera path needs (Sentinel-2 cloudless + terrain)
@@ -16,6 +17,7 @@ on:
       tag: { description: 'result release tag (must start with factory_)', default: 'factory_ussr15_test' }
       stills: { description: 'seconds of the verification stills', default: '27.3 38.5 59.5 98 119.5 248 264 330 366 383 411 458.5 475 490' }
       compare: { description: 'release holding reference stills with the same names (none = no side-by-side)', default: 'test_v5' }
+      ref_run: { description: 'run id whose station pack is the reference for a pixel comparison (empty = none)', default: '' }
 concurrency:
   group: factory-${{ github.ref }}
   cancel-in-progress: true
@@ -37,6 +39,18 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: '3.11' }
+      - name: Hermetic check - pictures only from the order store
+        run: python3 factory/rules/hermetic.py
+      - name: Order store - the order's pictures with their licences
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          set -e
+          S=factory/orders/$ORDER/store.json
+          if [ ! -f "$S" ]; then echo "::error::$S is missing (factory/intake/store.py puts the order's pictures in its store)"; exit 1; fi
+          R=$(python3 -c "import json; print(json.load(open('$S'))['release'])")
+          mkdir -p factory/orders/$ORDER/store_files
+          gh release download "$R" -R ${{ github.repository }} -D factory/orders/$ORDER/store_files --clobber
+          echo "order store $R: $(ls factory/orders/$ORDER/store_files | wc -l) files"
       - uses: actions/cache@v4
         with:
           path: |
@@ -89,6 +103,13 @@ jobs:
           ls -la out/pack/clips
       - name: Clip lengths, review sheets, report
         run: python -u factory/station/station.py finish factory/orders/$ORDER
+      - name: Same result as the reference run (pixel comparison)
+        if: inputs.ref_run != ''
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          set -e
+          gh run download ${{ inputs.ref_run }} -R ${{ github.repository }} -n pack -D /tmp/refpack
+          python -u factory/station/compare.py out/pack /tmp/refpack | tee out/pack/station_compare.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with: { name: pack, path: out/pack, retention-days: 7, if-no-files-found: warn }
@@ -346,7 +367,7 @@ jobs:
         run: |
           set -e
           cp ../../art/direction/director_report.txt ../../art/direction/audit*.txt ../../art/direction/CREDITS.txt out/ 2>/dev/null || true
-          mkdir -p out/station && cp ../../art/pack/sheets/* ../../art/pack/station_report.txt ../../art/pack/pack.json out/station/ 2>/dev/null || true
+          mkdir -p out/station && cp ../../art/pack/sheets/* ../../art/pack/station_report.txt ../../art/pack/station_compare.txt ../../art/pack/pack.json out/station/ 2>/dev/null || true
           gh release delete "$TAG" -y --cleanup-tag -R ${{ github.repository }} 2>/dev/null || true
           gh release create "$TAG" -R ${{ github.repository }} --title "$TAG" --notes "factory: automatic director + processing station - order $ORDER" \
             out/stills/*.jpg out/stills_station/*.jpg out/compare/*.jpg out/compare/*.pdf out/*.txt out/station/* src/data/film.json 2>/dev/null \

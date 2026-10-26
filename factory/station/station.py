@@ -1,24 +1,27 @@
 #!/usr/bin/env python3
 """FACTORY - PROCESSING STATION (phase 2). Makes the order's picks film-ready in our identity.
 
-in : factory/orders/<order>/sources.json   (the order's picks: Wikimedia Commons files + document texts)
+in : factory/orders/<order>/sources.json   (the order's picks: keys of the order store + document texts)
+     factory/orders/<order>/store.json     (the order store: every picture with its licence, author and source page;
+                                            files of the release store_<order>, downloaded by the workflow into
+                                            <order>/store_files - the station never downloads a picture itself)
 out: out/pack/   archive/<id>.jpg (+ _depth.png, _fg.png, _cut.png), sig/, flags/, clips/ (Manim documents, made by the
                  workflow with doc_scene.py), pack.json (what the director reads), CREDITS.txt, station_report.txt, sheets/
 
-photos     : Commons file (pages of djvu/pdf/tif via "page") -> licence gate (PD, CC0, CC BY, CC BY-SA only; anything else
+photos     : store file -> sha256 + licence gate (PD, CC0, CC BY, CC BY-SA only; anything else
              = ORDER ERROR) -> scan-border trim -> 4x super-resolution when small (Real-ESRGAN general x4v3, BSD) ->
              levels -> by use:
                banner / scene : depth map (Depth-Anything-V2-Small, Apache-2.0) + near layer <id>_fg.png (2.5D parallax)
                                 + focus point (faces: YuNet; no face: the nearest region) so a crop never cuts the subject
                portrait       : cut-out <id>_cut.png (BiRefNet portrait -> general -> ISNet) with clean alpha
                document       : the page itself (no depth, no levels)
-signatures : Commons SVG kept as drawn; PNG/JPG -> ink only (paper -> transparent), tight crop
-flags      : extra flags (non-ISO, e.g. historical) from Commons SVG -> flags/<code>.svg + flags/4x3/<code>.svg + aspect
+signatures : store SVG kept as drawn; PNG/JPG -> ink only (paper -> transparent), tight crop
+flags      : extra flags (non-ISO, e.g. historical) from store SVG -> flags/<code>.svg + flags/4x3/<code>.svg + aspect
              (the ISO flags of the order's countries come from flag-icons in the workflow)
-credits    : licence + author + page of every file from Commons -> pack.json "credits" (the director keeps the ones the
+credits    : licence + author + source page of every store file -> pack.json "credits" (the director keeps the ones the
              film really shows: end card + CREDITS.txt for the YouTube description)
 
-usage: python station.py process <orderDir> [--meta-only]      (meta-only: licence/metadata check, nothing downloaded)
+usage: python station.py process <orderDir> [--meta-only]      (meta-only: store + licence check, no file needed)
        python station.py finish  <orderDir>                    (after the Manim documents: clip lengths, sheets, report)
 exit code 2 = ORDER ERROR (every problem of the order is listed at once)."""
 import html, io, json, os, re, sys, time, hashlib
@@ -26,8 +29,7 @@ import html, io, json, os, re, sys, time, hashlib
 HERE = os.path.dirname(os.path.abspath(__file__))
 FACTORY = os.path.dirname(HERE)
 REPO = os.path.dirname(FACTORY)
-API = "https://commons.wikimedia.org/w/api.php"
-UA = {"User-Agent": "videomaps-factory/2.0 (https://github.com/vidlgtm/videomaps; history map films)"}
+UA = {"User-Agent": "videomaps-factory/2.0 (https://github.com/vidlgtm/videomaps)"}
 USES = {"banner", "scene", "portrait", "document"}
 MAXS, SR_BELOW, LOW_RES = 2400, 1800, 700
 OUT = "out/pack"
@@ -38,10 +40,10 @@ FIXED_CREDITS = [
     "Sentinel-2 cloudless 2016 by EOX IT Services GmbH (contains modified Copernicus Sentinel data 2016), CC BY 4.0",
     "Boundaries: Natural Earth · Flags: flag-icons (MIT) · Narration: synthetic voice · Music: original score",
 ]
-PHOTO_KEYS = {"commons", "page", "use", "what", "author", "note"}
+PHOTO_KEYS = {"src", "use", "what", "author", "note"}
 DOC_KEYS = {"layout", "head", "title", "title_font", "body", "gloss", "underline", "seal", "hold", "what", "note"}
-SIG_KEYS = {"commons", "what", "note"}
-FLAG_KEYS = {"commons", "what", "note"}
+SIG_KEYS = {"src", "what", "note"}
+FLAG_KEYS = {"src", "what", "note"}
 TOP_KEYS = {"photos", "documents", "signatures", "flags", "credits_fixed", "note"}
 
 errors, warnings = [], []
@@ -51,7 +53,7 @@ def err(msg): errors.append(msg); print("ORDER ERROR:", msg, flush=True)
 def warn(msg): warnings.append(msg); print("warning:", msg, flush=True)
 
 
-# ------------------------------------------------------------------ Commons
+# ------------------------------------------------------------------ model weights (software, not pictures)
 def http(url, params=None, tries=6):
     import requests
     last = None
@@ -73,19 +75,42 @@ def plain(v):
     return m.group(1).strip() if m else s
 
 
-def commons_info(title, page=None, width=None):
-    t = re.sub(r"^(File|Image):", "", title.strip(), flags=re.I)
-    p = dict(action="query", format="json", redirects=1, titles="File:" + t, prop="imageinfo",
-             iiprop="url|size|mime|extmetadata",
-             iiextmetadatafilter="LicenseShortName|LicenseUrl|Artist|Credit|DateTimeOriginal|NonFree|AttributionRequired|ObjectName")
-    if page: p.update(iiurlwidth=width or 1280, iiurlparam=f"page{int(page)}-{width or 1280}px")
-    elif width: p.update(iiurlwidth=width)
-    j = http(API, p).json()
-    pages = list(j.get("query", {}).get("pages", {}).values())
-    if not pages or "imageinfo" not in pages[0]: raise FileNotFoundError(f'no such file on Wikimedia Commons: "{t}"')
-    ii = pages[0]["imageinfo"][0]; ii["title"] = pages[0]["title"]
-    ii["page_url"] = "https://commons.wikimedia.org/wiki/" + pages[0]["title"].replace(" ", "_")
-    return ii
+# ------------------------------------------------------------------ order store
+STORE = {}
+
+
+def load_store(order):
+    """store.json + the downloaded files; every pick must be there, with an allowed licence and the right sha256"""
+    p = os.path.join(order, "store.json")
+    if not os.path.exists(p): err(f"{p} is missing (the order store: every picture with its licence)"); return
+    try: M = json.load(open(p, encoding="utf-8"))
+    except Exception as e: err(f"store.json is not valid JSON: {e}"); return
+    for k, it in (M.get("items") or {}).items():
+        miss = [f for f in ("file", "sha256", "bytes", "mime", "licence", "author", "source") if not it.get(f)]
+        if miss: err(f'store.json: "{k}" has no {", ".join(miss)}'); continue
+        STORE[k] = it
+    STORE["_dir"] = os.environ.get("STORE_DIR") or os.path.join(order, "store_files")
+
+
+def store_item(sect, i, key):
+    it = STORE.get(key) if key and key != "_dir" else None
+    if not it: err(f'{sect}.{i}: "{key}" is not in the order store (store.json)')
+    return it
+
+
+def store_bytes(sect, i, it):
+    f = os.path.join(STORE["_dir"], it["file"])
+    if not os.path.exists(f): err(f'{sect}.{i}: {it["file"]} is missing from the downloaded store ({STORE["_dir"]})'); return None
+    raw = open(f, "rb").read()
+    if hashlib.sha256(raw).hexdigest() != it["sha256"]: err(f'{sect}.{i}: {it["file"]} does not match its sha256 in store.json'); return None
+    return raw
+
+
+def store_info(it):
+    """the store entry in the shape the licence/author rules read"""
+    return {"extmetadata": {"LicenseShortName": {"value": it["licence"]}, "Artist": {"value": it["author"]}},
+            "width": it.get("width") or 0, "height": it.get("height") or 0, "mime": it["mime"],
+            "title": "File:" + (it.get("title") or it["file"]), "page_url": it["source"]}
 
 
 def licence(ii):
@@ -134,7 +159,8 @@ def load_sources(order):
             if not isinstance(v, dict): err(f"{sect}.{i} must be an object"); continue
             for k in v:
                 if k not in keys: err(f'{sect}.{i}: unknown key "{k}" (allowed: {", ".join(sorted(keys))})')
-            if sect != "documents" and not v.get("commons"): err(f'{sect}.{i}: "commons" (the file name on Wikimedia Commons) is missing')
+            if sect != "documents" and "commons" in v: err(f'{sect}.{i}: "commons" is not read any more - put the file in the order store (factory/intake/store.py) and give its key in "src"')
+            if sect != "documents" and not v.get("src"): err(f'{sect}.{i}: "src" (the key of the file in the order store) is missing')
             if sect == "photos":
                 uses = v.get("use") if isinstance(v.get("use"), list) else [v.get("use")]
                 bad = [u for u in uses if u not in USES]
@@ -350,37 +376,24 @@ def svg_aspect(svg):
 
 
 # ------------------------------------------------------------------ process
-def raster_bytes(ii, title, page):
-    """the picture itself: page render for multipage files, the original when it is a normal-size jpg/png, else a
-    large rendering (tif, huge files)"""
-    if page: return http(ii["thumburl"]).content, ii["thumburl"]
-    big = max(ii["width"], ii["height"])
-    if ii.get("mime") in ("image/jpeg", "image/png", "image/webp", "image/gif") and ii.get("size", 0) <= 45e6 and big <= 9000:
-        return http(ii["url"]).content, ii["url"]
-    for W in (3840, 2560, 1920, 1280):
-        w = W if ii["width"] >= ii["height"] else max(320, round(W * ii["width"] / ii["height"]))
-        try:
-            j = commons_info(title, width=w)
-            if j.get("thumburl"): return http(j["thumburl"]).content, j["thumburl"]
-        except Exception as e: print("  rendering", W, "failed:", str(e)[:80])
-    raise RuntimeError("no usable rendering")
-
-
 def process(order, meta_only=False):
     S = load_sources(order)
+    load_store(order)
     if errors: return finish_errors()
     for d in ("archive", "sig", "flags/4x3", "clips", "sheets"): os.makedirs(os.path.join(OUT, d), exist_ok=True)
     os.makedirs(TMP, exist_ok=True); os.makedirs(os.path.join(TMP, "docs_json"), exist_ok=True)
     from PIL import Image, ImageOps
     pack = {"archive": {}, "cutouts": {}, "docs": {}, "sig": {}, "flags": {}, "credits": [], "credits_fixed": S.get("credits_fixed") or FIXED_CREDITS,
             "station": {"order": os.path.basename(os.path.normpath(order)), "made": time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime()),
-                        "sources_sha": hashlib.sha256(open(os.path.join(order, "sources.json"), "rb").read()).hexdigest()[:16]}}
+                        "sources_sha": hashlib.sha256(open(os.path.join(order, "sources.json"), "rb").read()).hexdigest()[:16],
+                        "store_sha": hashlib.sha256(open(os.path.join(order, "store.json"), "rb").read()).hexdigest()[:16]}}
     rows, rep = [], []
     # ---- photos
     for i, s in (S.get("photos") or {}).items():
         t0 = time.time(); uses = s["use"] if isinstance(s["use"], list) else [s["use"]]
-        try: ii = commons_info(s["commons"], s.get("page"))
-        except Exception as e: err(f'photos.{i}: {e}'); continue
+        it = store_item("photos", i, s["src"])
+        if not it: continue
+        ii = store_info(it)
         short, show, ok = licence(ii)
         if not ok: err(f'photos.{i}: "{ii["title"][5:]}" has licence "{short or "none"}" - only Public domain, CC0, CC BY, CC BY-SA are allowed; pick another file'); continue
         who = author(ii, s.get("author"))
@@ -388,13 +401,13 @@ def process(order, meta_only=False):
         line = f'{i:14s} {"+".join(uses):16s} {show:16s} {who[:40]:40s} {ii["width"]}x{ii["height"]}'
         if meta_only:
             rep.append(line); print(line, flush=True); continue
-        try: raw, src = raster_bytes(ii, s["commons"], s.get("page"))
-        except Exception as e: err(f'photos.{i}: download failed ({e})'); continue
+        raw = store_bytes("photos", i, it)
+        if raw is None: continue
         img = ImageOps.exif_transpose(Image.open(io.BytesIO(raw)))
         if img.mode in ("RGBA", "LA", "P"):
             img = img.convert("RGBA"); bg = Image.new("RGBA", img.size, (255, 255, 255, 255)); bg.alpha_composite(img); img = bg
         img = img.convert("RGB"); orig = img.copy(); w0, h0 = img.size; steps = []
-        if max(img.size) < LOW_RES: warn(f'photos.{i}: only {w0}x{h0} px on Commons - upscaled 4x, a larger file would look better')
+        if max(img.size) < LOW_RES: warn(f'photos.{i}: only {w0}x{h0} px - upscaled 4x, a larger file would look better')
         photo = any(u in ("banner", "scene", "portrait") for u in uses)
         if photo:
             img, st = trim_borders(img)
@@ -430,14 +443,16 @@ def process(order, meta_only=False):
         rows.append({"id": i, "uses": uses, "orig": orig, "final": img, "licence": show, "author": who, "size0": (w0, h0), **extra})
     # ---- signatures
     for i, s in (S.get("signatures") or {}).items():
-        try: ii = commons_info(s["commons"])
-        except Exception as e: err(f"signatures.{i}: {e}"); continue
+        it = store_item("signatures", i, s["src"])
+        if not it: continue
+        ii = store_info(it)
         short, show, ok = licence(ii)
         if not ok: err(f'signatures.{i}: licence "{short}" is not allowed'); continue
         who = author(ii)
         rep.append(f"{i:14s} signature        {show:16s} {who[:40]}"); print(rep[-1], flush=True)
         if meta_only: continue
-        raw = http(ii["url"]).content
+        raw = store_bytes("signatures", i, it)
+        if raw is None: continue
         if ii.get("mime") == "image/svg+xml":
             open(f"{OUT}/sig/{i}.svg", "wb").write(raw); f = f"sig/{i}.svg"
         else:
@@ -448,14 +463,16 @@ def process(order, meta_only=False):
         pack["credits"].append({"id": i, "files": [f], "what": s.get("what") or f"Signature ({i})", "author": who, "license": show, "page": ii["page_url"]})
     # ---- extra flags
     for c, s in (S.get("flags") or {}).items():
-        try: ii = commons_info(s["commons"])
-        except Exception as e: err(f"flags.{c}: {e}"); continue
+        it = store_item("flags", c, s["src"])
+        if not it: continue
+        ii = store_info(it)
         short, show, ok = licence(ii)
         if not ok: err(f'flags.{c}: licence "{short}" is not allowed'); continue
         rep.append(f"{c:14s} flag             {show:16s}"); print(rep[-1], flush=True)
         if meta_only: continue
         if ii.get("mime") != "image/svg+xml": err(f"flags.{c}: pick the SVG version of the flag"); continue
-        raw = http(ii["url"]).content
+        raw = store_bytes("flags", c, it)
+        if raw is None: continue
         for p in (f"{OUT}/flags/{c}.svg", f"{OUT}/flags/4x3/{c}.svg"): open(p, "wb").write(raw)
         pack["flags"][c] = {"file": f"flags/4x3/{c}.svg", "aspect": round(svg_aspect(raw), 4)}
         pack["credits"].append({"id": c, "files": [f"flags/4x3/{c}.svg"], "what": s.get("what") or ii["title"][5:-4], "author": author(ii), "license": show, "page": ii["page_url"]})
@@ -527,7 +544,7 @@ def finish(order):
     for mf in sorted(glob.glob(f"{TMP}/*_meta.json")):
         m = json.load(open(mf)); k = m["id"]
         row = Image.new("RGB", (W, RH), (14, 22, 30)); dr = ImageDraw.Draw(row); x = 16
-        cols = [("COMMONS", Image.open(f"{TMP}/{k}_orig.png")), ("STATION", Image.open(f"{TMP}/{k}_final.png"))]
+        cols = [("STORE", Image.open(f"{TMP}/{k}_orig.png")), ("STATION", Image.open(f"{TMP}/{k}_final.png"))]
         if os.path.exists(f"{TMP}/{k}_depthv.png"): cols.append(("DEPTH", Image.open(f"{TMP}/{k}_depthv.png").convert("RGB")))
         if os.path.exists(f"{TMP}/{k}_cutv.png"): cols.append(("CUT-OUT", Image.open(f"{TMP}/{k}_cutv.png")))
         for name, im in cols:

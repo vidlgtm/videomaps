@@ -1,91 +1,88 @@
 {
- "note": "Picks for the film (phase 2 test: the same files as our film v5). Photos come from Wikimedia Commons by file name; the station checks every licence, processes the image and writes the credits.",
+ "note": "Picks for the film (phase 2 test: the same files as our film v5). Every picture is a key of the order store (store.json: file, licence, author, source page); the station checks every licence and sha256, processes the image and writes the credits.",
  "photos": {
   "kazan": {
-   "commons": "Казанский кремль. Панорама с колеса обозрения.jpg",
+   "src": "kazan",
    "use": "banner",
    "what": "Kazan Kremlin"
   },
   "tallinn": {
-   "commons": "Tallinn Toompea Upper Old Town 2013.jpg",
+   "src": "tallinn",
    "use": "banner",
    "what": "Tallinn"
   },
   "lenin": {
-   "commons": "Lenin in 1920 (cropped).jpg",
+   "src": "lenin",
    "use": "portrait",
    "what": "Lenin (1920)"
   },
   "redarmy": {
-   "commons": "Red army in moscow.jpg",
+   "src": "redarmy",
    "use": "banner",
    "what": "Red Army in Moscow"
   },
   "treaty1922": {
-   "commons": "Treaty on the Creation of the Union of Soviet Socialist Republics.jpg",
+   "src": "treaty1922",
    "use": "document",
    "what": "Treaty on the Creation of the USSR (1922)"
   },
   "stalin": {
-   "commons": "State portrait of Stalin.jpg",
+   "src": "stalin",
    "use": "portrait",
    "what": "Stalin"
   },
   "gulag": {
-   "commons": "Canal Mer Blanche.jpg",
+   "src": "gulag",
    "use": "banner",
    "what": "White Sea Canal"
   },
   "const1936": {
-   "commons": "The Soviet Socialist Constitution of december 5, 1936.djvu",
-   "page": 3,
+   "src": "const1936",
    "use": "document",
    "what": "USSR Constitution (1936)"
   },
   "const1936_a13": {
-   "commons": "The Soviet Socialist Constitution of december 5, 1936.djvu",
-   "page": 9,
+   "src": "const1936_a13",
    "use": "document",
    "what": "USSR Constitution (1936)"
   },
   "const1936_a17": {
-   "commons": "The Soviet Socialist Constitution of december 5, 1936.djvu",
-   "page": 11,
+   "src": "const1936_a17",
    "use": "document",
    "what": "USSR Constitution (1936)"
   },
   "winterwar": {
-   "commons": "A Finnish Maxim M-32 machine gun nest during the Winter War.jpg",
+   "src": "winterwar",
    "use": "banner",
    "what": "Winter War"
   },
   "crimea1954": {
-   "commons": "The transfer of Crimea.jpg",
+   "src": "crimea1954",
    "use": "document",
    "what": "Transfer of Crimea (1954)"
   },
   "gorbachev": {
-   "commons": "Mikhail Gorbachev in 1987 (cropped).jpg",
+   "src": "gorbachev",
    "use": "portrait",
    "what": "Gorbachev (1987)"
   },
   "balticway": {
-   "commons": "Baltic Way in Latvia between Cēsis and Valmiera.jpeg",
+   "src": "balticway",
    "use": "banner",
    "what": "Baltic Way"
   },
   "lithuania90": {
-   "commons": "Leaders of the Supreme Council of Lithuania on 11 March 1990.jpg",
+   "src": "lithuania90",
    "use": "banner",
    "what": "Lithuania, 11 Mar 1990"
   },
   "tanks91": {
-   "commons": "Red army tanks (8000380028).jpg",
+   "src": "tanks91",
    "use": "banner",
    "what": "Moscow, 20 Aug 1991"
   },
   "belovezha": {
-   "commons": "RIAN archive 848095 Signing the Agreement to eliminate the USSR and establish the Commonwealth of Independent States.jpg",
+   "src": "belovezha",
    "use": [
     "document",
     "scene"
@@ -93,27 +90,27 @@
    "what": "Belovezha, 8 Dec 1991"
   },
   "viskuli": {
-   "commons": "RIAN archive 22982 Agreement on the setup of the CIS was signed in this building.jpg",
+   "src": "viskuli",
    "use": "banner",
    "what": "Viskuli, 8 Dec 1991"
   },
   "almaata": {
-   "commons": "Egemen Archive Nazarbayev and CIS leaders.jpg",
+   "src": "almaata",
    "use": "banner",
    "what": "Alma-Ata, 21 Dec 1991"
   },
   "grozny": {
-   "commons": "Evstafiev-chechnya-palace-gunman.jpg",
+   "src": "grozny",
    "use": "banner",
    "what": "Grozny 1995"
   },
   "bender": {
-   "commons": "Bender 1992.jpg",
+   "src": "bender",
    "use": "banner",
    "what": "Bender 1992"
   },
   "sukhumi": {
-   "commons": "The burned out shell of the former Parliament building of the Autonomous Republic of Abkhazia, (28489422794).jpg",
+   "src": "sukhumi",
    "use": "banner",
    "what": "Sukhumi"
   }
@@ -144,15 +141,15 @@
  },
  "signatures": {
   "yeltsin": {
-   "commons": "Yeltsin signature.svg",
+   "src": "yeltsin",
    "what": "Signature of Boris Yeltsin"
   },
   "kravchuk": {
-   "commons": "Leonid Kravchuk signature 1991.svg",
+   "src": "kravchuk",
    "what": "Signature of Leonid Kravchuk"
   },
   "shushkevich": {
-   "commons": "Signature of Stanislau Shushkevich.png",
+   "src": "shushkevich",
    "what": "Signature of Stanislav Shushkevich"
   }
  }
