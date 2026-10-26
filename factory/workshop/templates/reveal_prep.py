@@ -1,20 +1,34 @@
-"""Workshop template 'reveal' - fetches the picture of every item (Wikimedia Commons file rendered to PNG by Commons,
-or a direct PNG/JPG url) + its licence for the credits.  usage: python3 reveal_prep.py <params.json> <out_dir>"""
-import json, os, sys, time, io, re
+"""Workshop template 'reveal' - fetches the picture of every item (Wikimedia Commons file at a standard Wikimedia
+thumbnail width, or a direct PNG/JPG url) + its licence for the credits.  Follows the Wikimedia robot policy: a
+User-Agent with a contact address, standard thumbnail sizes only, Retry-After honoured on HTTP 429.  If Wikimedia
+refuses the download, the factory copy in the cache release is used (factory/tools/mirror_commons.py).
+usage: python3 reveal_prep.py <params.json> <out_dir>"""
+import json, os, sys, time, io, re, hashlib
 import numpy as np, requests
 from PIL import Image
 
 P = json.load(open(sys.argv[1])); OUT = sys.argv[2]; os.makedirs(OUT, exist_ok=True)
-H = {"User-Agent": "videomaps-workshop/1.0 (map history films)"}
+H = {"User-Agent": "videomaps-workshop-bot/1.0 (https://github.com/vidlgtm/videomaps)"}
+WIDTH = 1920                                                        # a standard Wikimedia thumbnail width
+MIRROR = f"https://github.com/{os.environ.get('GITHUB_REPOSITORY', 'vidlgtm/videomaps')}/releases/download/factory_ws_cache/"
 
 
-def get(url, **kw):
-    for i in range(6):
+def get(url, tries=6, **kw):
+    last = ""
+    for i in range(tries):
         try:
-            r = requests.get(url, timeout=60, headers=H, **kw); r.raise_for_status(); return r
-        except Exception:
-            time.sleep(2 + 3 * i)
-    raise RuntimeError(url)
+            r = requests.get(url, timeout=60, headers=H, **kw)
+        except Exception as ex:
+            last = type(ex).__name__; print(f"  {url.split('?')[0][-70:]}: {last}", flush=True); time.sleep(3 + 3 * i); continue
+        if r.status_code == 200: return r
+        ra = r.headers.get("Retry-After", ""); last = f"HTTP {r.status_code}"
+        print(f"  {url.split('?')[0][-70:]}: HTTP {r.status_code}" + (f", retry after {ra} s" if ra else ""), flush=True)
+        if r.status_code in (403, 404): break
+        time.sleep(min(90.0, float(ra)) if ra.replace(".", "", 1).isdigit() else 5.0 * (i + 1))
+    raise RuntimeError(f"{last}: {url.split('?')[0]}")
+
+
+def mirror_name(title): return "cm_" + hashlib.sha1(title.encode()).hexdigest()[:16]
 
 
 def fetch(img):
@@ -22,7 +36,7 @@ def fetch(img):
     if img.get("commons"):
         t = img["commons"] if img["commons"].startswith("File:") else "File:" + img["commons"]
         d = get("https://commons.wikimedia.org/w/api.php", params={"action": "query", "titles": t, "prop": "imageinfo",
-                "iiprop": "url|size|extmetadata", "iiurlwidth": 2048, "format": "json"}).json()
+                "iiprop": "url|size|extmetadata", "iiurlwidth": WIDTH, "format": "json"}).json()
         pg = next(iter(d["query"]["pages"].values()))
         if "imageinfo" not in pg: raise SystemExit(f"file not found on Wikimedia Commons: {t}")
         ii = pg["imageinfo"][0]; em = ii.get("extmetadata", {})
@@ -34,9 +48,15 @@ def fetch(img):
         url = ii.get("thumburl") or ii["url"]
         meta = {"what": t[5:].rsplit(".", 1)[0], "author": art, "page": ii.get("descriptionurl", ""),
                 "license": "Public domain" if "public domain" in lic.lower() or lic.lower().startswith("pd") else lic}
+        try: content = get(url).content
+        except RuntimeError as ex:
+            print(f"  Wikimedia refused the download ({ex}); using the factory copy", flush=True)
+            try: content = get(MIRROR + mirror_name(t), tries=3).content
+            except RuntimeError: raise SystemExit(f"cannot download {t}: Wikimedia refused it ({ex}) and the factory has no copy "
+                                                  f"(factory/tools/mirror_commons.py)")
     else:
-        url = img["url"]
-    im = Image.open(io.BytesIO(get(url).content)).convert("RGB")
+        content = get(img["url"]).content
+    im = Image.open(io.BytesIO(content)).convert("RGB")
     if im.width < 1600: im = im.resize((1600, round(im.height * 1600 / im.width)), Image.LANCZOS)
     return im, meta
 
