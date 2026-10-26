@@ -104,7 +104,7 @@ wd.node_tree.links.new(wsky.outputs["Color"], wd.node_tree.nodes["Background"].i
 wd.node_tree.nodes["Background"].inputs["Strength"].default_value = WSTR
 # shadow fill: diffuse light from the sky is FILL x stronger (lighter shadows); the visible sky, the haze and the water
 # reflections keep their values
-FILLK = float(P.get("fill", 1.45))
+FILLK = float(P.get("fill", 1.0))
 lpw = wd.node_tree.nodes.new("ShaderNodeLightPath"); mw = wd.node_tree.nodes.new("ShaderNodeMath"); mw.operation = "MULTIPLY_ADD"
 wd.node_tree.links.new(lpw.outputs["Is Diffuse Ray"], mw.inputs[0]); mw.inputs[1].default_value = WSTR * (FILLK - 1); mw.inputs[2].default_value = WSTR
 wd.node_tree.links.new(mw.outputs[0], wd.node_tree.nodes["Background"].inputs["Strength"])
@@ -220,9 +220,9 @@ for k in P["path"]:
     tgt.location = wpt(*k["look"]); tgt.keyframe_insert("location", frame=f)
 C.bezier_keys([cam, tgt])
 sc.frame_start, sc.frame_end = 1, FRAMES
-# AgX Base is neutral but flat on satellite imagery; Punchy adds contrast + colour, the exposure is calibrated after it
-C.setup_cycles(sc, O, samples=int(P.get("samples", 72)), look={"punchy": "AgX - Punchy", "base": "AgX - Base Contrast"}[P.get("look", "punchy")])
-LOOK = {"punchy": "AgX - Punchy", "base": "AgX - Base Contrast"}[P.get("look", "punchy")]
+# AgX Base keeps the shadow detail of dark forests; Punchy adds contrast + colour but crushes them (measured)
+C.setup_cycles(sc, O, samples=int(P.get("samples", 72)), look={"punchy": "AgX - Punchy", "base": "AgX - Base Contrast"}[P.get("look", "base")])
+LOOK = {"punchy": "AgX - Punchy", "base": "AgX - Base Contrast"}[P.get("look", "base")]
 if sc.view_settings.look != LOOK: raise SystemExit(f"colour look {LOOK!r} is not available (got {sc.view_settings.look!r})")
 print(f"look {sc.view_settings.view_transform} / {sc.view_settings.look}", flush=True)
 print(f"built: terrain {NV} verts (step {STEP}, ring {FAR['w']}x{FAR['h']} px), lines {len(meta['lines'])}", flush=True)
