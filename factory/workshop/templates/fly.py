@@ -140,7 +140,7 @@ ex_, ey_ = edge_fac("X", (W - 1) / 2 / U), edge_fac("Y", (H - 1) / 2 / U)
 inside = N.new("ShaderNodeMath"); inside.operation = "MULTIPLY"; L.new(ex_.outputs[0], inside.inputs[0]); L.new(ey_.outputs[0], inside.inputs[1])
 cmix = N.new("ShaderNodeMix"); cmix.data_type = "RGBA"
 L.new(inside.outputs[0], cmix.inputs[0]); L.new(t_far.outputs["Color"], cmix.inputs[6]); L.new(t_main.outputs["Color"], cmix.inputs[7])
-hs = N.new("ShaderNodeHueSaturation"); hs.inputs["Saturation"].default_value = float(P.get("saturation", 1.12)); hs.inputs["Value"].default_value = 1.06
+hs = N.new("ShaderNodeHueSaturation"); hs.inputs["Saturation"].default_value = float(P.get("saturation", 1.3)); hs.inputs["Value"].default_value = 1.06
 L.new(cmix.outputs[2], hs.inputs["Color"])
 bc = N.new("ShaderNodeBrightContrast"); bc.inputs["Contrast"].default_value = 0.10; L.new(hs.outputs["Color"], bc.inputs["Color"])
 geo = N.new("ShaderNodeNewGeometry"); sepn = N.new("ShaderNodeSeparateXYZ"); L.new(geo.outputs["Normal"], sepn.inputs[0])
