@@ -103,5 +103,28 @@
    "background": "transparent"
   },
   "kind_alpha": "doll"
+ },
+ "reveal": {
+  "script": "reveal.py",
+  "prep": "reveal_prep.py",
+  "deps": [
+   "reveal_geo.py"
+  ],
+  "kind": "cauc",
+  "labels": true,
+  "segment": "shot",
+  "prep_keys": [
+   "items"
+  ],
+  "prep_fields": {
+   "items": [
+    "key",
+    "image"
+   ]
+  },
+  "overlay_keys": [
+   "labels"
+  ],
+  "budget_min_per_s": 2.2
  }
 }

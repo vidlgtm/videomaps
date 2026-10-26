@@ -421,7 +421,46 @@ def check_nest(c, sec):
            f"{', '.join(f'{x:.1f}' for x in NG.timeline(sec, len(lv))['t_open'])} s")
 
 
-CHECKS = {"fly": check_fly, "cloth": check_cloth, "shatter": check_shatter, "nest": check_nest}
+REVEAL_KEYS = {"items", "setting", "reveal", "camera", "labels", "samples"}
+
+
+def check_reveal(c, sec):
+    import sys, os
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates"))
+    import reveal_geo as RG
+    p = c.p; n0 = len(c.rep.errors)
+    c.known(REVEAL_KEYS)
+    it = p.get("items")
+    if not (isinstance(it, list) and 1 <= len(it) <= 4): c.bad("'items' must be a list of 1..4 items (left to right)"); return
+    keys = []
+    for i, e in enumerate(it):
+        if not isinstance(e, dict): c.bad(f"item {i}: must be an object"); continue
+        if set(e) - {"key", "image", "kind", "size"}: c.bad(f"item {i}: unknown field(s) {sorted(set(e) - {'key', 'image', 'kind', 'size'})}")
+        k = e.get("key")
+        if not (isinstance(k, str) and k and set(k) <= set("abcdefghijklmnopqrstuvwxyz0123456789_")): c.bad(f"item {i}: key must be lowercase letters, digits, _")
+        elif k in keys: c.bad(f"item {i}: duplicate key {k}")
+        else: keys.append(k)
+        if not _flag_ok(e.get("image")): c.bad(f"item {i}: 'image' must be {{commons: File:...}} or {{url: https://...}}")
+        if e.get("kind", "print") not in ("print", "document"): c.bad(f"item {i}: kind must be print or document")
+        if "size" in e and not (_num(e["size"]) and 0.6 <= e["size"] <= 1.6): c.bad(f"item {i}: size must be 0.6..1.6")
+    c.choice("setting", ("desk", "museum")); c.choice("reveal", ("spot", "sweep")); c.number("samples", 16, 256)
+    cam = p.get("camera", {})
+    if not isinstance(cam, dict) or set(cam) - {"elevation", "lens", "fill"}: c.bad("'camera' takes elevation, lens, fill")
+    else:
+        c.number("elevation", 35, 80, src=cam); c.number("lens", 35, 85, src=cam); c.number("fill", 0.45, 0.75, src=cam)
+    lab = p.get("labels", [])
+    if not (isinstance(lab, list) and all(isinstance(e, list) and 1 <= len(e) <= 3 and all(isinstance(x, str) for x in e) for e in lab)):
+        c.bad("'labels' must be [[key, display, style], ...]")
+    else:
+        for e in lab:
+            if e[0] not in keys: c.bad(f"label {e[0]!r} is not an item key")
+    if len(c.rep.errors) > n0: return
+    tl = RG.timeline(sec, len(it))
+    if sec < tl["need"]: c.bad(f"{len(it)} items need at least {tl['need']:.1f} s (got {sec:g})"); return
+    c.note(f"{len(it)} item(s), reveals at {', '.join(f'{x:.1f}' for x in tl['t_rev'])} s, each held {tl['hold']:.1f} s")
+
+
+CHECKS = {"fly": check_fly, "cloth": check_cloth, "shatter": check_shatter, "nest": check_nest, "reveal": check_reveal}
 
 
 def check(spec, reg):

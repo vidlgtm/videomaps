@@ -1,5 +1,5 @@
 {
- "note": "Workshop samples, second batch: the flag of Yugoslavia (budget raised), French West Africa splitting into eight states (1958-1960, flags and names of the time), and the flags of Egypt nested in four levels (1922-1984).",
+ "note": "Workshop samples, second batch: the flag of Yugoslavia (budget raised), French West Africa splitting into eight states (1958-1960, flags and names of the time), the flags of Egypt nested in four levels (1922-1984), and the Sykes-Picot archive revealed on a desk (the two negotiators and the signed map of 8 May 1916).",
  "pieces": [
   {
    "id": "flag_yugoslavia",
@@ -225,6 +225,54 @@
      [
       "today",
       "Egypt today · flag of 1984"
+     ]
+    ],
+    "samples": 48
+   }
+  },
+  {
+   "id": "reveal_sykes_picot",
+   "template": "reveal",
+   "seconds": 14,
+   "params": {
+    "items": [
+     {
+      "key": "sykes",
+      "image": {
+       "commons": "File:Leopold Pilichowski - Portrait of Sir Mark Sykes.jpg"
+      },
+      "kind": "print"
+     },
+     {
+      "key": "picot",
+      "image": {
+       "commons": "File:François Georges-Picot.JPG"
+      },
+      "kind": "print"
+     },
+     {
+      "key": "map1916",
+      "image": {
+       "commons": "File:MPK1-426 Sykes Picot Agreement Map signed 8 May 1916.jpg"
+      },
+      "kind": "document",
+      "size": 1.35
+     }
+    ],
+    "setting": "desk",
+    "reveal": "sweep",
+    "labels": [
+     [
+      "sykes",
+      "Sir Mark Sykes · British negotiator"
+     ],
+     [
+      "picot",
+      "François Georges-Picot · French negotiator"
+     ],
+     [
+      "map1916",
+      "The Sykes–Picot map · signed 8 May 1916"
      ]
     ],
     "samples": 48
