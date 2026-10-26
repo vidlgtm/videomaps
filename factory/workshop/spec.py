@@ -1,0 +1,145 @@
+#!/usr/bin/env python3
+"""3D SCENE DESCRIPTIONS - <order>/scenes.json. There are no ready-made scenes in the factory: every 3D shot of a film
+is described in the order (what is there, where, what happens, how the camera moves), and the workshop builds it from
+general tools (kit/). This file holds the vocabulary of those tools and checks a description before anything runs.
+
+scenes.json
+{"scenes": {"<id>": {
+   "idea":   one sentence - what the viewer sees and why it matters to the story,
+   "seconds": length of the shot (the voice timing replaces it in the production line),
+   "output": "film" (full frame) | "over_map" (transparent, laid over the 2D map),
+   "place":  {"kind": PLACE, "surface": MATERIAL, "region": [lon0, lat0, lon1, lat1] (terrain / sea only)},
+   "light":  {"mood": MOOD, "weather": WEATHER},
+   "cast":   {"<name>": {"is": NOUN, "from": "store:<key>" | "map:<ISO3 or shape>" | "terrain" | "text:<words>" | "none",
+                         "material": MATERIAL, "size": metres or "S"|"M"|"L", "where": [RELATION, "<name>" | "place"]}},
+   "beats":  [{"t": seconds, "do": VERB, "who": "<name>", ...parameters of the verb}],
+   "camera": [{"t": seconds, "move": MOVE, "to": "<name>", ...parameters}]   (the first one sets the opening framing)
+}}}
+usage: python spec.py <orderDir>     exit 2 = the description has errors (all listed at once)"""
+import json, os, re, sys
+
+NOUNS = {   # what a cast member is -> the sources it can be made from
+    "sheet": {"store"}, "print": {"store"}, "canvas": {"store"}, "cutout": {"store"}, "cloth": {"store", "none"},
+    "tile": {"map"}, "block": {"store", "text", "none"}, "book": {"store", "none"}, "box": {"store", "none"},
+    "disc": {"store", "none"}, "globe": {"none"}, "model": {"store"}, "terrain": {"terrain"}, "text": {"text"},
+    "pole": {"none"}, "table": {"none"}, "plinth": {"none"}, "frame": {"none"}, "wall": {"none"}, "candle": {"none"},
+}
+VERBS = {   # verb -> parameters it accepts (all optional unless listed in REQUIRED)
+    "appear": {"how", "dur"}, "vanish": {"how", "dur"}, "drop": {"from_h", "dur"}, "rise": {"h", "dur"},
+    "slide": {"to", "dur"}, "turn": {"deg", "axis", "dur"}, "flip": {"axis", "dur"}, "open": {"deg", "parts", "dur"},
+    "close": {"dur"}, "unfold": {"dur"}, "fold": {"dur"}, "wave": {"wind", "dur"}, "split": {"into", "gap", "dur"},
+    "assemble": {"dur"}, "burn": {"from", "dur"}, "dissolve": {"dur"}, "stamp": {"with", "dur"}, "glow": {"color", "dur"},
+    "light": {"how", "dur"}, "write": {"text", "dur"}, "route": {"path", "color", "dur"}, "label": {"text", "dur"},
+    "scatter": {"dur"}, "stack": {"on", "dur"},
+}
+REQUIRED = {"split": {"into"}, "write": {"text"}, "route": {"path"}, "label": {"text"}, "stamp": {"with"}}
+MOVES = {"wide": set(), "close": set(), "top": set(), "low": set(), "push": {"dur"}, "pull": {"dur"},
+         "orbit": {"deg", "dur"}, "crane": {"h", "dur"}, "dolly": {"side", "dur"}, "track": {"dur"}, "tilt": {"deg", "dur"},
+         "fly": {"path", "dur"}, "rack": {"from", "dur"}, "hold": {"dur"}}
+PLACES = {"desk", "museum", "floor", "wall", "terrain", "sea", "sky", "void"}
+MOODS = {"studio", "museum", "lamp", "dawn", "noon", "dusk", "night", "candle", "overcast"}
+WEATHER = {"clear", "haze", "rain", "snow"}
+MATERIALS = {"paper", "parchment", "cloth", "silk", "wood", "walnut", "oak", "stone", "marble", "slate", "sand", "bronze",
+             "brass", "gold", "silver", "iron", "glass", "velvet", "leather", "wax", "plaster", "painted", "felt"}
+RELATIONS = {"on", "in", "under", "left_of", "right_of", "behind", "in_front_of", "beside", "around", "above", "against"}
+SCENE_KEYS = {"idea", "seconds", "output", "place", "light", "cast", "beats", "camera", "note"}
+CAST_KEYS = {"is", "from", "material", "size", "where", "what", "note"}
+
+
+def check(order):
+    errs = []
+    E = errs.append
+    p = os.path.join(order, "scenes.json")
+    if not os.path.exists(p): return [f"{p} is missing"], {}
+    try: D = json.load(open(p, encoding="utf-8"))
+    except Exception as e: return [f"scenes.json is not valid JSON: {e}"], {}
+    store = {}
+    sp = os.path.join(order, "store.json")
+    if os.path.exists(sp): store = json.load(open(sp, encoding="utf-8")).get("items", {})
+    S = D.get("scenes") or {}
+    if not S: E("scenes.json: no scenes")
+    for sid, sc in S.items():
+        w = f"scene {sid}"
+        if not re.fullmatch(r"[a-z0-9_]+", sid): E(f"{w}: id uses lower-case letters, digits and _ only")
+        for k in sc:
+            if k not in SCENE_KEYS: E(f'{w}: unknown key "{k}" (allowed: {", ".join(sorted(SCENE_KEYS))})')
+        idea = sc.get("idea", "")
+        if len(idea.split()) < 6: E(f'{w}: "idea" must say in one sentence what the viewer sees and why (6+ words)')
+        T = sc.get("seconds")
+        if not isinstance(T, (int, float)) or not 2 <= T <= 40: E(f'{w}: "seconds" must be 2 to 40')
+        T = T if isinstance(T, (int, float)) else 0
+        if sc.get("output", "film") not in ("film", "over_map"): E(f'{w}: "output" is "film" or "over_map"')
+        pl = sc.get("place") or {}
+        if pl.get("kind") not in PLACES: E(f'{w}: place.kind must be one of {", ".join(sorted(PLACES))}')
+        if pl.get("surface") and pl["surface"] not in MATERIALS: E(f'{w}: place.surface "{pl["surface"]}" is not a known material')
+        if pl.get("kind") in ("terrain", "sea"):
+            r = pl.get("region")
+            if not (isinstance(r, list) and len(r) == 4 and all(isinstance(x, (int, float)) for x in r) and r[0] < r[2] and r[1] < r[3]):
+                E(f"{w}: place.region must be [lon0, lat0, lon1, lat1] for {pl.get('kind')}")
+        lt = sc.get("light") or {}
+        if lt.get("mood") not in MOODS: E(f'{w}: light.mood must be one of {", ".join(sorted(MOODS))}')
+        wx = lt.get("weather", "clear")
+        if wx not in WEATHER: E(f'{w}: light.weather must be one of {", ".join(sorted(WEATHER))}')
+        if wx in ("rain", "snow") and lt.get("mood") in ("noon", "dawn", "dusk", "studio"):
+            E(f"{w}: {wx} needs an overcast or night sky, not {lt.get('mood')} sun")
+        if sc.get("output") == "over_map" and pl.get("kind") not in ("void",):
+            E(f'{w}: a shot laid over the map has place.kind "void" (nothing behind the cast)')
+        cast = sc.get("cast") or {}
+        if not cast: E(f"{w}: no cast")
+        for n, c in cast.items():
+            cw = f"{w} cast {n}"
+            for k in c:
+                if k not in CAST_KEYS: E(f'{cw}: unknown key "{k}"')
+            nn = c.get("is")
+            if nn not in NOUNS: E(f'{cw}: "is" must be one of {", ".join(sorted(NOUNS))} (a missing tool is added on request)'); continue
+            src = str(c.get("from", "none")); kind = src.split(":", 1)[0]
+            if kind not in NOUNS[nn]: E(f'{cw}: a {nn} is made from {" | ".join(sorted(NOUNS[nn]))}, not "{src}"')
+            if kind == "store" and src.split(":", 1)[1] not in store: E(f'{cw}: "{src}" is not in the order store (store.json)')
+            if kind == "map" and not re.fullmatch(r"map:[A-Za-z0-9_:-]+", src): E(f'{cw}: "{src}" - map:<ISO3> or map:<shape id>')
+            if c.get("material") and c["material"] not in MATERIALS: E(f'{cw}: material "{c["material"]}" is not known')
+            sz = c.get("size")
+            if sz is not None and not (sz in ("S", "M", "L") or (isinstance(sz, (int, float)) and 0.01 <= sz <= 50)): E(f'{cw}: size is metres (0.01-50) or S/M/L')
+            wh = c.get("where")
+            if wh is not None:
+                if not (isinstance(wh, list) and len(wh) == 2 and wh[0] in RELATIONS and (wh[1] in cast or wh[1] == "place") and wh[1] != n):
+                    E(f'{cw}: "where" is [relation, other cast name or "place"], relations: {", ".join(sorted(RELATIONS))}')
+        last = -1
+        for i, b in enumerate(sc.get("beats") or []):
+            bw = f"{w} beat {i + 1}"
+            v = b.get("do")
+            if v not in VERBS: E(f'{bw}: "do" must be one of {", ".join(sorted(VERBS))} (a missing tool is added on request)'); continue
+            if b.get("who") not in cast: E(f'{bw}: "who" must be a cast name')
+            t = b.get("t")
+            if not isinstance(t, (int, float)) or not 0 <= t < T: E(f"{bw}: t must be inside the shot (0-{T})")
+            elif t < last: E(f"{bw}: beats in time order")
+            else: last = t
+            for k in b:
+                if k not in VERBS[v] | {"t", "do", "who", "note"}: E(f'{bw}: "{v}" has no parameter "{k}" (it has: {", ".join(sorted(VERBS[v])) or "none"})')
+            for k in REQUIRED.get(v, ()):
+                if k not in b: E(f'{bw}: "{v}" needs "{k}"')
+            if v == "split" and isinstance(b.get("into"), list):
+                for x in b["into"]:
+                    if not re.fullmatch(r"map:[A-Za-z0-9_:-]+|\d+", str(x)): E(f'{bw}: split "into" lists map:<ISO3> pieces or a number of pieces')
+        cams = sc.get("camera") or []
+        if not cams: E(f"{w}: no camera (the first entry sets the opening framing)")
+        lastc = -1
+        for i, c in enumerate(cams):
+            cw = f"{w} camera {i + 1}"
+            mv = c.get("move")
+            if mv not in MOVES: E(f'{cw}: "move" must be one of {", ".join(sorted(MOVES))}'); continue
+            t = c.get("t")
+            if not isinstance(t, (int, float)) or not 0 <= t < T: E(f"{cw}: t must be inside the shot")
+            elif t < lastc: E(f"{cw}: camera entries in time order")
+            else: lastc = t
+            if c.get("to") is not None and c["to"] not in cast: E(f'{cw}: "to" must be a cast name')
+            for k in c:
+                if k not in MOVES[mv] | {"t", "move", "to", "note"}: E(f'{cw}: "{mv}" has no parameter "{k}"')
+            if mv == "fly" and pl.get("kind") != "terrain": E(f"{cw}: fly is over terrain")
+    return errs, S
+
+
+if __name__ == "__main__":
+    errs, S = check(sys.argv[1])
+    for e in errs: print("SCENE ERROR:", e)
+    print(f"{len(S)} scenes, {len(errs)} errors")
+    sys.exit(2 if errs else 0)

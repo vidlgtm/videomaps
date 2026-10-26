@@ -1,0 +1,210 @@
+{
+ "note": "Every 3D scene ever made (what it is, what it does, where, light, camera, idea). novelty.py refuses a new scene that repeats one of them. Seeded with the 3D pieces of ussr15 (v5) and the workshop samples of October 2026 (removed).",
+ "scenes": [
+  {
+   "film": "ussr15",
+   "scene": "opening_flag_lowered",
+   "idea": "The red flag is lowered from its pole above the Kremlin at dusk as the Soviet Union ends",
+   "hero": [
+    "cloth",
+    "drop",
+    "sky"
+   ],
+   "features": [
+    "material:cloth",
+    "mood:dusk",
+    "move:low",
+    "move:push",
+    "moves:low>push",
+    "noun:cloth",
+    "noun:pole",
+    "output:film",
+    "place:sky",
+    "surface:None",
+    "verb:drop",
+    "verb:wave",
+    "vn:drop>cloth",
+    "vn:wave>cloth",
+    "weather:clear"
+   ],
+   "recorded": "2026-10-26"
+  },
+  {
+   "film": "ussr15",
+   "scene": "matryoshka_republics",
+   "idea": "A nesting doll opens shell after shell to show the republics nested inside one another",
+   "hero": [
+    "model",
+    "open",
+    "void"
+   ],
+   "features": [
+    "material:painted",
+    "mood:studio",
+    "move:close",
+    "move:hold",
+    "moves:close>hold",
+    "noun:model",
+    "output:over_map",
+    "place:void",
+    "surface:None",
+    "verb:open",
+    "vn:open>model",
+    "weather:clear"
+   ],
+   "recorded": "2026-10-26"
+  },
+  {
+   "film": "ussr15",
+   "scene": "caucasus_flight",
+   "idea": "The camera flies low over the real relief of the Caucasus with the borders drawn on the land",
+   "hero": [
+    "terrain",
+    "hold",
+    "terrain"
+   ],
+   "features": [
+    "mood:noon",
+    "move:fly",
+    "move:wide",
+    "moves:wide>fly",
+    "noun:terrain",
+    "output:film",
+    "place:terrain",
+    "surface:None",
+    "weather:clear"
+   ],
+   "recorded": "2026-10-26"
+  },
+  {
+   "film": "workshop_samples_2026_10",
+   "scene": "fly_balkans",
+   "idea": "The camera glides over the mountains and islands of a region with its borders drawn on the relief",
+   "hero": [
+    "terrain",
+    "hold",
+    "terrain"
+   ],
+   "features": [
+    "mood:noon",
+    "move:fly",
+    "move:wide",
+    "moves:wide>fly",
+    "noun:terrain",
+    "output:film",
+    "place:terrain",
+    "surface:None",
+    "weather:clear"
+   ],
+   "recorded": "2026-10-26"
+  },
+  {
+   "film": "workshop_samples_2026_10",
+   "scene": "flag_yugoslavia",
+   "idea": "A historical flag waves on its pole in a strong wind under an overcast sky",
+   "hero": [
+    "cloth",
+    "wave",
+    "sky"
+   ],
+   "features": [
+    "material:cloth",
+    "mood:overcast",
+    "move:low",
+    "move:orbit",
+    "moves:low>orbit",
+    "noun:cloth",
+    "noun:pole",
+    "output:film",
+    "place:sky",
+    "surface:None",
+    "verb:wave",
+    "vn:wave>cloth",
+    "weather:rain"
+   ],
+   "recorded": "2026-10-26"
+  },
+  {
+   "film": "workshop_samples_2026_10",
+   "scene": "shatter_aof",
+   "idea": "The map of French West Africa breaks into the pieces of its future countries which rise apart",
+   "hero": [
+    "tile",
+    "rise",
+    "void"
+   ],
+   "features": [
+    "mood:studio",
+    "move:push",
+    "move:wide",
+    "moves:wide>push",
+    "noun:tile",
+    "output:over_map",
+    "place:void",
+    "surface:None",
+    "verb:rise",
+    "verb:split",
+    "vn:rise>tile",
+    "vn:split>tile",
+    "weather:clear"
+   ],
+   "recorded": "2026-10-26"
+  },
+  {
+   "film": "workshop_samples_2026_10",
+   "scene": "nest_egypt",
+   "idea": "A nested painted object opens shell after shell to show the successive flags of Egypt inside one another",
+   "hero": [
+    "box",
+    "open",
+    "museum"
+   ],
+   "features": [
+    "material:painted",
+    "mood:museum",
+    "move:close",
+    "move:orbit",
+    "moves:close>orbit",
+    "noun:box",
+    "output:film",
+    "place:museum",
+    "surface:marble",
+    "verb:open",
+    "vn:open>box",
+    "weather:clear"
+   ],
+   "recorded": "2026-10-26"
+  },
+  {
+   "film": "workshop_samples_2026_10",
+   "scene": "reveal_sykes_picot",
+   "idea": "On a desk under a lamp two portraits and the original map are revealed one after another by a moving light with captions",
+   "hero": [
+    "print",
+    "light",
+    "desk"
+   ],
+   "features": [
+    "material:paper",
+    "mood:lamp",
+    "move:dolly",
+    "move:push",
+    "move:wide",
+    "moves:push>dolly",
+    "moves:wide>push",
+    "noun:print",
+    "noun:sheet",
+    "output:film",
+    "place:desk",
+    "surface:walnut",
+    "verb:label",
+    "verb:light",
+    "vn:label>print",
+    "vn:light>print",
+    "vn:light>sheet",
+    "weather:clear"
+   ],
+   "recorded": "2026-10-26"
+  }
+ ]
+}
