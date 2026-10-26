@@ -1,0 +1,51 @@
+name: workshop
+# 3D pieces of an order (factory/orders/<order>/workshop.json) rendered on Kaggle GPU, cached by content in the
+# release factory_ws_cache. Started on purpose only (dispatch, or called by the factory line).
+on:
+  workflow_dispatch:
+    inputs:
+      order: { description: 'order folder in factory/orders', required: true }
+  workflow_call:
+    inputs:
+      order: { type: string, required: true }
+
+permissions:
+  contents: write
+
+jobs:
+  workshop:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    env:
+      KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
+      KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+      GH_TOKEN: ${{ github.token }}
+      ORDER: ${{ inputs.order }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - name: Kaggle client
+        run: pip install -q "kaggle>=1.7.4"
+      - name: Render the 3D pieces on Kaggle GPU and publish them
+        run: python3 factory/workshop/run.py factory/orders/$ORDER --release factory_ws_cache --sha ${{ github.sha }} --repo ${{ github.repository }}
+      - name: Review sheet of the pieces
+        if: always()
+        run: |
+          mkdir -p /tmp/rev && cd /tmp/rev
+          python3 - <<'PY'
+          import json, os, subprocess
+          p = f"{os.environ['GITHUB_WORKSPACE']}/factory/orders/{os.environ['ORDER']}/out/workshop.json"
+          if os.path.exists(p):
+              for k, c in json.load(open(p))["clips"].items():
+                  subprocess.run(["gh", "release", "download", "factory_ws_cache", "-R", os.environ["GITHUB_REPOSITORY"], "-p", c["sheet"], "--clobber"])
+                  print(k, c["src"], c["kind"], c["segments"])
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: workshop
+          path: |
+            factory/orders/${{ inputs.order }}/out/workshop.json
+            /tmp/rev/*.jpg
+          if-no-files-found: ignore

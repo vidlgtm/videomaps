@@ -1,0 +1,7 @@
+{
+ "fly": {"script": "fly.py", "prep": "fly_prep.py", "kind": "cauc", "labels": true, "segment": "fly",
+         "credits": ["Sentinel-2 cloudless 2016 by EOX IT Services GmbH (contains modified Copernicus Sentinel data 2016), CC BY 4.0",
+                     "Terrain: AWS Terrain Tiles (SRTM, ETOPO)", "Boundaries: Natural Earth"]},
+ "cloth": {"script": "cloth.py", "prep": "cloth_prep.py", "kind": "cauc", "labels": false, "segment": "shot",
+           "alpha_when": {"background": "transparent"}, "kind_alpha": "doll"}
+}

@@ -218,11 +218,11 @@ const CaucLabels: React.FC<{t: number}> = ({t}) => {
   const tr: any = (cauc as any).tracks;
   const placed: {x0: number; x1: number; y0: number; y1: number}[] = [];
   const out: React.ReactNode[] = [];
-  (((cauc as any).names?.length ? (cauc as any).names : CAUC_NAMES) as [string, string][]).forEach(([k, name]) => {
+  (((cauc as any).names?.length ? (cauc as any).names : CAUC_NAMES) as [string, string, string?][]).forEach(([k, name, st]) => {
     const a = tr[k]?.[Math.min(Math.max(f, 0), (tr[k]?.length ?? 1) - 1)];
     if (!a || !a[2]) return;
-    const sea = k.includes('SEA');
-    const chech = k === 'Grozny';
+    const sea = st === 'sea' || k.includes('SEA');
+    const chech = st === 'hot' || k === 'Grozny';
     const fs = chech ? 34 : sea ? 30 : 24;
     const hw = (name.length * fs * (sea ? 0.56 : 0.74)) / 2 + 8;
     const stem0 = sea ? 0 : 28;
