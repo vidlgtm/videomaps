@@ -53,16 +53,16 @@ def z_top(t):
 
 u = np.linspace(0, 1, NU + 1); v = np.linspace(0, 1, NV + 1)
 UU, VV = np.meshgrid(u, v)
-AW = 0.18 + 0.34 * WIND; SPD = 0.6 + 0.8 * WIND
-HANG = math.radians(75 * (1 - WIND) ** 1.5)
+AW = (0.12 + 0.26 * WIND) * (0.75 if WET else 1.0); SPD = 0.6 + 0.8 * WIND      # a wet flag is heavier: smaller waves
+HANG = math.radians(75 * (1 - WIND) ** 1.5 + (6.0 if WET else 0.0))
 
 
 def flag_at(t):
     tw = SPD * t
     A = AW * UU ** 0.7 * (0.88 + 0.12 * math.sin(0.8 * tw))
     y = A * (np.sin(2 * np.pi * (1.6 * UU - 1.05 * tw) + 1.4 * VV)
-             + 0.45 * np.sin(2 * np.pi * (3.1 * UU - 1.9 * tw) + 2.3 * VV + 1.1)
-             + 0.22 * UU * np.sin(2 * np.pi * (6.2 * UU - 3.4 * tw) - 2.6 * VV + 0.3))
+             + 0.32 * np.sin(2 * np.pi * (3.1 * UU - 1.9 * tw) + 2.3 * VV + 1.1)
+             + 0.12 * UU * np.sin(2 * np.pi * (6.2 * UU - 3.4 * tw) - 2.6 * VV + 0.3))
     dx0 = L / NU
     dxs = np.sqrt(np.clip(dx0 ** 2 - np.diff(y, axis=1) ** 2, (0.35 * dx0) ** 2, None))
     x = np.concatenate([np.zeros((NV + 1, 1)), np.cumsum(dxs, axis=1)], 1)
