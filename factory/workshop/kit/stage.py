@@ -25,7 +25,7 @@ MOOD = {
                                                      ("SPOT", (0.35, 1.7, 1.1), (1.0, 0.88, 0.72), 10.0, 0.6)]),
     "museum": (0.09, 0.97, (0.0014, 0.0014, 0.0016), [("KEY", (-0.2, -0.5, 2.4), (1.0, 0.94, 0.86), 25.0, 0.25),
                                                        ("SPOT", (0.3, 1.8, 1.4), (0.92, 0.95, 1.0), 9.0, 0.5)]),
-    "candle": (0.08, 0.95, (0.0012, 0.0009, 0.0006), [("CANDLE", (-0.55, -0.25, 0.35), (1.0, 0.55, 0.25), 11.1, 0.0)]),
+    "candle": (0.08, 0.95, (0.0030, 0.0022, 0.0015), [("CANDLE", (-0.55, -0.25, 0.35), (1.0, 0.55, 0.25), 11.1, 0.0)]),
     "studio": (0.16, 0.50, (0.010, 0.010, 0.011), [("AREA", (-1.2, -1.4, 1.8), (1.0, 0.97, 0.92), 12.4, 1.0),
                                                    ("AREA", (1.4, -1.0, 1.0), (0.92, 0.95, 1.0), 2.5, 1.4),
                                                    ("SPOT", (0.3, 1.6, 1.3), (1.0, 0.98, 0.95), 19.0, 0.5)]),
@@ -314,7 +314,9 @@ class Stage:
                 objs.append((box(f"{n}_leg{i}", 0.05, 0.05, m["h"] - 0.04, e, tm, x=sx * (m["w"] / 2 - 0.07), y=sy * (m["d"] / 2 - 0.07)), "o"))
         elif noun == "candle":
             cm = M.solid(n, "wax", color=(0.92, 0.88, 0.78)); mats.append(cm)
-            objs.append((cylinder(n, 0.022, m["h"], e, cm, seg=32, bevel=0.002), "o"))
+            body = cylinder(n, 0.022, m["h"], e, cm, seg=32, bevel=0.002); objs.append((body, "o"))
+            try: body.visible_shadow = False                           # wax lets its own flame through: no black ring at its foot
+            except Exception: pass
             km = M.solid(f"{n}_wick", "painted", color=(0.03, 0.03, 0.03)); mats.append(km)
             objs.append((cylinder(f"{n}_wick", 0.0012, 0.012, e, km, z0=m["h"], seg=8), "o"))
             fl = M.flame(f"{n}_flame"); mats.append(fl)
@@ -427,6 +429,13 @@ class Stage:
                 on = ((b > 0.002) & (b < 0.995)).astype(float)
                 fl = 1 + 0.25 * np.sin(2 * np.pi * 7.3 * t) + 0.15 * np.sin(2 * np.pi * 13.1 * t + 0.7)
                 keys(ld, "energy", self.k * 0.4 * Lm * Lm * on * fl * np.sin(np.pi * np.clip(b, 0, 1)) ** 0.5)
+        # documents and pictures always have their own soft light: their exact colours then sit in a matching pool of light
+        warm = {"candle": (1.0, 0.72, 0.46), "night": (0.78, 0.84, 1.0)}.get(self.mood, (1.0, 0.93, 0.82))
+        for n, c in self.cast.items():
+            if n in self.spots or not (c["is"] in ("sheet", "print", "canvas") or (c["is"] == "block" and self.src(n)[0] == "store")): continue
+            m = self.L[n]; Lm = max(0.25, max(m["w"], m["d"]))
+            cc = Vector((m["x"], m["y"], m["z"] + m["h"]))
+            self.spot(f"{n}_own", cc + Vector((-0.35, -0.8, 2.2)) * Lm, cc, warm, self.k * 32.0 * Lm * Lm, Lm, 0.45)
         for n, sp in self.spots.items():
             m = self.L[n]; Lm = max(0.25, max(m["w"], m["d"]))
             c = Vector((m["x"], m["y"], m["z"] + m["h"]))
