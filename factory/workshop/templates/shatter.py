@@ -3,14 +3,15 @@ break : the union flag spans all pieces as one slab with a gold rim; the shared 
         split apart and lift one after another, and each top wipes from the union flag to its own flag
 rise  : pieces lift out of the map - their tops first show the land, then wipe to their flags - leaving dark sockets
 drop  : pieces fall into place one after another, fading in, and land with a light ring in their own outline
-look  : flag tops with a gold rim, dark slab sides, soft sun shadows on the base, vignette toward the edges of the view
+look  : flag tops in their exact colours with a gold rim, dark slab sides, soft sun shadows on the base, vignette toward
+        the edges of the view; the exposure is set on the base map
 labels: per-frame 2D positions of each labelled piece (a point inside its shape, moving with it; hidden when another
         piece covers it), so the engine pins the names exactly
 usage: blender -b -P shatter.py -- --params p.json --data <prep dir> --out <dir> [--start 1 --end N --gpu OPTIX --ev X
        --budget-min M | --preview]
 params: seconds; action; camera {target [lon, lat], span [km, km], heading [deg, deg], tilt [deg, deg]}; pieces
         [{key, ..., fit, focus}]; union {fit, focus}; order; thickness / lift / spread (fractions of the start span);
-        rim (frame px); base_dim; sun {elevation, azimuth (relative to the frame)}; lens; samples; timing; labels"""
+        rim (frame px); base_dim; base_luma; sun {elevation, azimuth (relative to the frame)}; lens; samples; timing; labels"""
 import bpy, os, sys, json, math, zlib
 import numpy as np
 from mathutils import Vector, Matrix, Quaternion
@@ -202,11 +203,27 @@ UNION = P.get("union") or {}
 if meta.get("union"):
     U_RECT = place(meta["union"]["bounds"], meta["union"]["flag"]["aspect"], UNION.get("fit", "cover"), UNION.get("focus", [0.5, 0.5]))
 OBJ, HND, LOCAL, NTOP, CEN, SOCK, RING = {}, {}, {}, {}, {}, {}, {}
+UVR, FFILE = {}, {}
 tri_total = 0
+EXACT = []   # value nodes holding 2^-exposure: emission x exposure = 1, so each flag renders with its own sRGB colours
+
+
+def flag_emission(N, L, col):
+    em = N.new("ShaderNodeEmission"); L.new(col, em.inputs["Color"])
+    k = value(N, 1.0); EXACT.append(k); L.new(k.outputs[0], em.inputs["Strength"])
+    return em
+
+
+def exact_flags(scene, *_):
+    v = 2.0 ** (-float(scene.view_settings.exposure))
+    for nd in EXACT:
+        if abs(nd.outputs[0].default_value - v) > 1e-7: nd.outputs[0].default_value = v
 
 
 def top_material(k, pc, pm, own_img, sdf_img):
     m = bpy.data.materials.new(f"top_{k}"); m.use_nodes = True
+    try: m.cycles.emission_sampling = "NONE"          # the flags are not light sources for the scene
+    except Exception: pass
     N_, L_, out = nodes_of(m)
     own = image(N_, L_, own_img, uvmap(N_, "UVown"), "Cubic")
     sdf = image(N_, L_, sdf_img, uvmap(N_, "UVsdf"))
@@ -221,16 +238,11 @@ def top_material(k, pc, pm, own_img, sdf_img):
                                                        math_node(N_, L_, "ADD", wipe.outputs[0], soft)))
     dd = math_node(N_, L_, "DIVIDE", math_node(N_, L_, "SUBTRACT", s, wipe.outputs[0]), soft)
     glow = math_node(N_, L_, "EXPONENT", math_node(N_, L_, "MULTIPLY", math_node(N_, L_, "MULTIPLY", dd, dd), -1.0))
-    pnew = N_.new("ShaderNodeBsdfPrincipled"); L_.new(own.outputs["Color"], pnew.inputs["Base Color"])
-    pnew.inputs["Roughness"].default_value = 0.42
-    try: pnew.inputs["Coat Weight"].default_value = 0.18
-    except Exception: pass
+    # flag faces are unlit (emission, strength 1 after exposure): sun, sky and the exposure never change their colours
+    pnew = flag_emission(N_, L_, own.outputs["Color"])
     if ACT == "break":
         un = image(N_, L_, UNION_IMG, uvmap(N_, "UVunion"), "Cubic")
-        pold = N_.new("ShaderNodeBsdfPrincipled"); L_.new(un.outputs["Color"], pold.inputs["Base Color"])
-        pold.inputs["Roughness"].default_value = 0.42
-        try: pold.inputs["Coat Weight"].default_value = 0.18
-        except Exception: pass
+        pold = flag_emission(N_, L_, un.outputs["Color"])
     elif ACT == "rise":
         land = image(N_, L_, BASE_IMG, uvmap(N_, "UVbase"), "Cubic")
         pold = N_.new("ShaderNodeBsdfDiffuse"); pold.inputs["Roughness"].default_value = 0.8
@@ -312,6 +324,7 @@ for pc in PIECES:
     px, py = np.concatenate([V[:, 0], V[:, 0]]), np.concatenate([V[:, 1], V[:, 1]])
     fl = pm["flag"]
     rx0, ry0, rw, rh = place(pm["bounds"], fl["aspect"], pc.get("fit", "cover"), pc.get("focus", [0.5, 0.5]))
+    UVR[k], FFILE[k] = (rx0, ry0, rw, rh), f"{DATA}/{fl['file']}"
     bx0, by0, rr, wr, hr = pm["sdf"]
     mnx, mny, mxx, mxy = pm["bounds"]
     uvs = {"UVown": ((px - rx0) / rw, 1 - (py - ry0) / rh), "UVbase": (px / W, 1 - py / H),
@@ -485,6 +498,8 @@ C.setup_cycles(sc, O, samples=int(P.get("samples", 64)), look="None")
 sc.view_settings.view_transform = "Standard"
 try: sc.view_settings.look = "None"
 except Exception: pass
+bpy.app.handlers.frame_change_pre.append(exact_flags)   # keeps 2^-exposure on the flags whenever the exposure changes
+exact_flags(sc)
 print(f"built: distance fields max {SDF_MAX}", flush=True)
 print(f"built: {n} pieces, {tri_total} top triangles, action {ACT}, end of animation {SCH['end']:.1f} s, base {W}x{H} px "
       f"({meta['base']}), rim {RIM:.1f} base px", flush=True)
@@ -595,12 +610,71 @@ if O.preview:
         _, Mi = mats(); o, rows = C.cam_rays(sc, cam)
         return ["".join(cast(o, d, Mi)[0] for d in row) for row in rows]
 
-    fl = [PM[k]["flag"]["luma"] for k in PK]
-    lum = float(np.mean(fl))
-    if ACT == "break": lum = 0.35 * meta["union"]["flag"]["luma"] + 0.65 * lum
-    target = float(np.clip(0.95 * lum, 0.25, 0.7))
-    C.preview_run(sc, O, FRAMES, classify, subject=("p",), fallback_subject=("p", "s"), target=target, tol=0.09,
-                  ev_range=(-1.2, 1.5), stats=stats, errors=errors, warnings=warnings, dark_max=0.35 if SAT else 0.85)
+    def pixels(path):
+        im = bpy.data.images.load(os.path.abspath(path), check_existing=False)
+        try: im.colorspace_settings.name = "Non-Color"
+        except Exception: pass
+        w_, h_ = im.size; a_ = np.empty(w_ * h_ * 4, np.float32); im.pixels.foreach_get(a_); bpy.data.images.remove(im)
+        return a_.reshape(h_, w_, 4)[..., :3]                # row 0 = bottom
+
+    def flag_fidelity(nx=160, ny=90):
+        """hold frames of the preview: rendered flag pixels against the flag images, through a grid of camera rays"""
+        cp = os.path.join(O.out, "check.json"); ck = json.load(open(cp))
+        hold = [f for f in ck["key_frames"] if (f - 1) / FPS >= SCH["end"] + 0.2] or [ck["key_frames"][-1]]
+        flags = {k: pixels(FFILE[k]) for k in PK}
+        acc = {k: [] for k in PK}
+        for f in hold:
+            rend = pixels(os.path.join(O.out, f"p_{f:04d}{ck.get('ext', '.jpg')}"))[::-1]   # row 0 = top
+            rh_, rw_ = rend.shape[:2]
+            sc.frame_set(f); _, Mi = mats(); o, rows = C.cam_rays(sc, cam, nx, ny)
+            hk = np.full((ny, nx), -1, np.int32); ex = np.zeros((ny, nx, 3), np.float32)
+            for j, row in enumerate(rows):
+                for i, d in enumerate(row):
+                    best, kk, loc = 1e30, -1, None
+                    for ki, k in enumerate(PK):
+                        mi, m3 = Mi[k]
+                        hit = BVH[k].ray_cast(mi @ o, (m3 @ d).normalized(), best)
+                        if hit[0] is not None and hit[3] < best:
+                            best, kk, loc = hit[3], (ki if hit[2] < NTOP[k] else -2), hit[0]
+                    if kk < 0: continue
+                    k = PK[kk]; rx0, ry0, rw, rh = UVR[k]
+                    u = ((loc.x + CEN[k][0]) / SB + W / 2 - rx0) / rw
+                    v = 1 - ((H / 2 - (loc.y + CEN[k][1]) / SB) - ry0) / rh
+                    fa = flags[k]
+                    ex[j, i] = fa[min(max(int(v * fa.shape[0]), 0), fa.shape[0] - 1), min(max(int(u * fa.shape[1]), 0), fa.shape[1] - 1)]
+                    hk[j, i] = kk
+            # interior of a flag face (no rim, no outline), on a flat part of the flag image (no stripe or emblem edge)
+            ok = hk >= 0
+            pk = np.pad(hk, 2, constant_values=-1); pe = np.pad(ex, ((2, 2), (2, 2), (0, 0)))
+            for dj in range(-2, 3):
+                for di in range(-2, 3):
+                    sh = pk[2 + dj:2 + dj + ny, 2 + di:2 + di + nx]; ok &= sh == hk
+                    if abs(dj) <= 1 and abs(di) <= 1:
+                        ok &= np.abs(pe[2 + dj:2 + dj + ny, 2 + di:2 + di + nx] - ex).max(-1) < 0.04
+            for j, i in zip(*np.nonzero(ok)):
+                r_ = rend[min(int((j + 0.5) / ny * rh_), rh_ - 1), min(int((i + 0.5) / nx * rw_), rw_ - 1)]
+                acc[PK[hk[j, i]]].append((r_, ex[j, i]))
+        lin = lambda c: np.where(c <= 0.04045, c / 12.92, ((c + 0.055) / 1.055) ** 2.4)
+        res, errs, warns = {}, [], []
+        for k, v in acc.items():
+            if len(v) < 12: warns.append(f"flag {k}: too few clear cells to measure its colours ({len(v)})"); continue
+            r_ = np.array([a for a, _ in v]); e_ = np.array([b for _, b in v])
+            dmed = float(np.median(np.abs(r_ - e_).max(-1)) * 255)
+            yl = lambda c: lin(c) @ np.array([0.2126, 0.7152, 0.0722])
+            evo = float(np.log2(max(np.median(yl(r_)), 1e-4) / max(np.median(yl(e_)), 1e-4)))
+            res[k] = {"median_diff": round(dmed, 1), "ev_offset": round(evo, 3), "cells": len(v)}
+            if dmed > 16 or abs(evo) > 0.2: errs.append(f"flag {k} renders off its true colours (median difference {dmed:.0f}/255, {evo:+.2f} EV)")
+            elif dmed > 9: warns.append(f"flag {k} colours slightly off (median difference {dmed:.0f}/255)")
+        ck["errors"] = ck.get("errors", []) + errs; ck["warnings"] = ck.get("warnings", []) + warns
+        ck.setdefault("stats", {})["flag_fidelity"] = res
+        json.dump(ck, open(cp, "w"))
+        print(f"flag colours: {res}", flush=True)
+
+    # the exposure is set on the base map (the flags do not depend on it); then the flag colours are measured
+    target = float(P.get("base_luma", 0.28 if SAT else 0.16))
+    C.preview_run(sc, O, FRAMES, classify, subject=("b",), target=target, tol=0.09,
+                  ev_range=(-1.5, 1.5), stats=stats, errors=errors, warnings=warnings, dark_max=0.35 if SAT else 0.85)
+    flag_fidelity()
     sys.exit(0)
 
 # ------------------------------------------------------------------ render

@@ -265,7 +265,7 @@ def shatter_footprint(p, sec):
     raise ValueError("the camera view could not be covered by the base map")
 
 
-SHATTER_KEYS = {"bbox", "zoom", "base", "base_borders", "base_dim", "pieces", "union", "action", "order", "camera", "thickness",
+SHATTER_KEYS = {"bbox", "zoom", "base", "base_borders", "base_dim", "base_luma", "pieces", "union", "action", "order", "camera", "thickness",
                 "lift", "spread", "rim", "labels", "sun", "samples", "lens", "timing"}
 PIECE_KEYS = {"key", "admin0", "admin1", "country", "disputed", "flag", "fit", "focus"}
 ISO3 = lambda x: isinstance(x, str) and len(x) == 3 and x.isupper()
@@ -286,7 +286,7 @@ def check_shatter(c, sec):
     if not (-180 <= lon0 < lon1 <= 180 and -80 <= lat0 < lat1 <= 80): c.bad("bbox: lon0 < lon1, lat0 < lat1, |lat| <= 80"); return
     if lon1 - lon0 > 80 or lat1 - lat0 > 55: c.bad("bbox too large (max 80 x 55 degrees)")
     if lon1 - lon0 < 0.5 or lat1 - lat0 < 0.4: c.bad("bbox too small (min 0.5 x 0.4 degrees)")
-    c.number("zoom", 3, 10); c.number("base_dim", 0.3, 1.0)
+    c.number("zoom", 3, 10); c.number("base_dim", 0.3, 1.0); c.number("base_luma", 0.06, 0.45)
     c.choice("base", ("satellite", "dark"), required=True)
     act = c.choice("action", ("break", "rise", "drop"), required=True)
     bbo = p.get("base_borders", True)
