@@ -208,10 +208,25 @@ tri_total = 0
 EXACT = []   # value nodes holding 2^-exposure: emission x exposure = 1, so each flag renders with its own sRGB colours
 
 
+def exact_value(N):
+    k = value(N, 1.0); EXACT.append(k)
+    return k.outputs[0]
+
+
+def camera_only(N, L, strength):
+    """emission seen by the camera only: no light spilled on the map, none leaking through the open slab bottom"""
+    lp = N.new("ShaderNodeLightPath")
+    return math_node(N, L, "MULTIPLY", strength, lp.outputs["Is Camera Ray"])
+
+
 def flag_emission(N, L, col):
-    em = N.new("ShaderNodeEmission"); L.new(col, em.inputs["Color"])
-    k = value(N, 1.0); EXACT.append(k); L.new(k.outputs[0], em.inputs["Strength"])
-    return em
+    """camera rays see the exact flag colours (emission at 2^-exposure); every other ray sees a painted surface"""
+    em = N.new("ShaderNodeEmission"); L.new(col, em.inputs["Color"]); L.new(exact_value(N), em.inputs["Strength"])
+    paint = N.new("ShaderNodeBsdfDiffuse"); L.new(col, paint.inputs["Color"])
+    lp = N.new("ShaderNodeLightPath")
+    mx = N.new("ShaderNodeMixShader"); L.new(lp.outputs["Is Camera Ray"], mx.inputs[0])
+    L.new(paint.outputs[0], mx.inputs[1]); L.new(em.outputs[0], mx.inputs[2])
+    return mx
 
 
 def exact_flags(scene, *_):
@@ -265,6 +280,7 @@ def top_material(k, pc, pm, own_img, sdf_img):
     crack = value(N_, 0.0)
     estr = math_node(N_, L_, "ADD", math_node(N_, L_, "MULTIPLY", math_node(N_, L_, "MULTIPLY", inner, crack.outputs[0]), 9.0),
                      math_node(N_, L_, "MULTIPLY", glow, 1.6))
+    estr = camera_only(N_, L_, math_node(N_, L_, "MULTIPLY", estr, exact_value(N_)))
     em = N_.new("ShaderNodeEmission"); em.inputs["Color"].default_value = (1.0, 0.86, 0.62, 1); L_.new(estr, em.inputs["Strength"])
     add = N_.new("ShaderNodeAddShader"); L_.new(rmix.outputs[0], add.inputs[0]); L_.new(em.outputs[0], add.inputs[1])
     alpha = value(N_, 1.0)
@@ -366,7 +382,8 @@ for pc in PIECES:
         ring = math_node(N_, L_, "EXPONENT", math_node(N_, L_, "MULTIPLY", math_node(N_, L_, "MULTIPLY", q, q), -1.0))
         ring = math_node(N_, L_, "MULTIPLY", ring, smoothstep(N_, L_, B, 0.2 * PX_FRAME, 1.2 * PX_FRAME))
         fa = math_node(N_, L_, "MULTIPLY", ring, ra.outputs[0])
-        em = N_.new("ShaderNodeEmission"); em.inputs["Color"].default_value = (1.0, 0.85, 0.58, 1); em.inputs["Strength"].default_value = 2.8
+        em = N_.new("ShaderNodeEmission"); em.inputs["Color"].default_value = (1.0, 0.85, 0.58, 1)
+        L_.new(math_node(N_, L_, "MULTIPLY", exact_value(N_), 1.25), em.inputs["Strength"])
         tr = N_.new("ShaderNodeBsdfTransparent")
         am = N_.new("ShaderNodeMixShader"); L_.new(fa, am.inputs[0]); L_.new(tr.outputs[0], am.inputs[1]); L_.new(em.outputs[0], am.inputs[2])
         L_.new(am.outputs[0], out.inputs["Surface"]); C.put(ro, m3); RING[k] = (rad, ra, 0.85 * (mnx - bx0))
@@ -671,8 +688,8 @@ if O.preview:
         print(f"flag colours: {res}", flush=True)
 
     # the exposure is set on the base map (the flags do not depend on it); then the flag colours are measured
-    target = float(P.get("base_luma", 0.28 if SAT else 0.16))
-    C.preview_run(sc, O, FRAMES, classify, subject=("b",), target=target, tol=0.09,
+    target = float(P.get("base_luma", 0.28 if SAT else 0.15))
+    C.preview_run(sc, O, FRAMES, classify, subject=("b",), target=target, tol=0.05,
                   ev_range=(-1.5, 1.5), stats=stats, errors=errors, warnings=warnings, dark_max=0.35 if SAT else 0.85)
     flag_fidelity()
     sys.exit(0)
