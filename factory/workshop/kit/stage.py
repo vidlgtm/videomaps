@@ -32,7 +32,7 @@ LIGHT = {
              "world": (0.0040, 0.0036, 0.0032), "dark": 0.92},
     "museum": {"key": (-100, 72, 2.0, 0.45, (1.0, 0.95, 0.88), 0.6), "fill": ((0.9, 0.93, 1.0), 0.04), "rim": ((0.92, 0.95, 1.0), 0.3),
                "world": (0.0012, 0.0012, 0.0014), "dark": 0.97},
-    "candle": {"key": (90, 30, 1.1, 0.22, (1.0, 0.64, 0.34), 0.8), "fill": ((0.55, 0.6, 0.8), 0.05), "rim": None,
+    "candle": {"key": (90, 30, 1.1, 0.22, (1.0, 0.64, 0.34), 0.7), "fill": ((0.55, 0.6, 0.8), 0.04), "rim": None,
                "world": (0.0025, 0.0018, 0.0012), "dark": 0.95},
     "studio": {"key": (-130, 50, 1.8, 1.4, (1.0, 0.97, 0.92), 0.65), "fill": ((0.92, 0.95, 1.0), 0.25), "rim": ((1.0, 0.98, 0.95), 0.4),
                "world": (0.010, 0.010, 0.011), "dark": 0.5},
@@ -49,6 +49,10 @@ LIGHT = {
 }
 DIM = 0.25                    # a scene whose pictures get their light on cue keeps its room at a quarter of the key
 A_ROOM = 0.06                 # the room light is set for a surface of this albedo and scaled to the real one (1/8 .. 4)
+# size of the key's pool (x L0, radius of its cone over the cast is 0.86 of it) and the softness of its edge, per mood:
+# a candle or a museum spot is a tight pool that falls into darkness, a studio or a window lights the whole stage
+POOL = {"candle": (0.95, 0.9), "museum": (1.15, 0.55), "lamp": (1.3, 0.7), "night": (1.2, 0.8), "studio": (2.6, 0.3),
+        "dawn": (2.2, 0.5), "noon": (2.4, 0.4), "dusk": (2.2, 0.5), "overcast": (3.0, 0.3)}
 # linear albedo of the place's surfaces (the exposure target on the lit surface follows from it)
 ALBEDO = {"walnut": 0.06, "wood": 0.06, "oak": 0.28, "marble": 0.58, "stone": 0.25, "slate": 0.012, "sand": 0.3,
           "plaster": 0.52, "velvet": 0.011}
@@ -406,7 +410,8 @@ class Stage:
         self.sc.world.node_tree.nodes["Background"].inputs["Strength"].default_value = room
         tgt = self.center + Vector((0, 0, 0.25 * self.Lz))
         d = dist * self.L0; at = tgt + d * Vector(P.cam_dir(el, az))
-        self.key = self.spot("key", at, tgt, col, PAPER_LIGHT * share * d * d, 1.5 * self.L0, 0.6)
+        cover, blend = POOL[self.mood]
+        self.key = self.spot("key", at, tgt, col, PAPER_LIGHT * share * d * d, cover * self.L0, blend)
         self.key.data.shadow_soft_size = 0.5 * size * self.L0; self.key.visible_glossy = False
         fcol, fsh = Lt["fill"]
         self.area("fill", az + 180, 30, 2.0, 1.5, fcol, share * fsh * E_PAPER * room, tgt).visible_glossy = False
@@ -552,7 +557,7 @@ class Stage:
                 if any(self.lit_level(n, fi) > 0.05 and (q - at).normalized().dot(ax) > math.cos(half) for n, _, at, ax, half in self.cones):
                     s += "p"; continue
                 near = any((q.x - self.L[n]["x"]) ** 2 + (q.y - self.L[n]["y"]) ** 2 <
-                           (0.5 * max(self.L[n]["w"], self.L[n]["d"]) + 0.25 * self.L0) ** 2 for n in lit)
+                           (0.5 * max(self.L[n]["w"], self.L[n]["d"]) + 0.12 * self.L0) ** 2 for n in lit)
                 s += "r" if near else "d"
             out.append(s)
         return out
