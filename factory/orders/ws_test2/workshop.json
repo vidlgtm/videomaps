@@ -175,7 +175,7 @@
   {
    "id": "nest_egypt",
    "template": "nest",
-   "seconds": 14,
+   "seconds": 15,
    "params": {
     "shape": "doll",
     "levels": [
@@ -226,7 +226,8 @@
       "today",
       "Arab Republic of Egypt · 1984"
      ]
-    ]
+    ],
+    "samples": 48
    }
   }
  ]

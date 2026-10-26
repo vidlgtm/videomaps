@@ -14,6 +14,7 @@ PRESETS = {
     "barrel":  {"pts": [(0, .27), (.02, .29), (.25, .322), (.5, .335), (.75, .322), (.98, .29), (1, .27)], "seam": .5, "panel": .27},
 }
 TW, CL, LIP, GAP = 0.022, 0.010, 0.035, 0.004       # wall, clearance between levels, lip height, seam gap
+REST = TW + 0.004                                    # an inner level rests just above the cavity floor (no touching faces)
 BANDS_BASE = [(0.030, 0.042)]                        # gold bands (relative height); seam bands added from the seam
 D_OPEN, H_FIRST, H_MID, H_LAST = 2.7, 1.4, 1.1, 1.8  # seconds: one opening, first hold, hold between, last hold
 # phases of one opening (seconds from its start)
@@ -94,7 +95,7 @@ def cavity(g, z, part):
 
 def fit(g, k):
     """can a level scaled by k rest inside, be lifted out of the base and have the lid lifted off it?"""
-    zi = np.linspace(0, 1, 401); ri = k * R(g, zi); h = TW + k * zi
+    zi = np.linspace(0, 1, 401); ri = k * R(g, zi); h = REST + k * zi
     if h[-1] > g["ceil"] - CL: return False
     full = np.minimum(cavity(g, h, "base"), cavity(g, h, "lid"))
     if np.any(ri + CL > full): return False
@@ -132,8 +133,8 @@ def panel(g, aspect):
     lo, hi = 0.075, zs - 0.045
     zc = min(max(g["panel_z"], lo + 0.06), hi - 0.06)
     rc = float(R(g, zc))
-    hmax = min(0.27, 2 * min(zc - lo, hi - zc))
-    hp = min(hmax, 1.1 * rc / aspect)
+    hmax = min(0.30, 2 * min(zc - lo, hi - zc))
+    hp = min(hmax, 1.25 * rc / aspect)
     return {"zc": zc, "rc": rc, "w": hp * aspect, "h": hp}
 
 

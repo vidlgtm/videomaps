@@ -178,8 +178,8 @@ if not TRANSP:
     nq = [[j * 3 + i, j * 3 + i + 1, (j + 1) * 3 + i + 1, (j + 1) * 3 + i] for j in range(len(ys) - 1) for i in range(2)]
     cyc = C.mesh_object("studio", co, np.array(nq)); C.smooth_shade(cyc)
     sm = bpy.data.materials.new("studio"); sm.use_nodes = True; sp = sm.node_tree.nodes["Principled BSDF"]
-    sp.inputs["Base Color"].default_value = (0.020, 0.024, 0.032, 1); sp.inputs["Roughness"].default_value = 0.42
-    sp.inputs["Specular IOR Level"].default_value = 0.35
+    sp.inputs["Base Color"].default_value = (0.020, 0.024, 0.032, 1); sp.inputs["Roughness"].default_value = 0.55
+    sp.inputs["Specular IOR Level"].default_value = 0.2
     cyc.data.materials.append(sm)
     pool = bpy.data.lights.new("pool", "SPOT"); pool.energy = 2000; pool.spot_size = math.radians(55); pool.spot_blend = 1.0
     pool.color = (0.80, 0.86, 1.0); po = bpy.data.objects.new("pool", pool); sc.collection.objects.link(po)
@@ -197,8 +197,12 @@ def area(name, energy, size, loc, color=(1, 1, 1), size_y=None):
     ob = bpy.data.objects.new(name, ld); sc.collection.objects.link(ob); ob.location = loc; C.aim(ob, (0, 0, 0.45)); return ob
 
 
-area("key", 250, 2.2, (-2.6, -3.4, 3.2), (1.0, 0.97, 0.92), 1.6)
-area("fill", 80, 3.0, (3.0, -2.6, 1.2), (0.92, 0.95, 1.0))
+kl = area("key", 250, 2.2, (-2.6, -3.4, 3.2), (1.0, 0.97, 0.92), 1.6)
+try: kl.data.spread = math.radians(75)
+except Exception: pass
+fl_ = area("fill", 80, 3.0, (3.0, -2.6, 1.2), (0.92, 0.95, 1.0))
+try: fl_.visible_glossy = False
+except Exception: pass
 area("rim_l", 160, 1.0, (-2.0, 2.0, 1.8), (0.95, 0.97, 1.0))
 area("rim_r", 160, 1.0, (2.0, 2.2, 1.6), (1.0, 0.95, 0.88))
 w = bpy.data.worlds.new("W"); sc.world = w; w.use_nodes = True
@@ -209,10 +213,10 @@ w.node_tree.nodes["Background"].inputs[0].default_value = (0.010, 0.011, 0.014, 
 def level_loc(m, t):
     """world position of level m (its base; also the closed lid) at time t"""
     if m > 0 and t < TOPEN[m - 1]:
-        lo = level_loc(m - 1, t); return (lo[0], lo[1], lo[2] + G.TW * HT[m - 1])
+        lo = level_loc(m - 1, t); return (lo[0], lo[1], lo[2] + G.REST * HT[m - 1])
     if m > 0 and t < TOPEN[m - 1] + D:
         tau = t - TOPEN[m - 1]; Hc = HT[m - 1]
-        rest, up = G.TW * Hc, (geo["seam"] + G.LIP + 0.10) * Hc
+        rest, up = G.REST * Hc, (geo["seam"] + G.LIP + 0.10) * Hc
         return (0.0, 0.0, rest + (up - rest) * G.ph(tau, PHS["rise"]) - up * G.ph(tau, PHS["down"]))
     if m < NO and t >= TOPEN[m]:
         tau = t - TOPEN[m]; a = G.ph(tau, PHS["away"], G.ease_in); side = 1 if m % 2 == 0 else -1
@@ -223,7 +227,7 @@ def level_loc(m, t):
 def lid_pose(m, t):
     if t < TOPEN[m]: return level_loc(m, t), (0.0, 0.0, 0.0)
     tau = t - TOPEN[m]; H_ = HT[m]; side = -1 if m % 2 == 0 else 1
-    inner_top = (G.TW * H_ + HT[m + 1]) - (geo["seam"] + G.GAP) * H_   # the lid rim must pass the top of the inner level
+    inner_top = (G.REST * H_ + HT[m + 1]) - (geo["seam"] + G.GAP) * H_   # the lid rim must pass the top of the inner level
     clear = max(0.06 * H_, inner_top + 0.10 * H_)
     z = 0.045 * H_ * G.ph(tau, PHS["twist"]) + (clear - 0.045 * H_) * G.ph(tau, PHS["clear"])
     e = G.ph(tau, PHS["exit"], G.ease_in)
@@ -387,7 +391,8 @@ if O.preview:
             m = KEYS.index(e[0]); lo = level_loc(m, t)
             pw = Vector((lo[0], lo[1] - float(G.R(geo, 0.0)) * HT[m], lo[2]))
             v = world_to_camera_view(sc, cam, pw)
-            vis = m == cm and settled and (t - SETTLE[m] >= 0.15 or m == 0) and 0.02 <= v.x <= 0.98 and 0.06 <= v.y <= 0.98 and v.z > 0
+            on = (t - SETTLE[m] >= 0.15 or m == 0) and (m == NO or t < TOPEN[m] + PHS["twist"][1])
+            vis = on and level_loc(m, t)[2] < 1e-6 and 0.02 <= v.x <= 0.98 and 0.06 <= v.y <= 0.98 and v.z > 0
             tracks[e[0]].append([round(v.x * 1920, 1), round((1 - v.y) * 1080 + 34, 1), int(vis)])
         Mw = mats()
         for i in range(NO):

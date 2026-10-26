@@ -29,7 +29,8 @@ def fetch(img):
         lic = em.get("LicenseShortName", {}).get("value", "")
         if not re.search(r"public domain|^pd|cc0|cc by(-sa)? ", lic.lower() + " "):
             raise SystemExit(f"licence not allowed for {t}: {lic}")
-        art = re.sub(r"<[^>]+>", "", em.get("Artist", {}).get("value", "")).strip()
+        art = re.sub(r"<[^>]+>", "", em.get("Artist", {}).get("value", "")).strip().split("\n")[0].strip()
+        if len(art) > 60 or re.search(r"file history|unknown|see below", art.lower()): art = ""
         url = ii.get("thumburl") or ii["url"]
         meta = {"what": t[5:].rsplit(".", 1)[0], "author": art, "page": ii.get("descriptionurl", ""),
                 "license": "Public domain" if "public domain" in lic.lower() or lic.lower().startswith("pd") else lic}
