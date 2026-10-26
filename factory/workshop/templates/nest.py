@@ -181,7 +181,7 @@ if not TRANSP:
     sp.inputs["Base Color"].default_value = (0.020, 0.024, 0.032, 1); sp.inputs["Roughness"].default_value = 0.55
     sp.inputs["Specular IOR Level"].default_value = 0.2
     cyc.data.materials.append(sm)
-    pool = bpy.data.lights.new("pool", "SPOT"); pool.energy = 2000; pool.spot_size = math.radians(55); pool.spot_blend = 1.0
+    pool = bpy.data.lights.new("pool", "SPOT"); pool.energy = 500; pool.spot_size = math.radians(55); pool.spot_blend = 1.0
     pool.color = (0.80, 0.86, 1.0); po = bpy.data.objects.new("pool", pool); sc.collection.objects.link(po)
     po.location = (0, -1.5, 5.0); C.aim(po, (0, 5.6, 1.4))
 else:
@@ -197,14 +197,14 @@ def area(name, energy, size, loc, color=(1, 1, 1), size_y=None):
     ob = bpy.data.objects.new(name, ld); sc.collection.objects.link(ob); ob.location = loc; C.aim(ob, (0, 0, 0.45)); return ob
 
 
-kl = area("key", 250, 2.2, (-2.6, -3.4, 3.2), (1.0, 0.97, 0.92), 1.6)
+kl = area("key", 62, 2.2, (-2.6, -3.4, 3.2), (1.0, 0.97, 0.92), 1.6)
 try: kl.data.spread = math.radians(75)
 except Exception: pass
-fl_ = area("fill", 80, 3.0, (3.0, -2.6, 1.2), (0.92, 0.95, 1.0))
+fl_ = area("fill", 20, 3.0, (3.0, -2.6, 1.2), (0.92, 0.95, 1.0))
 try: fl_.visible_glossy = False
 except Exception: pass
-area("rim_l", 160, 1.0, (-2.0, 2.0, 1.8), (0.95, 0.97, 1.0))
-area("rim_r", 160, 1.0, (2.0, 2.2, 1.6), (1.0, 0.95, 0.88))
+area("rim_l", 40, 1.0, (-2.0, 2.0, 1.8), (0.95, 0.97, 1.0))
+area("rim_r", 40, 1.0, (2.0, 2.2, 1.6), (1.0, 0.95, 0.88))
 w = bpy.data.worlds.new("W"); sc.world = w; w.use_nodes = True
 w.node_tree.nodes["Background"].inputs[0].default_value = (0.010, 0.011, 0.014, 1) if not TRANSP else (0.03, 0.03, 0.035, 1)
 
