@@ -151,6 +151,8 @@ def float_image(name, arr):
     """float data -> OpenEXR file -> image (an image only made in memory renders black)"""
     h, w = arr.shape[:2]
     tmp = bpy.data.images.new(name + "_tmp", w, h, alpha=True, float_buffer=True)
+    try: tmp.colorspace_settings.name = "Non-Color"     # data: no colour conversion when the file is written
+    except Exception: pass
     rgba = np.ones((h, w, 4), np.float32); rgba[..., :3] = arr[::-1]
     tmp.pixels.foreach_set(rgba.ravel())
     path = os.path.abspath(os.path.join(DATA, f"{name}.exr"))
@@ -160,7 +162,7 @@ def float_image(name, arr):
     try: img.colorspace_settings.name = "Non-Color"
     except Exception: pass
     px = np.empty(w * h * 4, np.float32); img.pixels.foreach_get(px)
-    SDF_MAX[name] = round(float(px.reshape(-1, 4)[:, 0].max()), 2)
+    SDF_MAX[name] = [round(float(px.reshape(-1, 4)[:, 0].max()), 2), round(float(arr[..., 0].max()), 2)]
     return img
 
 
@@ -363,10 +365,10 @@ el = math.radians(float(SUN.get("elevation", 42)))
 az = math.radians(float(CAM.get("heading", [0, 0])[0]) + float(SUN.get("azimuth", 300)))
 sdir = Vector((math.cos(el) * math.sin(az), math.cos(el) * math.cos(az), math.sin(el)))
 sun = bpy.data.objects.new("Sun", bpy.data.lights.new("Sun", "SUN")); sc.collection.objects.link(sun)
-sun.data.energy = 3.2; sun.data.angle = math.radians(2.5)
+sun.data.energy = 3.2; sun.data.angle = math.radians(5.0)
 sun.rotation_euler = sdir.to_track_quat("Z", "Y").to_euler()
 wd = bpy.data.worlds.new("W"); sc.world = wd; wd.use_nodes = True
-bg = wd.node_tree.nodes["Background"]; bg.inputs["Color"].default_value = (0.052, 0.06, 0.075, 1); bg.inputs["Strength"].default_value = 0.6
+bg = wd.node_tree.nodes["Background"]; bg.inputs["Color"].default_value = (0.10, 0.112, 0.135, 1); bg.inputs["Strength"].default_value = 0.9
 
 # ------------------------------------------------------------------ camera
 cam = bpy.data.objects.new("Cam", bpy.data.cameras.new("Cam")); sc.collection.objects.link(cam); sc.camera = cam
@@ -489,8 +491,9 @@ if O.preview:
     bx_lo, bx_hi, by_lo, by_hi = wx(0), wx(W), wy(H), wy(0)
     errors, warnings, stats = [], [], {"credits": meta.get("credits", []), "pieces": n, "triangles": tri_total,
                                        "sdf_max": SDF_MAX, "raised": RAISED}
-    for k_, v_ in SDF_MAX.items():
-        if v_ < 0.5: errors.append(f"distance field {k_} reads empty (max {v_}) - rims and cracks would cover the whole top")
+    for k_, (got, want) in SDF_MAX.items():
+        if abs(got - want) > 0.03 * want + 0.05:
+            errors.append(f"distance field {k_} reads {got} instead of {want} - rims and cracks would have the wrong width")
 
     def mats():
         M = {k: OBJ[k].matrix_world.copy() for k in PK}
