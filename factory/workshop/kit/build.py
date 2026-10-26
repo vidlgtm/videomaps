@@ -48,10 +48,11 @@ if O.preview:
              "lights": [ob.name for ob in sc.objects if ob.type == "LIGHT"], "L0": round(st.L0, 3), "mood": st.mood, "place": st.place}
     void = st.place == "void"
     calm = [f for f in key if all(st.ch[k]["glow"][f - 1] < 1e-3 and st.ch[k]["burn"][f - 1] < 1e-3 for k in st.ch)]
-    EV_RANGE = (-3.0, 3.0)
-    C.preview_run(sc, O, st.n, st.classify, subject=("o",) if void else ("r",), target=st.target, tol=round(0.25 * st.target, 3),
+    EV_RANGE = (-1.5, 1.5)            # the light is set for paper at 0 EV: a scene needing more than this has a light error
+    stats["light"] = {"share": round(st.share, 3), "target": st.target, "albedo": st.albedo}
+    C.preview_run(sc, O, st.n, st.classify, subject=("_",) if void else ("r",), target=st.target, tol=round(0.25 * st.target, 3),
                   ev_range=EV_RANGE, stats=stats, errors=st.errors, warnings=st.warnings, dark_max=st.dark_max,
-                  fallback_subject=None if void else ("o",), key=key, calm=calm)
+                  fallback_subject=None, key=key, calm=calm)
     cp = os.path.join(O.out, "check.json"); ck = json.load(open(cp))
     res = st.fidelity(O.out, ck["key_frames"], ck.get("ext", ".jpg"))
     if ck.get("calibration") and min(abs(ck["ev"] - EV_RANGE[0]), abs(ck["ev"] - EV_RANGE[1])) < 0.02:

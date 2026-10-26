@@ -17,34 +17,43 @@ FONTS = os.path.normpath(os.path.join(KIT, "..", "..", "..", "fonts"))
 SURFACE = {"desk": "walnut", "museum": "marble", "floor": "stone", "void": None}
 MATERIAL = {"sheet": "paper", "print": "paper", "canvas": "gold", "frame": "gold", "disc": "wax", "block": "marble", "text": "gold",
             "pole": "walnut", "plinth": "marble", "table": "walnut", "candle": "wax"}
-# mood: exposure target on the lit surface, share of near-black allowed, world colour, lights (kind, position / L0 from the
-# centre of the cast, colour, power / L0^2, size / L0 or spot blend)
-MOOD = {
-    "lamp": (0.12, 0.92, (0.0046, 0.0041, 0.0037), [("KEY", (-0.45, -1.0, 2.0), (1.0, 0.86, 0.68), 32.0, 0.45),
-                                                     ("AREA", (2.4, 3.0, 2.2), (1.0, 0.82, 0.62), 25.0, 1.2),
-                                                     ("SPOT", (0.35, 1.7, 1.1), (1.0, 0.88, 0.72), 10.0, 0.6)]),
-    "museum": (0.09, 0.97, (0.0014, 0.0014, 0.0016), [("KEY", (-0.2, -0.5, 2.4), (1.0, 0.94, 0.86), 25.0, 0.25),
-                                                       ("SPOT", (0.3, 1.8, 1.4), (0.92, 0.95, 1.0), 9.0, 0.5)]),
-    "candle": (0.08, 0.95, (0.0030, 0.0022, 0.0015), [("CANDLE", (-0.55, -0.25, 0.35), (1.0, 0.55, 0.25), 11.1, 0.0)]),
-    "studio": (0.16, 0.50, (0.010, 0.010, 0.011), [("AREA", (-1.2, -1.4, 1.8), (1.0, 0.97, 0.92), 12.4, 1.0),
-                                                   ("AREA", (1.4, -1.0, 1.0), (0.92, 0.95, 1.0), 2.5, 1.4),
-                                                   ("SPOT", (0.3, 1.6, 1.3), (1.0, 0.98, 0.95), 19.0, 0.5)]),
-    "dawn": (0.14, 0.60, (0.012, 0.010, 0.010), [("AREA", (-2.4, 0.8, 1.3), (1.0, 0.80, 0.62), 24.0, 2.0),
-                                                 ("AREA", (1.8, -1.2, 1.0), (0.80, 0.86, 1.0), 3.0, 1.5)]),
-    "noon": (0.16, 0.50, (0.020, 0.020, 0.021), [("AREA", (-1.6, 0.6, 2.2), (1.0, 0.97, 0.92), 26.0, 2.0)]),
-    "dusk": (0.13, 0.65, (0.010, 0.007, 0.006), [("AREA", (-2.4, 0.8, 1.1), (1.0, 0.60, 0.34), 23.4, 2.0),
-                                                 ("AREA", (1.8, -1.2, 1.0), (0.70, 0.80, 1.0), 3.0, 1.5)]),
-    "overcast": (0.15, 0.50, (0.030, 0.032, 0.036), [("AREA", (-2.0, 0.6, 1.8), (0.86, 0.90, 1.0), 30.0, 3.0)]),
-    "night": (0.07, 0.95, (0.0015, 0.0020, 0.0040), [("AREA", (-2.2, 1.2, 1.6), (0.62, 0.72, 1.0), 10.0, 1.6),
-                                                     ("SPOT", (0.35, 1.7, 1.1), (0.62, 0.72, 1.0), 4.0, 0.6)]),
+# LIGHT. A document or picture is shown in its exact colours, so the scene is lit for paper: the key light gives the cast an
+# irradiance that is a share of E_PAPER (under E_PAPER white paper is exactly white at 0 EV). Seals, hands and props on the
+# documents are then lit as the documents appear, and the mood comes from the key's direction, height, size and colour, the
+# fill, the rim and the dark room. A key is one large soft light (a lamp shade, a window, a skylight), never pools of spots.
+E_PAPER = math.pi / 0.8
+PAPER_LIGHT = E_PAPER * 4 * math.pi                                # spot power for E_PAPER = PAPER_LIGHT x distance^2
+# key: azimuth and elevation from the centre of the cast (deg; the camera stands at -90), distance and size (x L0), colour,
+# irradiance (share of E_PAPER); fill and rim: colour, share of the key; world: ambient colour; dark: share of near-black allowed
+LIGHT = {
+    "lamp": {"key": (-125, 58, 1.7, 0.6, (1.0, 0.86, 0.68), 0.6), "fill": ((0.85, 0.88, 1.0), 0.08), "rim": ((1.0, 0.9, 0.75), 0.3),
+             "world": (0.0040, 0.0036, 0.0032), "dark": 0.92},
+    "museum": {"key": (-100, 72, 2.0, 0.45, (1.0, 0.95, 0.88), 0.6), "fill": ((0.9, 0.93, 1.0), 0.04), "rim": ((0.92, 0.95, 1.0), 0.3),
+               "world": (0.0012, 0.0012, 0.0014), "dark": 0.97},
+    "candle": {"key": (90, 30, 1.1, 0.22, (1.0, 0.64, 0.34), 0.8), "fill": ((0.55, 0.6, 0.8), 0.05), "rim": None,
+               "world": (0.0025, 0.0018, 0.0012), "dark": 0.95},
+    "studio": {"key": (-130, 50, 1.8, 1.4, (1.0, 0.97, 0.92), 0.65), "fill": ((0.92, 0.95, 1.0), 0.25), "rim": ((1.0, 0.98, 0.95), 0.4),
+               "world": (0.010, 0.010, 0.011), "dark": 0.5},
+    "dawn": {"key": (-165, 22, 2.4, 2.0, (1.0, 0.80, 0.62), 0.75), "fill": ((0.75, 0.82, 1.0), 0.12), "rim": None,
+             "world": (0.010, 0.009, 0.010), "dark": 0.6},
+    "noon": {"key": (-120, 62, 2.2, 1.6, (1.0, 0.97, 0.92), 0.65), "fill": ((0.85, 0.9, 1.0), 0.18), "rim": None,
+             "world": (0.018, 0.018, 0.020), "dark": 0.5},
+    "dusk": {"key": (-165, 20, 2.4, 2.0, (1.0, 0.60, 0.34), 0.7), "fill": ((0.6, 0.72, 1.0), 0.10), "rim": None,
+             "world": (0.008, 0.006, 0.006), "dark": 0.65},
+    "overcast": {"key": (-110, 55, 2.2, 3.0, (0.86, 0.90, 1.0), 0.55), "fill": ((0.86, 0.9, 1.0), 0.3), "rim": None,
+                 "world": (0.025, 0.027, 0.030), "dark": 0.5},
+    "night": {"key": (-150, 35, 2.2, 1.6, (0.62, 0.72, 1.0), 0.35), "fill": ((0.5, 0.55, 0.8), 0.05), "rim": ((0.62, 0.72, 1.0), 0.25),
+              "world": (0.0012, 0.0016, 0.0032), "dark": 0.95},
 }
-# the light is scaled to the place's surface so that the exposure lands near 0 EV on any of them (linear albedo)
+DIM = 0.25                    # a scene whose pictures get their light on cue keeps its room at a quarter of the key
+# linear albedo of the place's surfaces (the exposure target on the lit surface follows from it)
 ALBEDO = {"walnut": 0.06, "wood": 0.06, "oak": 0.28, "marble": 0.58, "stone": 0.25, "slate": 0.012, "sand": 0.3,
           "plaster": 0.52, "velvet": 0.011}
-A_REF = 0.045
-# a document or picture is shown in its exact colours; the light on it is the light under which white paper is exactly
-# white at 0 EV, so whatever lies on it or beside it (a seal, a hand, a pen) is lit as the picture appears
-PAPER_LIGHT = math.pi / 0.8 * 4 * math.pi                          # spot power = PAPER_LIGHT x distance^2
+
+
+def srgb(x): return 12.92 * x if x <= 0.0031308 else 1.055 * x ** (1 / 2.4) - 0.055
+
+
 GLOW = {"warm": (1.0, 0.72, 0.40), "gold": (1.0, 0.78, 0.35), "red": (1.0, 0.25, 0.15), "blue": (0.45, 0.65, 1.0), "white": (1.0, 0.97, 0.92)}
 
 
@@ -345,15 +354,15 @@ class Stage:
         lo, hi = pts.min(0), pts.max(0)
         self.center = Vector(((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, 0.0))
         self.L0 = max(0.35, float(math.hypot(hi[0] - lo[0], hi[1] - lo[1])), float(hi[2] - lo[2]))
+        self.Lz = float(hi[2] - lo[2])
         self.R = max(8.0, 14.0 * self.L0)
         wd = bpy.data.worlds.new("world"); self.sc.world = wd; wd.use_nodes = True
-        bg = wd.node_tree.nodes["Background"]; bg.inputs["Color"].default_value = (*MOOD[self.mood][2], 1); bg.inputs["Strength"].default_value = 1.0
-        self.surface = None; self.backdrop = None
-        self.k = 1.0
+        bg = wd.node_tree.nodes["Background"]; bg.inputs["Color"].default_value = (*LIGHT[self.mood]["world"], 1)
+        bg.inputs["Strength"].default_value = 1.0
+        self.surface = None; self.backdrop = None; self.albedo = None
         if self.place == "void": return
         sname = self.S["place"].get("surface") or SURFACE[self.place]
-        self.k = float(np.clip(A_REF / ALBEDO.get(sname, 0.1), 1 / 16, 16))
-        bg.inputs["Strength"].default_value = self.k
+        self.albedo = ALBEDO.get(sname, 0.2)
         sm = M.surface(sname)
         self.surface = quad("surface", 2 * self.R, 2 * self.R, 0.0, None, sm, self.center.x, self.center.y)
         wm = M.Graph("room"); p = wm.node("ShaderNodeBsdfPrincipled", Roughness=0.9)
@@ -373,39 +382,44 @@ class Stage:
         ob = bpy.data.objects.new(name, ld); link(ob); ob.location = at; C.aim(ob, target)
         return ob
 
+    def area(self, name, az, el, dist, size, color, E, target):
+        """a large soft light at (az, el) from the target, giving irradiance E there (disk, lambertian)"""
+        d = dist * self.L0; at = Vector(target) + d * Vector(P.cam_dir(el, az))
+        ld = bpy.data.lights.new(name, "AREA"); ld.shape = "DISK"; ld.size = size * self.L0; ld.color = color
+        ld.energy = E * math.pi * d * d * (1 + (ld.size / (2 * d)) ** 2)
+        ob = bpy.data.objects.new(name, ld); link(ob); ob.location = at; C.aim(ob, target)
+        return ob
+
     def make_lights(self):
-        target, self.dark_max, _, Ls = MOOD[self.mood]
-        self.target = target
-        L0, c = self.L0, self.center
-        steady = [k for k in self.L if not self.lit_by_beat(k)]
-        if steady:
-            pts = np.concatenate([P.box_points(self.L[k]) for k in steady]); lo, hi = pts.min(0), pts.max(0)
-            kc = Vector(((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, 0.3 * (hi[2] - lo[2])))
-            kL = max(0.3, float(math.hypot(hi[0] - lo[0], hi[1] - lo[1])))
-        has_candle = any(x[0] == "candle" for x in self.lights)
-        for i, (kind, pos, col, pw, sz) in enumerate(Ls):
-            at = c + Vector(pos) * L0
-            k = self.k
-            if kind == "KEY":
-                if not steady: continue
-                at = kc + Vector(pos) * kL
-                self.spot(f"key{i}", at, kc, col, k * pw * kL * kL, kL, sz)
-            elif kind == "SPOT":
-                self.spot(f"rim{i}", at, c, col, k * pw * L0 * L0, L0, sz)
-            elif kind == "AREA":
-                ld = bpy.data.lights.new(f"area{i}", "AREA"); ld.color = col; ld.energy = k * pw * L0 * L0; ld.shape = "DISK"; ld.size = sz * L0
-                ob = bpy.data.objects.new(f"area{i}", ld); link(ob); ob.location = at; C.aim(ob, c)
-            elif kind == "CANDLE":
-                if has_candle: continue                                 # the candle on the stage is the light
-                ld = bpy.data.lights.new("candle_light", "POINT"); ld.color = col; ld.shadow_soft_size = 0.01
-                ob = bpy.data.objects.new("candle_light", ld); link(ob); ob.location = at
-                self.lights.append(("candle", None, ob))
+        Lt = LIGHT[self.mood]; self.dark_max = Lt["dark"]
+        az, el, dist, size, col, share = Lt["key"]
+        candle = next((n for kind, n, _ in self.lights if kind == "candle" and n), None)
+        if candle:                                                      # the candle on the stage motivates the key
+            m = self.L[candle]; v = Vector((m["x"], m["y"], 0)) - self.center
+            if v.length > 1e-3: az = math.degrees(math.atan2(v.y, v.x))
+        if any(b["do"] == "light" for b in self.beats): share *= DIM
+        tgt = self.center + Vector((0, 0, 0.25 * self.Lz))
+        self.key = self.area("key", az, el, dist, size, col, share * E_PAPER, tgt)
+        fcol, fsh = Lt["fill"]
+        self.area("fill", az + 180, 30, 2.0, 1.5, fcol, share * fsh * E_PAPER, tgt)
+        if Lt["rim"]:
+            rcol, rsh = Lt["rim"]; d = 2.0 * self.L0; at = tgt + d * Vector(P.cam_dir(35, 70))
+            ob = self.spot("rim", at, tgt, rcol, PAPER_LIGHT * share * rsh * d * d, self.L0, 0.6)
+            ob.visible_glossy = False
+        # exposure target: the lit surface near the cast as this light shows it (linear -> sRGB luma)
+        if self.albedo is not None:
+            lin = self.albedo * (share * math.sin(math.radians(el)) + share * fsh * 0.5) * E_PAPER / math.pi
+            lin += self.albedo * float(np.mean(Lt["world"]))
+            self.target = round(srgb(lin), 3)
+        else: self.target = 0.18
+        self.share = share
         t = np.arange(self.n) / P.FPS
         for kind, n, ob in self.lights:
             if kind == "candle":                                        # a living flame: slow sway + quick flicker
-                base = self.k * (MOOD["candle"][3][0][3] if self.mood == "candle" else 2.0) * L0 * L0
                 fl = 1 + 0.07 * np.sin(2 * np.pi * 1.3 * t) + 0.05 * np.sin(2 * np.pi * 3.7 * t + 1.1) + 0.03 * np.sin(2 * np.pi * 9.1 * t + 2.3)
-                keys(ob.data, "energy", base * fl)
+                keys(ob.data, "energy", 0.05 * PAPER_LIGHT * 0.15 ** 2 * fl)
+                if self.mood == "candle":
+                    keys(self.key.data, "energy", self.key.data.energy * (1 + 0.5 * (fl - 1)))
 
     # ---------------------------------------------------------- motion
     def animate(self):
@@ -427,7 +441,7 @@ class Stage:
                 Lm = max(0.25, max(m["w"], m["d"]))
                 ld = bpy.data.lights.new(f"{n}_glow", "POINT"); ld.color = col; ld.shadow_soft_size = 0.3 * Lm
                 ob = bpy.data.objects.new(f"{n}_glow", ld); link(ob, e); ob.location = (0, 0, m["h"] + 0.5 * Lm)
-                keys(ld, "energy", self.k * 0.7 * Lm * Lm * ch["glow"])
+                keys(ld, "energy", 0.12 * PAPER_LIGHT * (0.5 * Lm) ** 2 * ch["glow"])
             if np.ptp(ch["burn"]) > 0:                                 # the fire lights the room while it eats the sheet
                 Lm = max(0.25, max(m["w"], m["d"]))
                 ld = bpy.data.lights.new(f"{n}_fire", "POINT"); ld.color = (1.0, 0.45, 0.12); ld.shadow_soft_size = 0.05
@@ -435,20 +449,13 @@ class Stage:
                 t = np.arange(self.n) / P.FPS; b = ch["burn"]
                 on = ((b > 0.002) & (b < 0.995)).astype(float)
                 fl = 1 + 0.25 * np.sin(2 * np.pi * 7.3 * t) + 0.15 * np.sin(2 * np.pi * 13.1 * t + 0.7)
-                keys(ld, "energy", self.k * 0.4 * Lm * Lm * on * fl * np.sin(np.pi * np.clip(b, 0, 1)) ** 0.5)
-        # documents and pictures always have their own soft light: their exact colours then sit in a matching pool of light
-        warm = {"candle": (1.0, 0.72, 0.46), "night": (0.78, 0.84, 1.0)}.get(self.mood, (1.0, 0.93, 0.82))
-        for n, c in self.cast.items():
-            if n in self.spots or not (c["is"] in ("sheet", "print", "canvas") or (c["is"] == "block" and self.src(n)[0] == "store")): continue
-            m = self.L[n]; Lm = max(0.25, max(m["w"], m["d"]))
-            cc = Vector((m["x"], m["y"], m["z"] + m["h"])); at = cc + Vector((-0.35, -0.8, 2.2)) * Lm
-            ob = self.spot(f"{n}_own", at, cc, warm, PAPER_LIGHT * (at - cc).length_squared, Lm, 0.3)
-            self.cones.append((n, ob, at, (cc - at).normalized(), ob.data.spot_size / 2))
+                keys(ld, "energy", 0.15 * PAPER_LIGHT * (0.35 * Lm) ** 2 * on * fl * np.sin(np.pi * np.clip(b, 0, 1)) ** 0.5)
         for n, sp in self.spots.items():
             m = self.L[n]; Lm = max(0.25, max(m["w"], m["d"]))
             c = Vector((m["x"], m["y"], m["z"] + m["h"])); at = c + Vector((-0.35, -0.8, 2.2)) * Lm
             P0 = PAPER_LIGHT * (at - c).length_squared
-            ob = self.spot(f"{n}_spot", at, c, (1.0, 0.9, 0.76), P0, Lm, 0.3)
+            ob = self.spot(f"{n}_spot", at, c, (1.0, 0.9, 0.76), P0, Lm, 0.5)
+            ob.data.shadow_soft_size = 0.15 * Lm; ob.visible_glossy = False
             keys(ob.data, "energy", P0 * sp["level"])
             self.cones.append((n, ob, at, (c - at).normalized(), ob.data.spot_size / 2))
 
