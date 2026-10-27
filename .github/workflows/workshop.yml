@@ -34,8 +34,9 @@ jobs:
         run: python3 factory/rules/hermetic.py
       - name: Python packages
         run: |
-          pip install -q numpy pillow
-          if [ "$STAGE" = render ]; then pip install -q "kaggle>=1.7.4"; fi
+          pip install -q numpy pillow scipy requests
+          if [ "$STAGE" = render ]; then pip install -q "kaggle>=1.7.4"; else pip install -q shapely pyshp mapbox-earcut; fi
+          if [ "$STAGE" = preview ] && grep -q '"cutout"' "factory/orders/$ORDER/scenes.json"; then pip install -q "rembg[cpu]"; fi
       - name: Order store - the order's pictures with their licences
         if: inputs.stage != 'render'
         run: |

@@ -368,7 +368,7 @@ for o in OBJ.values():
                             "credit": o["credit"], "rkey": o["rkey"]}
     else:
         res_m[o["name"]] = {"glb": m["glb"], "views": {str(az): f"{o['rkey']}_a{az}.png" for az in AZ}, "credit": o["credit"],
-                            "rkey": o["rkey"]}
+                            "rkey": o["rkey"], "engine": o["engine"]}
 json.dump({"release": TAG, "icons": res_i, "models": res_m}, open(OUT / "objects.json", "w"), indent=1, ensure_ascii=False)
 print(f"objects.json: {len(res_i)} icons, {len(res_m)} models" + (f" · FAILED: {', '.join(failed)}" if failed else ""), flush=True)
 sys.exit(1 if failed or len(res_i) + len(res_m) < len(OBJ) else 0)

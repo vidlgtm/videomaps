@@ -14,7 +14,7 @@ mp = os.path.join(O.data or "", "meta.json")
 meta = json.load(open(mp)) if O.data and os.path.exists(mp) else {"items": {}}
 st = ST.Stage(scene, O.data, meta, O)
 sc = st.sc
-C.setup_cycles(sc, O, samples=int(scene.get("samples", 160)), motion_blur=True)
+C.setup_cycles(sc, O, samples=int(scene.get("samples", 160)), motion_blur=True, transparent=scene.get("output") == "over_map")
 sc.view_settings.view_transform = "Standard"
 try: sc.view_settings.look = "None"
 except Exception: pass
@@ -29,7 +29,8 @@ def exact(s, *a):
 bpy.app.handlers.frame_change_pre.append(exact)
 exact(sc)
 
-if st.errors and any("not built yet" in e or "never placed" in e for e in st.errors):
+if st.errors and any("not built yet" in e or "never placed" in e or "missing from the scene data" in e or "needs a GLB" in e
+                     for e in st.errors):
     for e in st.errors: print("SCENE ERROR:", e, flush=True)
     if O.preview:
         json.dump({"frames": st.n, "key_frames": [], "errors": st.errors, "warnings": st.warnings, "fatal": True},
@@ -46,13 +47,13 @@ if O.preview:
              for k, m in st.L.items()}, "camera": [{"t": round(s0, 2), "dur": round(d, 2), "target": rnd(b["T"]), "dist": round(b["D"], 3),
              "az": round(b["A"], 1), "el": round(b["E"], 1)} for s0, d, a, b in st.plan["states"]], "found": found,
              "lights": [ob.name for ob in sc.objects if ob.type == "LIGHT"], "L0": round(st.L0, 3), "mood": st.mood, "place": st.place}
-    void = st.place == "void"
+    void = st.place in ("void", "sky"); ground = st.place in ("terrain", "sea")
     calm = [f for f in key if all(st.ch[k]["glow"][f - 1] < 1e-3 and st.ch[k]["burn"][f - 1] < 1e-3 for k in st.ch)]
     EV_RANGE = (-1.5, 1.5)            # the light is set for paper at 0 EV: a scene needing more than this has a light error
     stats["light"] = {"share": round(st.share, 3), "target": st.target, "albedo": st.albedo}
-    C.preview_run(sc, O, st.n, st.classify, subject=("_",) if void else ("r",), target=st.target, tol=round(0.25 * st.target, 3),
-                  ev_range=EV_RANGE, stats=stats, errors=st.errors, warnings=st.warnings, dark_max=st.dark_max,
-                  fallback_subject=None, key=key, calm=calm)
+    C.preview_run(sc, O, st.n, st.classify, subject=("_",) if void else (("t",) if ground else ("r",)), target=st.target,
+                  tol=round(0.25 * st.target, 3), ev_range=EV_RANGE, stats=stats, errors=st.errors, warnings=st.warnings,
+                  dark_max=st.dark_max, fallback_subject=("w",) if ground else None, key=key, calm=calm)
     cp = os.path.join(O.out, "check.json"); ck = json.load(open(cp))
     res = st.fidelity(O.out, ck["key_frames"], ck.get("ext", ".jpg"))
     if ck.get("calibration") and min(abs(ck["ev"] - EV_RANGE[0]), abs(ck["ev"] - EV_RANGE[1])) < 0.02:

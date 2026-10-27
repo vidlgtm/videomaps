@@ -11,12 +11,16 @@ from bpy_extras.object_utils import world_to_camera_view
 import common as C
 import mats as M
 import plan as P
+import props as PR
+import outdoor as OD
 
 KIT = os.path.dirname(os.path.abspath(__file__))
 FONTS = os.path.normpath(os.path.join(KIT, "..", "..", "..", "fonts"))
 SURFACE = {"desk": "walnut", "museum": "marble", "floor": "stone", "void": None}
 MATERIAL = {"sheet": "paper", "print": "paper", "canvas": "gold", "frame": "gold", "disc": "wax", "block": "marble", "text": "gold",
-            "pole": "walnut", "plinth": "marble", "table": "walnut", "candle": "wax"}
+            "pole": "walnut", "plinth": "marble", "table": "walnut", "candle": "wax", "book": "leather", "box": "walnut",
+            "globe": "walnut", "cutout": "paper", "cloth": "cloth", "wall": "plaster", "tile": "slate", "terrain": "stone",
+            "model": "painted"}
 # LIGHT. A document or picture is shown in its exact colours, so the scene is lit for paper: the key light gives the cast an
 # irradiance that is a share of E_PAPER (under E_PAPER white paper is exactly white at 0 EV). Seals, hands and props on the
 # documents are then lit as the documents appear. The key is one soft pool over the whole cast (full strength over the cast,
@@ -205,11 +209,25 @@ class Stage:
         except Exception as e: print("interpolation preference:", e, flush=True)
         self.pics, self.objs, self.root, self.mats, self.nodes, self.lights, self.cones = [], {}, {}, {}, {}, [], []
         self.items = meta.get("items", {})
+        self.unit, self.fixed, self.ground_fn, self.span, self.ground_obj, self.sky = 1.0, {}, None, None, None, None
+        self.globes, self.models, self.model_parts, self.terrain_z, self.route_objs, self.rigs = {}, {}, {}, {}, [], []
+        self.split_members = {b["who"] for b in self.beats if b["do"] in ("split", "assemble")}
+        self.extra_split = {}
+        for b in self.beats:
+            if b["do"] in ("split", "assemble") and b.get("gap") is not None:
+                self.extra_split.setdefault(b["who"], {})["gap"] = float(np.clip(b["gap"], 0.05, 1.5))
+        self.fold_members = {b["who"] for b in self.beats if b["do"] in ("fold", "unfold")}
+        geo = PR.data_json(self, "geo.json")
+        self.tile_meta = geo.get("tiles") or {}; self.tiles = self.tile_meta.get("members", {})
+        self.pieces = geo.get("pieces") or {}; self.terrains = geo.get("terrains") or {}; self.geo_routes = geo.get("routes") or {}
+        self.geo_fly = geo.get("fly") or {}
+        if self.place in ("terrain", "sea"): OD.load_place(self)
         self.make_cast()
         self.make_place()
         self.make_lights()
         self.animate()
         self.make_camera()
+        OD.weather(self)
         for ob in self.sc.objects:                                      # lamps light the scene but are never seen as dots
             if ob.type == "LIGHT":
                 try: ob.visible_camera = False
@@ -222,7 +240,9 @@ class Stage:
 
     def aspect(self, name):
         k, v = self.src(name)
-        if k == "store" and v in self.items: return float(self.items[v]["aspect"])
+        if k == "store" and self.cast[name]["is"] == "cutout" and ("cut:" + v) in self.items: return float(self.items["cut:" + v]["aspect"])
+        if k == "store" and v in self.items and self.items[v].get("aspect"): return float(self.items[v]["aspect"])
+        if self.cast[name]["is"] == "terrain" and name in self.terrains: return float(self.terrains[name]["aspect"])
         return None
 
     def make_cast(self):
@@ -231,19 +251,44 @@ class Stage:
         for n, c in self.cast.items():                                  # text: its real size decides the layout
             if c["is"] == "text":
                 k, words = self.src(n)
-                d = P.dims(c); mt = M.solid(n, c.get("material", "gold"))
+                d = P.dims(c, None, self.unit); mt = M.solid(n, c.get("material", "gold"))
                 e = self.empty(n)
                 ob = text_object(f"{n}_text", words, d["L"], e, mt, 0.06 * d["L"])
                 lo, hi = local_size([ob])
                 over[n] = {"w": float(hi[0] - lo[0]), "d": float(hi[1] - lo[1]), "h": float(hi[2])}
                 self.objs[n] = [(ob, "o")]; self.mats[n] = [mt]
-        self.L, errs = P.layout(self.cast, aspects, over)
+        tl = [n for n, c in self.cast.items() if c["is"] == "tile"]
+        self.tile_scale = max([P.dims(self.cast[n], None, self.unit)["L"] for n in tl] or [1.0])
+        groups = {}
+        for n in tl:                                                    # the tiles of one map keep their places
+            D = self.tiles.get(n)
+            if not D: continue
+            S = self.tile_scale
+            over[n] = {"w": D["w"] * S, "d": D["d"] * S, "h": 0.03 * S, "L": max(D["w"], D["d"]) * S}
+            groups[n] = (D["cx"] * S, D["cy"] * S)
+        for n, c in self.cast.items():                                  # an imported model: its real proportions
+            if c["is"] == "model":
+                holder, size = PR.model_import(self, n, P.dims(c, None, self.unit)["L"])
+                if holder is not None:
+                    self.models[n] = holder; over[n] = {"w": float(size[0]), "d": float(size[1]), "h": float(size[2])}
+        self.L, errs = P.layout(self.cast, aspects, over, place=self.place, unit=self.unit, fixed=self.fixed, groups=groups)
         self.errors += errs
+        if self.ground_fn is not None:                                  # on a region: members stand on its ground
+            dz = {}
+            for n, c in self.cast.items():
+                wh = c.get("where")
+                if wh and wh[1] != "place": continue
+                fp = P.footprint(self.L[n]); z = float(np.max(self.ground_fn(fp[:, 0], fp[:, 1])))
+                dz[n] = z - self.L[n]["z"]; self.L[n]["z"] = z
+            for _ in range(len(self.cast)):                             # and what stands on them follows
+                for n, c in self.cast.items():
+                    wh = c.get("where")
+                    if n not in dz and wh and wh[1] in dz: dz[n] = dz[wh[1]]; self.L[n]["z"] += dz[n]
         for n, c in self.cast.items():
             if c["is"] != "text": self.make_member(n, c, self.L[n])
         for n in self.cast:
             m = self.L[n]; e = self.root[n]
-            e.location = (m["x"], m["y"], m["z"]); e.rotation_euler = (0, 0, math.radians(m["rot"]))
+            e.location = (m["x"] + m["ox"], m["y"], m["z"] + m["oz"]); e.rotation_euler = (math.radians(m["rx0"]), 0, math.radians(m["rot"]))
 
     def empty(self, n):
         e = bpy.data.objects.new(f"{n}_root", None); link(e); self.root[n] = e
@@ -254,8 +299,20 @@ class Stage:
             if b["who"] == n and b["do"] == "burn": return b.get("from", "left")
         return "left"
 
+    def builder(self, n, c):
+        noun = c["is"]
+        if noun in ("sheet", "print") and n in self.split_members: return PR.torn
+        if noun in ("sheet", "print") and n in self.fold_members: return PR.sheet_folding
+        return {"book": PR.book, "box": PR.chest, "globe": PR.globe, "cutout": PR.cutout, "model": PR.model, "cloth": PR.cloth,
+                "wall": PR.wall, "tile": PR.tiles, "terrain": PR.terrain_block}.get(noun)
+
     def make_member(self, n, c, m):
         noun = c["is"]; e = self.root.get(n) or self.empty(n)
+        fn = self.builder(n, c)
+        if fn is not None:
+            self.objs.setdefault(n, []); self.mats.setdefault(n, [])
+            self.rigs += [(n, r) for r in (fn(self, n, c, m, e) or [])]
+            return
         kind, val = self.src(n); mat = c.get("material", MATERIAL.get(noun, "painted"))
         objs, mats = [], []
         if noun in ("sheet", "print"):
@@ -266,7 +323,7 @@ class Stage:
                                    sheen=noun == "print", burn_from=self.burn_from(n))
                 back, bnd = M.paper(f"{n}_back", pk, m["w"], m["d"], self.burn_from(n))
                 ob = sheet_mesh(n, m, e, [pm, back]); objs.append((ob, "i")); mats += [pm, back]
-                self.pics.append({"member": n, "obj": ob, "iw": m["iw"], "ih": m["ih"], "path": path})
+                self.pics.append({"member": n, "obj": ob, "iw": m["iw"], "ih": m["ih"], "path": path, "ox": 0.0, "oy": 0.0})
                 self.nodes.setdefault(n, []).extend([nd, bnd])
             else:
                 pm, nd = M.paper(n, pk, m["w"], m["d"], self.burn_from(n))
@@ -282,7 +339,7 @@ class Stage:
                 path = os.path.join(self.data, self.items[val]["file"])
                 pm, nd = M.picture(n, path, m["iw"], m["ih"], m["iw"], m["ih"], kind="paper", burn_from=self.burn_from(n))
                 ob = quad(f"{n}_canvas", m["iw"], m["ih"], 0.55 * hh, e, pm); objs.append((ob, "i")); mats.append(pm)
-                self.pics.append({"member": n, "obj": ob, "iw": m["iw"], "ih": m["ih"], "path": path})
+                self.pics.append({"member": n, "obj": ob, "iw": m["iw"], "ih": m["ih"], "path": path, "ox": 0.0, "oy": 0.0})
                 self.nodes.setdefault(n, []).append(nd)
         elif noun == "disc":
             wm = M.solid(n, mat, color=(0.50, 0.04, 0.04) if mat == "wax" else None); mats.append(wm)
@@ -309,7 +366,7 @@ class Stage:
                 path = os.path.join(self.data, self.items[val]["file"])
                 pm, nd = M.picture(n, path, m["iw"], m["ih"], m["iw"], m["ih"], kind="print", burn_from=self.burn_from(n))
                 ob = quad(f"{n}_face", m["iw"], m["ih"], m["h"] + 0.0006, e, pm); objs.append((ob, "i")); mats.append(pm)
-                self.pics.append({"member": n, "obj": ob, "iw": m["iw"], "ih": m["ih"], "path": path})
+                self.pics.append({"member": n, "obj": ob, "iw": m["iw"], "ih": m["ih"], "path": path, "ox": 0.0, "oy": 0.0})
                 self.nodes.setdefault(n, []).append(nd)
             elif kind == "text":
                 light = mat in ("marble", "stone", "plaster", "sand", "paper", "parchment", "silver", "glass")
@@ -319,36 +376,37 @@ class Stage:
                 lo, hi = local_size([to])
                 s = min(1.0, 0.9 * m["w"] / max(hi[0] - lo[0], 1e-6), 0.62 * m["d"] / max(hi[1] - lo[1], 1e-6))
                 to.scale = (s, s, 1.0); to.location.z = m["h"] + 1.12 * dep; objs.append((to, "o"))
-        elif noun == "pole":
-            pm = M.solid(n, mat); mats.append(pm)
-            objs.append((cylinder(n, 0.016, m["h"], e, pm, seg=24), "o"))
-            objs.append((cylinder(f"{n}_foot", 0.09, 0.025, e, pm, seg=32, bevel=0.006), "o"))
+        elif noun == "pole":                                            # proportions of a 1.8 m flagpole at any size
+            pm = M.solid(n, mat); mats.append(pm); k = m["L"] / 1.8
+            objs.append((cylinder(n, 0.016 * k, m["h"], e, pm, seg=24), "o"))
+            objs.append((cylinder(f"{n}_foot", 0.09 * k, 0.025 * k, e, pm, seg=32, bevel=0.006 * k), "o"))
             gm = M.solid(f"{n}_finial", "brass"); mats.append(gm)
-            objs.append((sphere(f"{n}_finial", 0.028, e, gm, at=(0, 0, m["h"] + 0.02)), "o"))
+            objs.append((sphere(f"{n}_finial", 0.028 * k, e, gm, at=(0, 0, m["h"] + 0.02 * k)), "o"))
         elif noun == "plinth":
             pm = M.solid(n, mat); mats.append(pm); w = m["w"]
             objs.append((box(f"{n}_base", 1.12 * w, 1.12 * w, 0.06 * m["h"], e, pm, bevel=0.01), "o"))
             objs.append((box(n, w, w, 0.88 * m["h"], e, pm, z0=0.06 * m["h"], bevel=0.006), "o"))
             objs.append((box(f"{n}_cap", 1.08 * w, 1.08 * w, 0.06 * m["h"], e, pm, z0=0.94 * m["h"], bevel=0.01), "o"))
         elif noun == "table":
-            tm = M.solid(n, mat); mats.append(tm)
-            objs.append((box(f"{n}_top", m["w"], m["d"], 0.04, e, tm, z0=m["h"] - 0.04, bevel=0.008), "o"))
+            tm = M.solid(n, mat); mats.append(tm); k = m["L"] / 1.4
+            objs.append((box(f"{n}_top", m["w"], m["d"], 0.04 * k, e, tm, z0=m["h"] - 0.04 * k, bevel=0.008 * k), "o"))
             for i, (sx, sy) in enumerate(((-1, -1), (1, -1), (1, 1), (-1, 1))):
-                objs.append((box(f"{n}_leg{i}", 0.05, 0.05, m["h"] - 0.04, e, tm, x=sx * (m["w"] / 2 - 0.07), y=sy * (m["d"] / 2 - 0.07)), "o"))
+                objs.append((box(f"{n}_leg{i}", 0.05 * k, 0.05 * k, m["h"] - 0.04 * k, e, tm, x=sx * (m["w"] / 2 - 0.07 * k),
+                                 y=sy * (m["d"] / 2 - 0.07 * k)), "o"))
         elif noun == "candle":
-            cm = M.solid(n, "wax", color=(0.92, 0.88, 0.78)); mats.append(cm)
-            body = cylinder(n, 0.022, m["h"], e, cm, seg=32, bevel=0.002); objs.append((body, "o"))
+            cm = M.solid(n, "wax", color=(0.92, 0.88, 0.78)); mats.append(cm); k = m["L"] / 0.16
+            body = cylinder(n, 0.022 * k, m["h"], e, cm, seg=32, bevel=0.002 * k); objs.append((body, "o"))
             try: body.visible_shadow = False                           # wax lets its own flame through: no black ring at its foot
             except Exception: pass
             km = M.solid(f"{n}_wick", "painted", color=(0.03, 0.03, 0.03)); mats.append(km)
-            objs.append((cylinder(f"{n}_wick", 0.0012, 0.012, e, km, z0=m["h"], seg=8), "o"))
+            objs.append((cylinder(f"{n}_wick", 0.0012 * k, 0.012 * k, e, km, z0=m["h"], seg=8), "o"))
             fl = M.flame(f"{n}_flame"); mats.append(fl)
-            fo = sphere(f"{n}_flame", 0.006, e, fl, at=(0, 0, m["h"] + 0.022), scale=(1, 1, 2.6)); objs.append((fo, "o"))
+            fo = sphere(f"{n}_flame", 0.006 * k, e, fl, at=(0, 0, m["h"] + 0.022 * k), scale=(1, 1, 2.6)); objs.append((fo, "o"))
             for vis in ("visible_shadow", "visible_diffuse", "visible_glossy", "visible_transmission"):
                 try: setattr(fo, vis, False)
                 except Exception: pass
-            ld = bpy.data.lights.new(f"{n}_light", "POINT"); ld.color = (1.0, 0.62, 0.30); ld.shadow_soft_size = 0.008
-            lo_ = bpy.data.objects.new(f"{n}_light", ld); link(lo_, e); lo_.location = (0, 0, m["h"] + 0.045)
+            ld = bpy.data.lights.new(f"{n}_light", "POINT"); ld.color = (1.0, 0.62, 0.30); ld.shadow_soft_size = 0.008 * k
+            lo_ = bpy.data.objects.new(f"{n}_light", ld); link(lo_, e); lo_.location = (0, 0, m["h"] + 0.045 * k)
             self.lights.append(("candle", n, lo_))
         else:
             self.errors.append(f'cast {n}: the workshop has no "{noun}" tool built yet')
@@ -357,8 +415,9 @@ class Stage:
     # ---------------------------------------------------------- place
     def make_place(self):
         names = list(self.L)
-        pts = np.concatenate([P.box_points(self.L[k]) for k in names])
-        lo, hi = pts.min(0), pts.max(0)
+        if names: pts = np.concatenate([P.box_points(self.L[k]) for k in names])
+        else: pts = self.region_pts()
+        lo, hi = pts.min(0), pts.max(0); self.lo, self.hi = lo, hi
         self.center = Vector(((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, 0.0))
         self.L0 = max(0.35, float(math.hypot(hi[0] - lo[0], hi[1] - lo[1])), float(hi[2] - lo[2]))
         self.Lz = float(hi[2] - lo[2])
@@ -367,6 +426,8 @@ class Stage:
         bg = wd.node_tree.nodes["Background"]; bg.inputs["Color"].default_value = (*LIGHT[self.mood]["world"], 1)
         bg.inputs["Strength"].default_value = 1.0
         self.surface = None; self.backdrop = None; self.albedo = None
+        if self.S.get("output") == "over_map": OD.catcher(self)
+        if self.place in ("terrain", "sea", "sky", "wall"): OD.place(self); return
         if self.place == "void": return
         sname = self.S["place"].get("surface") or SURFACE[self.place]
         self.albedo = ALBEDO.get(sname, 0.2)
@@ -378,6 +439,12 @@ class Stage:
         bm = bmesh.new(); bmesh.ops.create_cone(bm, cap_ends=False, segments=96, radius1=0.95 * self.R, radius2=0.95 * self.R, depth=2 * self.R)
         for v in bm.verts: v.co = Vector((self.center.x + v.co.x, self.center.y + v.co.y, v.co.z + self.R))
         self.backdrop = bm_object("room", bm, None, [wm])
+
+    def region_pts(self):
+        """what to frame on a terrain or sea place without a cast: the region at its ground"""
+        D = self.place_d; H, W = self.hm.shape; px = D["px_km"]; x1, y1 = (W - 1) / 2 * px, (H - 1) / 2 * px
+        g = float(np.percentile(self.hm, 60)) / 1000.0 * D["ve"]
+        return np.array([[sx * x1 * 0.8, sy * y1 * 0.8, z] for sx in (-1, 1) for sy in (-1, 1) for z in (0.0, max(g, 0.0))])
 
     # ---------------------------------------------------------- light
     def lit_by_beat(self, n): return any(b["who"] == n and b["do"] == "light" for b in self.beats)
@@ -398,8 +465,11 @@ class Stage:
         return ob
 
     def make_lights(self):
+        if self.place in P.OUTDOOR: OD.outdoor_lights(self); return
         Lt = LIGHT[self.mood]; self.dark_max = Lt["dark"]
         az, el, dist, size, col, share = Lt["key"]
+        wall = self.place == "wall"
+        if wall: az, el = float(np.clip(az, -140, -40)), min(el, 42.0)        # the key lights the face of the wall
         candle = next((n for kind, n, _ in self.lights if kind == "candle" and n), None)
         if candle:                                                      # the candle on the stage motivates the key
             m = self.L[candle]; v = Vector((m["x"], m["y"], 0)) - self.center
@@ -408,7 +478,7 @@ class Stage:
         room = float(np.clip(A_ROOM / self.albedo, 1 / 8, 4)) if self.albedo else 1.0
         if self.albedo is not None and self.albedo < 0.03: self.dark_max = max(self.dark_max, 0.95)
         self.sc.world.node_tree.nodes["Background"].inputs["Strength"].default_value = room
-        tgt = self.center + Vector((0, 0, 0.25 * self.Lz))
+        tgt = self.center + Vector((0, 0, 0.25 * self.Lz if not wall else 0.5 * (self.lo[2] + self.hi[2])))
         d = dist * self.L0; at = tgt + d * Vector(P.cam_dir(el, az))
         cover, blend = POOL[self.mood]
         self.key = self.spot("key", at, tgt, col, PAPER_LIGHT * share * d * d, cover * self.L0, blend)
@@ -421,7 +491,8 @@ class Stage:
             ob.visible_glossy = False
         # exposure target: the lit surface near the cast as this light shows it (linear -> sRGB luma)
         if self.albedo is not None:
-            lin = self.albedo * (share * math.sin(math.radians(el)) + share * fsh * 0.5 * room) * E_PAPER / math.pi
+            inc = math.cos(math.radians(el)) * max(0.2, -math.sin(math.radians(az))) if wall else math.sin(math.radians(el))
+            lin = self.albedo * (share * inc + share * fsh * 0.5 * room) * E_PAPER / math.pi
             lin += self.albedo * float(np.mean(Lt["world"])) * room
             self.target = round(srgb(lin), 3)
         else: self.target = 0.18
@@ -436,13 +507,21 @@ class Stage:
 
     # ---------------------------------------------------------- motion
     def animate(self):
-        self.ch, self.spots, self.labels, errs = P.channels(self.L, self.beats, self.T)
+        self.ch, self.spots, self.labels, errs, self.extra = P.channels(self.L, self.beats, self.T)
         self.errors += errs
+        for n, sp in self.extra["splits"].items(): self.L[n]["gap"] = sp["gap"]
+        for i, wr in enumerate(self.extra["writes"]): PR.write(self, wr, i)
+        for n, rig in self.rigs: rig(self.ch[n], self.extra)
+        self.make_routes()
         for n, e in self.root.items():
             ch, m = self.ch[n], self.L[n]
-            keys(e, "location", np.stack([m["x"] + ch["dx"], m["y"] + ch["dy"], m["z"] + ch["dz"]], -1))
-            keys(e, "rotation_euler", np.stack([ch["rx"], ch["ry"], math.radians(m["rot"]) + ch["rz"]], -1))
+            spin = 0.0 if n in self.globes else 1.0                    # a globe turns its Earth, not its stand
+            keys(e, "location", np.stack([m["x"] + m["ox"] + ch["dx"], m["y"] + ch["dy"], m["z"] + m["oz"] + ch["dz"]], -1))
+            keys(e, "rotation_euler", np.stack([math.radians(m["rx0"]) + ch["rx"], ch["ry"], math.radians(m["rot"]) + spin * ch["rz"]], -1))
             keys(e, "scale", np.stack([ch["sx"], ch["sy"], ch["sz"]], -1))
+            if np.ptp(ch["dissolve"]) > 0:
+                for mt in self.mats.get(n, []):
+                    key_socket(M.add_dissolve(mt, 6.0 / max(m["L"], 0.05)), ch["dissolve"])
             for mt in self.mats.get(n, []): key_socket(M.presence_node(mt), ch["presence"])
             for nd in self.nodes.get(n, []):
                 key_socket(nd["reveal"], ch["reveal"]); key_socket(nd["burn"], ch["burn"]); key_socket(nd["glow"], ch["glow"])
@@ -472,13 +551,49 @@ class Stage:
             keys(ob.data, "energy", P0 * sp["level"])
             self.cones.append((n, ob, at, (c - at).normalized(), ob.data.spot_size / 2))
 
+    def make_routes(self):
+        """lines drawn over a map tile, a terrain block, a globe or the ground of a terrain or sea place (points prepared
+        with the scene data: projected to the piece they are drawn on)"""
+        for r in self.extra["routes"]:
+            pts = self.geo_routes.get(str(r["i"]))
+            who = r["who"]
+            if not pts: self.errors.append(f"route {r['i'] + 1} on {who}: its points are missing from the scene data"); continue
+            P_ = np.asarray(pts, float)
+            if who == "place":
+                if self.ground_fn is None: self.errors.append("a route on the place needs a terrain or sea place"); continue
+                z = self.ground_fn(P_[:, 0], P_[:, 1]) + 0.004 * self.span
+                PR.route(self, r, np.c_[P_[:, :2], z], None, 0.0022 * self.span); continue
+            m = self.L.get(who); noun = m["noun"] if m else None
+            if noun == "tile":
+                S = self.tile_scale; D = self.tiles[who]
+                xy = P_[:, :2] * S - np.array([D["cx"] * S, D["cy"] * S])
+                PR.route(self, r, np.c_[xy, np.full(len(xy), m["h"] + 0.004 * S)], self.root[who], 0.003 * S)
+            elif noun == "terrain" and who in self.terrain_z:
+                xs, ys, zs = self.terrain_z[who]; xy = P_[:, :2] * [m["w"], m["d"]]
+                col = np.interp(xy[:, 0], xs, np.arange(len(xs))); row = np.interp(-xy[:, 1], -ys, np.arange(len(ys)))
+                z = OD.bilinear(zs, row, col) + 0.006 * m["w"]
+                PR.route(self, r, np.c_[xy, z], self.root[who], 0.003 * m["w"])
+            elif noun == "globe" and who in self.globes:
+                g = self.globes[who]; lon, lat = np.radians(P_[:, 0]), np.radians(P_[:, 1]); rr = 1.012 * g["r"]
+                xyz = np.stack([rr * np.cos(lat) * np.cos(lon), rr * np.cos(lat) * np.sin(lon), rr * np.sin(lat)], -1)
+                PR.route(self, r, xyz, g["sphere"], 0.008 * g["r"])
+            else:
+                self.errors.append(f'route {r["i"] + 1}: "who" must be a map tile, a terrain, a globe or "place" (a terrain or sea place)')
+
     # ---------------------------------------------------------- camera
     def make_camera(self):
         cd = bpy.data.cameras.new("cam"); cd.lens = P.LENS; cd.sensor_width = P.SENSOR; cd.sensor_fit = "HORIZONTAL"
-        cd.clip_start = 0.01; cd.clip_end = 4 * self.R
+        cd.clip_start = 0.01; cd.clip_end = max(4 * self.R, 10 * self.span if self.span else 0.0)   # outdoors: to the horizon
         cam = bpy.data.objects.new("cam", cd); link(cam); self.sc.camera = cam; self.cam = cam
         cam.rotation_mode = "QUATERNION"
-        plan = P.camera(self.cams, self.L, self.ch, self.T, self.place, labels={x["who"] for x in self.labels})
+        fly = {}
+        for i, e in enumerate(sorted(self.cams, key=lambda x: x["t"])):
+            if e["move"] == "fly":
+                pts = self.geo_fly.get(str(i))
+                if pts and self.ground_fn is not None: fly[i] = P.fly_path(pts, self.ground_fn, self.span)
+                else: self.errors.append(f"camera {i + 1}: fly needs its path in the scene data and a terrain place")
+        plan = P.camera(self.cams, self.L, self.ch, self.T, self.place, labels={x["who"] for x in self.labels}, fly=fly,
+                        extra_pts=self.region_pts() if self.place in ("terrain", "sea") else [[0, 0, 0], [1, 1, 0.5]])
         self.plan = plan
         loc, rot, fd = [], [], []
         prev = None
@@ -516,6 +631,9 @@ class Stage:
                 pic = next((p for p in self.pics if p["obj"].name == ob.name), None)
                 self.B.append({"member": n, "obj": ob, "code": code, "tree": BVHTree.FromPolygons(vs, tris), "pic": pic,
                                "V": np.array([[v.x, v.y, v.z, 1.0] for v in vs]), "tri": tris})
+        if getattr(self, "ground_mesh", None) is not None:             # the ground of a terrain or sea place
+            wc, fc = self.ground_mesh
+            self.ground_tree = BVHTree.FromPolygons([Vector(v) for v in wc], [tuple(int(i) for i in f) for f in fc])
 
     def frame_mats(self, fi):
         for b in self.B:
@@ -548,8 +666,17 @@ class Stage:
                 if r is not None:
                     b, hp, _ = r; pic = b["pic"]; n = b["member"]
                     clean = self.ch[n]["burn"][fi] < 0.01 and self.ch[n]["reveal"][fi] >= 0.99
-                    s += "i" if pic and clean and abs(hp.x) < pic["iw"] / 2 and abs(hp.y) < pic["ih"] / 2 else "o"; continue
+                    s += "i" if pic and clean and abs(hp.x + pic.get("ox", 0.0)) < pic["iw"] / 2 and abs(hp.y + pic.get("oy", 0.0)) < pic["ih"] / 2 else "o"; continue
                 if self.place == "void": s += "b"; continue
+                bc = OD.bg_code(self, o, d)
+                if bc: s += bc; continue
+                if self.place == "wall" and d.y > 1e-9:                # the wall: lit near the hung pieces
+                    tw = -o.y / d.y; tf = (-o.z / d.z) if d.z < -1e-9 else 1e30
+                    if tw < tf:
+                        q = o + d * tw
+                        near = any(abs(q.x - self.L[n]["x"]) < 0.5 * self.L[n]["w"] + 0.12 * self.L0 and
+                                   abs(q.z - self.L[n]["z"] - 0.5 * self.L[n]["h"]) < 0.5 * self.L[n]["h"] + 0.12 * self.L0 for n in lit)
+                        s += "r" if near else "d"; continue
                 if d.z >= -1e-6:
                     s += "k" if self.backdrop else "v"; continue
                 q = o + d * (-o.z / d.z)
@@ -564,6 +691,9 @@ class Stage:
 
     def corners(self, n, fi, top=True):
         m = self.L[n]; e = self.root[n]; mw = e.matrix_world
+        if m["rx0"] or m["ox"] or m["oz"]:                              # hung pieces and flags: their box in the world
+            q = P.box_points(m, self.ch[n], fi)
+            return [Vector(tuple(v)) for v in (q if top else q[::2])]
         pts = []
         for sx, sy in ((-1, -1), (1, -1), (1, 1), (-1, 1)):
             for z in ((0.0, m["h"]) if top else (0.0,)):
@@ -582,6 +712,7 @@ class Stage:
         CHW = 0.5 * 45
         cut, sliver, lout, lover, overl = {}, {}, {}, {}, {}
         support = {(n, c["where"][1]) for n, c in self.cast.items() if c.get("where") and c["where"][0] in ("on", "in")}
+        support |= {(b["who"], b.get("on")) for b in self.beats if b["do"] == "stack"}
         for fr in range(1, self.n + 1):
             sc.frame_set(fr); fi = fr - 1; t = fi / P.FPS
             for i, lb in enumerate(LAB):
@@ -672,7 +803,9 @@ class Stage:
         nx, ny = 160, 90
         for f in key_frames:
             fi = f - 1
-            held = [p for p in self.pics if self.visible(p["member"], fi) and not self.moving(p["member"], fi)
+            held = [p for p in self.pics if p.get("obj") is not None and not p.get("deforms") and not p.get("pieces")
+                    and self.visible(p["member"], fi) and not self.moving(p["member"], fi)
+                    and self.ch[p["member"]]["open"][fi] in (0.0, 1.0) and self.ch[p["member"]]["dissolve"][fi] < 1e-3
                     and self.ch[p["member"]]["reveal"][fi] >= 0.999 and self.ch[p["member"]]["burn"][fi] < 1e-3
                     and self.ch[p["member"]]["glow"][fi] < 1e-3 and abs(self.ch[p["member"]]["rx"][fi]) < 1e-3
                     and abs(self.ch[p["member"]]["ry"][fi]) < 1e-3]
@@ -683,7 +816,8 @@ class Stage:
                 k = p["member"]
                 if k not in imgs: imgs[k] = pixels(p["path"])
                 fa = imgs[k]; mw = p["obj"].matrix_world
-                cv = [world_to_camera_view(self.sc, self.cam, mw @ Vector((sx * p["iw"] / 2, sy * p["ih"] / 2, 0.0))) for sx in (-1, 1) for sy in (-1, 1)]
+                cv = [world_to_camera_view(self.sc, self.cam, mw @ Vector((sx * p["iw"] / 2 - p.get("ox", 0.0), sy * p["ih"] / 2 - p.get("oy", 0.0), 0.0)))
+                      for sx in (-1, 1) for sy in (-1, 1)]
                 wpx = (max(q.x for q in cv) - min(q.x for q in cv)) * rw; hpx = (max(q.y for q in cv) - min(q.y for q in cv)) * rh
                 by, bx = max(1, int(round(fa.shape[0] / max(hpx, 1.0)))), max(1, int(round(fa.shape[1] / max(wpx, 1.0))))
                 if (k, by, bx) not in seen:
@@ -698,7 +832,7 @@ class Stage:
                     for i_, d in enumerate(row):
                         r = self.cast_ray(o, d, fi)
                         if r is None or r[0]["obj"].name != p["obj"].name: continue
-                        x, y = r[1].x, r[1].y
+                        x, y = r[1].x + p.get("ox", 0.0), r[1].y + p.get("oy", 0.0)
                         if not (abs(x) < p["iw"] / 2 and abs(y) < p["ih"] / 2): continue
                         u, v = x / p["iw"] + 0.5, y / p["ih"] + 0.5
                         ex[j, i_] = fa[min(max(int(v * fa.shape[0]), 0), fa.shape[0] - 1), min(max(int(u * fa.shape[1]), 0), fa.shape[1] - 1)]

@@ -10,9 +10,13 @@ scenes.json
    "output": "film" (full frame) | "over_map" (transparent, laid over the 2D map),
    "place":  {"kind": PLACE, "surface": MATERIAL, "region": [lon0, lat0, lon1, lat1] (terrain / sea only)},
    "light":  {"mood": MOOD, "weather": WEATHER},
-   "cast":   {"<name>": {"is": NOUN, "from": "store:<key>" | "map:<ISO3 or shape>" | "terrain" | "text:<words>" | "none",
-                         "material": MATERIAL, "size": metres or "S"|"M"|"L", "where": [RELATION, "<name>" | "place"]}},
-   "beats":  [{"t": seconds, "do": VERB, "who": "<name>", ...parameters of the verb}],
+   "cast":   {"<name>": {"is": NOUN, "from": "store:<key>" | "obj:<object name>" | "map:<ref>[+<ref>...]" | "terrain" |
+                                    "text:<words>" | "none",
+                         "material": MATERIAL, "size": metres or "S"|"M"|"L", "where": [RELATION, "<name>" | "place"],
+                         "region": [lon0, lat0, lon1, lat1] (a terrain block), "at": [lon, lat] (on a terrain or sea
+                         place; on a globe: the longitude facing the camera)}},
+             map refs: ISO3 | shape:<id> | rr:<region> | brk:<disputed area> (order.json); obj: = a model of objects.json
+   "beats":  [{"t": seconds, "do": VERB, "who": "<name>" ("place" for a route on a terrain or sea place), ...parameters}],
    "camera": [{"t": seconds, "move": MOVE, "to": "<name>", ...parameters}]   (the first one sets the opening framing)
 }}}
 usage: python spec.py <orderDir>     exit 2 = the description has errors (all listed at once)"""
@@ -23,18 +27,23 @@ from plan import BUILT          # the part of the vocabulary the kit has built s
 NOUNS = {   # what a cast member is -> the sources it can be made from
     "sheet": {"store", "none"}, "print": {"store"}, "canvas": {"store"}, "cutout": {"store"}, "cloth": {"store", "none"},
     "tile": {"map"}, "block": {"store", "text", "none"}, "book": {"store", "none"}, "box": {"store", "none"},
-    "disc": {"store", "none"}, "globe": {"none"}, "model": {"store"}, "terrain": {"terrain"}, "text": {"text"},
+    "disc": {"store", "none"}, "globe": {"none"}, "model": {"store", "obj"}, "terrain": {"terrain"}, "text": {"text"},
     "pole": {"none"}, "table": {"none"}, "plinth": {"none"}, "frame": {"none"}, "wall": {"none"}, "candle": {"none"},
 }
 VERBS = {   # verb -> parameters it accepts (all optional unless listed in REQUIRED)
     "appear": {"how", "dur"}, "vanish": {"how", "dur"}, "drop": {"from_h", "dur"}, "rise": {"h", "dur"},
-    "slide": {"to", "dur"}, "turn": {"deg", "axis", "dur"}, "flip": {"axis", "dur"}, "open": {"deg", "parts", "dur"},
+    "slide": {"to", "dur"}, "turn": {"deg", "axis", "dur"}, "flip": {"axis", "dur"}, "open": {"deg", "dur"},
     "close": {"dur"}, "unfold": {"dur"}, "fold": {"dur"}, "wave": {"wind", "dur"}, "split": {"into", "gap", "dur"},
-    "assemble": {"dur"}, "burn": {"from", "dur"}, "dissolve": {"dur"}, "stamp": {"with", "dur"}, "glow": {"color", "dur"},
+    "assemble": {"into", "gap", "dur"}, "burn": {"from", "dur"}, "dissolve": {"dur"}, "stamp": {"with", "dur"}, "glow": {"color", "dur"},
     "light": {"how", "dur"}, "write": {"text", "dur"}, "route": {"path", "color", "dur"}, "label": {"text", "dur"},
     "scatter": {"dur"}, "stack": {"on", "dur"},
 }
-REQUIRED = {"split": {"into"}, "write": {"text"}, "route": {"path"}, "label": {"text"}, "stamp": {"with"}}
+REQUIRED = {"split": {"into"}, "write": {"text"}, "route": {"path"}, "label": {"text"}, "stamp": {"with"}, "stack": {"on"}}
+ONLY = {"open": {"book", "box"}, "close": {"book", "box"}, "unfold": {"cloth", "sheet", "print"}, "fold": {"cloth", "sheet", "print"},
+        "wave": {"cloth"}, "split": {"tile", "sheet", "print"}, "assemble": {"tile", "sheet", "print"},
+        "write": {"sheet", "print", "block", "book", "box"}, "route": {"tile", "terrain", "globe"}}
+OUTDOOR_MOODS = {"dawn", "noon", "dusk", "overcast", "night"}
+COLORS = {"warm", "gold", "red", "blue", "white"}
 MOVES = {"wide": set(), "close": set(), "top": set(), "low": set(), "push": {"dur"}, "pull": {"dur"},
          "orbit": {"deg", "dur"}, "crane": {"h", "dur"}, "dolly": {"side", "dur"}, "track": {"dur"}, "tilt": {"deg", "dur"},
          "fly": {"path", "dur"}, "rack": {"from", "dur"}, "hold": {"dur"}}
@@ -45,7 +54,18 @@ MATERIALS = {"paper", "parchment", "cloth", "silk", "wood", "walnut", "oak", "st
              "brass", "gold", "silver", "iron", "glass", "velvet", "leather", "wax", "plaster", "painted", "felt"}
 RELATIONS = {"on", "in", "under", "left_of", "right_of", "behind", "in_front_of", "beside", "around", "above", "against"}
 SCENE_KEYS = {"idea", "seconds", "output", "place", "light", "cast", "beats", "camera", "note"}
-CAST_KEYS = {"is", "from", "material", "size", "where", "what", "note"}
+CAST_KEYS = {"is", "from", "material", "size", "where", "what", "note", "region", "at"}
+
+
+def lonlat(v): return isinstance(v, list) and len(v) == 2 and all(isinstance(x, (int, float)) for x in v) and -540 <= v[0] <= 540 and -90 <= v[1] <= 90
+
+
+def path_ok(p): return isinstance(p, list) and len(p) >= 2 and all(lonlat(x) for x in p)
+
+
+def region_ok(r, max_deg=60.0):
+    return (isinstance(r, list) and len(r) == 4 and all(isinstance(x, (int, float)) for x in r) and r[0] < r[2] and r[1] < r[3]
+            and -90 <= r[1] and r[3] <= 90 and 0.05 <= r[2] - r[0] <= max_deg and 0.05 <= r[3] - r[1] <= max_deg)
 
 
 def check(order):
@@ -75,19 +95,22 @@ def check(order):
         if pl.get("kind") not in PLACES: E(f'{w}: place.kind must be one of {", ".join(sorted(PLACES))}')
         if pl.get("surface") and pl["surface"] not in MATERIALS: E(f'{w}: place.surface "{pl["surface"]}" is not a known material')
         if pl.get("kind") in ("terrain", "sea"):
-            r = pl.get("region")
-            if not (isinstance(r, list) and len(r) == 4 and all(isinstance(x, (int, float)) for x in r) and r[0] < r[2] and r[1] < r[3]):
-                E(f"{w}: place.region must be [lon0, lat0, lon1, lat1] for {pl.get('kind')}")
+            if not region_ok(pl.get("region")):
+                E(f"{w}: place.region must be [lon0, lat0, lon1, lat1] for {pl.get('kind')} (0.05 to 60 degrees each way)")
         lt = sc.get("light") or {}
         if lt.get("mood") not in MOODS: E(f'{w}: light.mood must be one of {", ".join(sorted(MOODS))}')
         wx = lt.get("weather", "clear")
         if wx not in WEATHER: E(f'{w}: light.weather must be one of {", ".join(sorted(WEATHER))}')
         if wx in ("rain", "snow") and lt.get("mood") in ("noon", "dawn", "dusk", "studio"):
             E(f"{w}: {wx} needs an overcast or night sky, not {lt.get('mood')} sun")
+        if wx in ("rain", "snow") and pl.get("kind") not in ("terrain", "sea", "sky", "floor"):
+            E(f"{w}: {wx} falls outdoors (place terrain, sea, sky or floor), not on a {pl.get('kind')}")
+        if pl.get("kind") in ("terrain", "sea", "sky") and lt.get("mood") not in OUTDOOR_MOODS:
+            E(f"{w}: an outdoor place has an outdoor light ({', '.join(sorted(OUTDOOR_MOODS))}), not {lt.get('mood')}")
         if sc.get("output") == "over_map" and pl.get("kind") not in ("void",):
             E(f'{w}: a shot laid over the map has place.kind "void" (nothing behind the cast)')
         cast = sc.get("cast") or {}
-        if not cast: E(f"{w}: no cast")
+        if not cast and pl.get("kind") not in ("terrain", "sea"): E(f"{w}: no cast")
         for n, c in cast.items():
             cw = f"{w} cast {n}"
             for k in c:
@@ -97,7 +120,20 @@ def check(order):
             src = str(c.get("from", "none")); kind = src.split(":", 1)[0]
             if kind not in NOUNS[nn]: E(f'{cw}: a {nn} is made from {" | ".join(sorted(NOUNS[nn]))}, not "{src}"')
             if kind == "store" and src.split(":", 1)[1] not in store: E(f'{cw}: "{src}" is not in the order store (store.json)')
-            if kind == "map" and not re.fullmatch(r"map:[A-Za-z0-9_:-]+", src): E(f'{cw}: "{src}" - map:<ISO3> or map:<shape id>')
+            if kind == "map" and not re.fullmatch(r"map:[A-Za-z0-9_:-]+(\+[A-Za-z0-9_:-]+)*", src):
+                E(f'{cw}: "{src}" - map:<ISO3 | shape:<id> | rr:<name> | brk:<name>>, several joined with +')
+            if kind == "obj" and not re.fullmatch(r"obj:[a-z][a-z0-9_]{1,30}", src): E(f'{cw}: "{src}" - obj:<name of a model in objects.json>')
+            if kind == "store" and nn == "model" and src.split(":", 1)[1] in store and \
+                    not str(store[src.split(":", 1)[1]].get("file", "")).lower().endswith(".glb"):
+                E(f'{cw}: a model from the store is a GLB file')
+            if nn == "terrain" and not region_ok(c.get("region"), 20.0): E(f'{cw}: a terrain needs "region": [lon0, lat0, lon1, lat1] (0.05 to 20 degrees)')
+            if c.get("region") is not None and nn != "terrain": E(f'{cw}: "region" belongs to a terrain')
+            if c.get("at") is not None:
+                if not lonlat(c["at"]): E(f'{cw}: "at" is [lon, lat]')
+                elif nn != "globe" and pl.get("kind") not in ("terrain", "sea"): E(f'{cw}: "at" places a member on a terrain or sea place (or turns a globe)')
+                elif nn != "globe" and c.get("where") and c["where"][1] != "place": E(f'{cw}: a member placed "at" a lon/lat stands on the place')
+            if pl.get("kind") in ("terrain", "sea") and nn in ("tile", "terrain", "table", "candle"):
+                E(f"{cw}: a {nn} does not belong on an outdoor region")
             if c.get("material") and c["material"] not in MATERIALS: E(f'{cw}: material "{c["material"]}" is not known')
             sz = c.get("size")
             if sz is not None and not (sz in ("S", "M", "L") or (isinstance(sz, (int, float)) and 0.01 <= sz <= 50)): E(f'{cw}: size is metres (0.01-50) or S/M/L')
@@ -110,7 +146,18 @@ def check(order):
             bw = f"{w} beat {i + 1}"
             v = b.get("do")
             if v not in VERBS: E(f'{bw}: "do" must be one of {", ".join(sorted(VERBS))} (a missing tool is added on request)'); continue
-            if b.get("who") not in cast: E(f'{bw}: "who" must be a cast name')
+            if b.get("who") not in cast and not (v == "route" and b.get("who") == "place" and pl.get("kind") in ("terrain", "sea")):
+                E(f'{bw}: "who" must be a cast name ("place" only for a route on a terrain or sea place)')
+            elif v in ONLY and b.get("who") in cast and cast[b["who"]].get("is") not in ONLY[v]:
+                E(f'{bw}: "{v}" works on {", ".join(sorted(ONLY[v]))}, not on a {cast[b["who"]].get("is")}')
+            if v == "route":
+                if not path_ok(b.get("path")): E(f'{bw}: route "path" is a list of 2+ [lon, lat] points')
+                if b.get("color", "red") not in COLORS: E(f'{bw}: route "color" is one of {", ".join(sorted(COLORS))}')
+            if v == "stack" and (b.get("on") not in cast or b.get("on") == b.get("who")): E(f'{bw}: stack "on" names another cast member')
+            if v == "wave" and not (isinstance(b.get("wind", 0.7), (int, float)) and 0.1 <= b.get("wind", 0.7) <= 1): E(f'{bw}: wave "wind" is 0.1 to 1')
+            if v in ("split", "assemble") and b.get("who") in cast and cast[b["who"]].get("is") in ("sheet", "print") and \
+                    b.get("into") is not None and not (isinstance(b["into"], int) or (isinstance(b["into"], list) and len(b["into"]) == 1 and str(b["into"][0]).isdigit())):
+                E(f'{bw}: a sheet or print splits "into" a number of pieces (2 to 8)')
             t = b.get("t")
             if not isinstance(t, (int, float)) or not 0 <= t < T: E(f"{bw}: t must be inside the shot (0-{T})")
             elif t < last: E(f"{bw}: beats in time order")
@@ -136,7 +183,8 @@ def check(order):
             if c.get("to") is not None and c["to"] not in cast: E(f'{cw}: "to" must be a cast name')
             for k in c:
                 if k not in MOVES[mv] | {"t", "move", "to", "note"}: E(f'{cw}: "{mv}" has no parameter "{k}"')
-            if mv == "fly" and pl.get("kind") != "terrain": E(f"{cw}: fly is over terrain")
+            if mv == "fly" and pl.get("kind") not in ("terrain", "sea"): E(f"{cw}: fly is over a terrain or sea place")
+            if mv == "fly" and not path_ok(c.get("path")): E(f'{cw}: fly needs "path": 2+ [lon, lat] points')
         # tools of the vocabulary that the kit has not built yet: refused now, before anything runs
         nb = lambda what, x: E(f'{w}: {what} "{x}" - this tool is not built yet in the workshop (added on request)')
         if pl.get("kind") in PLACES and pl["kind"] not in BUILT["places"]: nb("place", pl["kind"])

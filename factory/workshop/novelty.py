@@ -33,6 +33,9 @@ def features(sc):
           f"output:{sc.get('output', 'film')}"}
     cast = sc.get("cast") or {}
     f |= {f"noun:{c.get('is')}" for c in cast.values()} | {f"material:{c.get('material')}" for c in cast.values() if c.get("material")}
+    f |= {f"src:{c.get('from')}" for c in cast.values() if str(c.get("from", "")).startswith(("map:", "obj:"))}
+    for r in [pl.get("region")] + [c.get("region") for c in cast.values()]:
+        if isinstance(r, list) and len(r) == 4: f.add("region:" + ",".join(str(int(round(float(v) / 5.0)) * 5) for v in r))
     for b in sc.get("beats") or []:
         f |= {f"verb:{b.get('do')}", f"vn:{b.get('do')}>{cast.get(b.get('who'), {}).get('is')}"}
     moves = [c.get("move") for c in sc.get("camera") or []]

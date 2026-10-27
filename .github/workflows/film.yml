@@ -219,7 +219,7 @@ jobs:
           set -e
           mkdir -p out/ws
           if [ -f $OD/scenes.json ]; then
-            pip install -q numpy "pillow==11.2.1" requests
+            pip install -q numpy "pillow==11.2.1" requests scipy
             python -u factory/workshop/run.py $OD --stage clips --sha ${{ github.sha }} --repo ${{ github.repository }}
             cp $OD/out/workshop.json out/ws/workshop.json
             cp -r $OD/out/ws_review out/ws/ 2>/dev/null || true

@@ -66,16 +66,27 @@ if meta_o.get("preview_only") and STAGE in ("render", "clips"): fail("this order
 store = json.load(open(ORDER / "store.json", encoding="utf-8")).get("items", {}) if (ORDER / "store.json").exists() else {}
 KITCODE = b"".join((KIT / f).read_bytes() for f in sorted(os.listdir(KIT)) if f.endswith(".py"))
 PREP, PREV, KERNEL = (HERE / "prep.py").read_bytes(), (HERE / "preview.py").read_bytes(), (HERE / "kaggle_kernel.py").read_bytes()
+GEOCODE = (HERE / "geodata.py").read_bytes() + b"".join((ROOT / "factory" / "maps" / f).read_bytes() for f in ("mapdef.py", "terrain.py", "geo_build.py"))
 GPU_S_PER_FRAME = 9.0                # T4 OptiX, 1920x1080, 160 samples + denoise (measured once, raised when a scene needs it)
+COST = {"terrain": 1.5, "sea": 1.5, "haze_in": 1.6, "rain": 1.3, "snow": 1.3}   # heavier scenes get a longer budget
+if any(str(c.get("from", "")).startswith("obj:") for sc in S.values() for c in (sc.get("cast") or {}).values()) \
+        and not (OUT / "objects.json").exists() and "--dry" not in a:
+    r = run([sys.executable, str(ROOT / "factory" / "objects" / "objects.py"), str(ORDER), "--stage", "collect", "--repo", REPO], check=False)
+    print(r.stdout[-1500:], flush=True)
+    if r.returncode or not (OUT / "objects.json").exists(): fail("a scene uses a model of the objects stage that is not made yet (objects.py --stage collect failed)")
+OBJ = json.load(open(OUT / "objects.json")).get("models", {}) if (OUT / "objects.json").exists() else {}
 jobs = []
 for sid, sc in S.items():
-    files = {k: store[k]["sha256"] for k in prep.used(sc)}
+    files = {k: store[k]["sha256"] for k in prep.used(sc) + prep.models(sc)}
+    objs = {n: OBJ.get(str(c["from"])[4:], {}).get("rkey") for n, c in (sc.get("cast") or {}).items() if str(c.get("from", "")).startswith("obj:")}
     look = {k: v for k, v in sc.items() if k not in ("note", "idea")}
-    dkey = sha(files, PREP)
+    dkey = sha(files, prep.key_parts(sc), objs, PREP, GEOCODE)
     vkey = sha(look, KITCODE, dkey)
     lkey = sha(vkey, PREV)
     frames = int(round(float(sc["seconds"]) * 30))
-    budget = max(12.0, round(frames * GPU_S_PER_FRAME / 60 * 1.6 + 4))
+    wx, pk = (sc.get("light") or {}).get("weather", "clear"), (sc.get("place") or {}).get("kind")
+    cost = COST.get(pk, 1.0) * (COST["haze_in"] if wx == "haze" and pk not in ("terrain", "sea", "sky") else COST.get(wx, 1.0))
+    budget = max(12.0, round(frames * GPU_S_PER_FRAME * cost / 60 * 1.6 + 4))
     jobs.append({"id": sid, "script": "build.py", "labels": any(b.get("do") == "label" for b in sc.get("beats", [])),
                  "alpha": sc.get("output") == "over_map", "seconds": sc["seconds"], "params": sc, "budget_min": budget,
                  "dkey": dkey, "vkey": vkey, "lkey": lkey})
