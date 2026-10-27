@@ -1,23 +1,26 @@
 name: film
 # PRODUCTION LINE (folder factory/): one order -> one film, on GitHub runners (+ the Kaggle GPU for the score only).
 #   check    : result tag, order files, hermetic check (pictures only from the order store), order store entries
-#   voice    : the voice takes (one per paragraph) -> one consistent read + word timeline + subtitles; at least 7 min
+#   voice    : the voice takes (one per paragraph) -> one consistent read + word timeline + subtitles; at least 7 min;
+#              made once per set of takes (release voice_cache); then the film's own score (ACE-Step 1.5 on the Kaggle GPU,
+#              kept by content in music_cache) or the house score
 #   map      : base map from the map library (picked, or defined and added once) + the order's geography -> geo.json
 #   station  : processing station (order-store pictures -> film-ready assets, Manim documents, credits)
 #   workshop : the order's 3D pieces (scenes.json), rendered once after their previews were approved
 #   objects  : the order's 3D icons and models (objects.json), made once after their previews were approved
-#   music    : the film's own score (ACE-Step 1.5 on Kaggle, kept by content) or the house score
 #   direct   : automatic director -> film.json, audit + feedback passes, map tiles this camera path needs
 #   tiles    : missing HD/UHD tiles, built once and kept in the map library
 #   stills   : every asset in place, final audit, review stills + station stills + soundtrack preview -> release <tag>_stills
 #              stage render continues only when order.json "approved": {"stills": "<key of these stills>"}
 #   render   : parallel parts (3 browsers each, self-check)   final: frame-exact assembly, QA -> release <tag>
+# stage voice: check + voice only -> release <tag>_voice (words.txt = the time of every word, timeline, subtitles,
+#              listening copy), to time the 3D shots and the plan on the real read before anything else runs.
 # Result tags start with film_; earlier releases are only read.
 on:
   workflow_dispatch:
     inputs:
       order: { description: 'order folder (factory/orders/<name>)', required: true }
-      stage: { description: 'stills (review stills + soundtrack) | render (the film; stills approved in order.json)', default: 'stills' }
+      stage: { description: 'voice (the read + word times only) | stills (review stills + soundtrack) | render (the film; stills approved in order.json)', default: 'stills' }
       tag: { description: 'result release tag, film_... (empty = film_<order>)', default: '' }
 concurrency:
   group: film-${{ inputs.order }}
@@ -38,7 +41,7 @@ jobs:
       - name: Result tag and stage
         run: |
           case "$TAG" in film_*) echo "tag $TAG ok";; *) echo "::error::tag must start with film_"; exit 1;; esac
-          case "$STAGE" in stills|render) echo "stage $STAGE";; *) echo "::error::stage must be stills or render"; exit 1;; esac
+          case "$STAGE" in voice|stills|render) echo "stage $STAGE";; *) echo "::error::stage must be voice, stills or render"; exit 1;; esac
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: '3.11' }
@@ -48,8 +51,9 @@ jobs:
         run: |
           set -e
           test -d "$OD" || { echo "::error::$OD does not exist"; exit 1; }
-          for f in order.json narration.json storyboard.json; do test -f "$OD/$f" || { echo "::error::$OD/$f is missing"; exit 1; }; done
-          python3 -c "import json; [json.load(open('$OD/' + f, encoding='utf-8')) for f in ('order.json', 'narration.json', 'storyboard.json')]; print('order files ok')"
+          F="order.json narration.json storyboard.json"; [ "$STAGE" = voice ] && F="order.json narration.json"
+          for f in $F; do test -f "$OD/$f" || { echo "::error::$OD/$f is missing"; exit 1; }; done
+          python3 -c "import json, sys; [json.load(open('$OD/' + f, encoding='utf-8')) for f in sys.argv[1:]]; print('order files ok')" $F
       - name: Order store - every entry in its release, licences allowed
         if: hashFiles(format('factory/orders/{0}/store.json', inputs.order)) != ''
         env: { GH_TOKEN: "${{ github.token }}" }
@@ -63,7 +67,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: '3.11' }
-      - name: Voice - the takes -> one read, word timeline, subtitles
+      - name: Voice - the takes -> one read, word timeline, subtitles (made once per set of takes, release voice_cache)
         env: { GH_TOKEN: "${{ github.token }}" }
         run: |
           set -e
@@ -76,15 +80,67 @@ jobs:
             python3 factory/line/srt.py out/voice/timeline.json out/voice/subtitles.srt
             echo "master voice $1/$2 with its timeline"
           else
-            bash production/ci/apt.sh ffmpeg rubberband-cli
-            pip install -q torch==2.5.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cpu
-            pip install -q soundfile num2words "numpy<2.3" scipy pyloudnorm pyworld
-            if [ -f $OD/store.json ] && python3 -c "import json, sys; sys.exit(0 if any(k.startswith('vo_') for k in json.load(open('$OD/store.json'))['items']) else 1)"; then
-              R=$(python3 -c "import json; print(json.load(open('$OD/store.json'))['release'])")
-              mkdir -p $OD/store_files && gh release download "$R" -R ${{ github.repository }} -p 'vo_*' -D $OD/store_files --clobber
+            # key of the read: the narration, every take (sha256, same search order as voice.py) and the voice code
+            python3 - <<'PY'
+          import glob, hashlib, json, os
+          od = os.environ['OD']; h = hashlib.sha256()
+          for f in (f'{od}/narration.json', 'factory/line/voice.py'): h.update(open(f, 'rb').read())
+          st = json.load(open(f'{od}/store.json', encoding='utf-8'))['items'] if os.path.exists(f'{od}/store.json') else {}
+          for p in json.load(open(f'{od}/narration.json', encoding='utf-8'))['paragraphs']:
+              fs = [f for e in ('wav', 'flac', 'mp3') for f in glob.glob(f"{od}/vo/vo_{p['id']}.{e}")]
+              h.update((hashlib.sha256(open(fs[0], 'rb').read()).hexdigest() if fs else st.get(f"vo_{p['id']}", {}).get('sha256', 'missing')).encode())
+          open('/tmp/vkey', 'w').write(h.hexdigest()[:16])
+          PY
+            VK=$(cat /tmp/vkey); C=voice_cache; R=${{ github.repository }}
+            rm -f out/voice/timeline.json
+            if gh release download "$C" -R "$R" -p "${VK}_timeline.json" -O out/voice/timeline.json 2>/dev/null && [ -s out/voice/timeline.json ]; then
+              gh release download "$C" -R "$R" -p "${VK}_voice.wav" -O out/voice/voice.wav
+              gh release download "$C" -R "$R" -p "${VK}_subtitles.srt" -O out/voice/subtitles.srt
+              echo "voice $VK: made earlier from these exact takes (release $C)"
+            else
+              rm -f out/voice/timeline.json
+              bash production/ci/apt.sh ffmpeg rubberband-cli
+              pip install -q torch==2.5.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cpu
+              pip install -q soundfile num2words "numpy<2.3" scipy pyloudnorm pyworld
+              if [ -f $OD/store.json ] && python3 -c "import json, sys; sys.exit(0 if any(k.startswith('vo_') for k in json.load(open('$OD/store.json'))['items']) else 1)"; then
+                SR=$(python3 -c "import json; print(json.load(open('$OD/store.json'))['release'])")
+                mkdir -p $OD/store_files && gh release download "$SR" -R "$R" -p 'vo_*' -D $OD/store_files --clobber
+              fi
+              python -u factory/line/voice.py $OD out/voice
+              gh release view "$C" -R "$R" > /dev/null 2>&1 || gh release create "$C" -R "$R" --title "$C" --notes "voice reads of the orders, kept by content (narration + takes + voice code)"
+              mkdir -p /tmp/vc && for f in voice.wav timeline.json subtitles.srt align_report.txt dsp_report.txt; do cp "out/voice/$f" "/tmp/vc/${VK}_$f"; done
+              gh release upload "$C" -R "$R" --clobber /tmp/vc/*
+              echo "voice $VK: made from the takes, kept in release $C"
             fi
-            python -u factory/line/voice.py $OD out/voice
+            echo "$VK" > out/voice/voice_key.txt
           fi
+          python3 - <<'PY'
+          import json, os
+          od = os.environ['OD']
+          ids = [p['id'] for p in json.load(open(f'{od}/narration.json', encoding='utf-8'))['paragraphs']]
+          t = json.load(open('out/voice/timeline.json'))
+          L = [f"WORD TIMES - order {os.environ['ORDER']} - film {t['total']:.2f} s = {t['total'] / 60:.2f} min",
+               "t0 / t1 = film seconds of each word. A 3D shot placed on cue word W starts 0.3 s before W (over_map: 0.2 s):",
+               "shot time = film time - (W.t0 - 0.3). The opening shot starts at film time 0.", ""]
+          for ch in t['chunks']:
+              L.append(f"## {ids[ch['i']]}   {ch['start']:.3f} - {ch['end']:.3f} s")
+              L += [f"{w['t0']:9.3f} {w['t1']:9.3f}  {w['w']}" for w in t['words'] if w['c'] == ch['i']]
+              L.append("")
+          open('out/voice/words.txt', 'w', encoding='utf-8').write("\n".join(L))
+          PY
+      - name: The read and its word times (stage voice) -> release <tag>_voice
+        if: env.STAGE == 'voice'
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          set -e
+          bash production/ci/apt.sh ffmpeg
+          ffmpeg -v error -y -i out/voice/voice.wav -c:a libmp3lame -b:a 128k out/voice/voice_preview.mp3
+          R="${TAG}_voice"
+          gh release delete "$R" -y --cleanup-tag -R ${{ github.repository }} 2>/dev/null || true
+          gh release create "$R" -R ${{ github.repository }} --title "$R" --notes "the read of order $ORDER: word times (words.txt), timeline, subtitles, listening copy" \
+            out/voice/words.txt out/voice/timeline.json out/voice/subtitles.srt out/voice/voice_preview.mp3
+      - name: Film length (at least 7 minutes)
+        run: |
           python3 - <<'PY'
           import json
           t = json.load(open('out/voice/timeline.json'))
@@ -95,9 +151,32 @@ jobs:
           PY
       - uses: actions/upload-artifact@v4
         with: { name: voice, path: out/voice, retention-days: 7 }
+      - name: The film's score (ACE-Step 1.5 on the Kaggle GPU, kept by content in music_cache; or the house score)
+        id: music
+        if: env.STAGE != 'voice'
+        continue-on-error: true
+        env:
+          GH_TOKEN: "${{ github.token }}"
+          KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+        run: |
+          set -e
+          bash production/ci/apt.sh ffmpeg
+          pip install -q numpy scipy pyloudnorm "kaggle>=1.7.4"
+          python -u factory/line/music.py $OD out/voice/timeline.json out/music
+      - if: steps.music.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: music
+          retention-days: 7
+          path: |
+            out/music/music
+            out/music/music.json
+            out/music/music_report.txt
 
   map:
     needs: check
+    if: ${{ inputs.stage != 'voice' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     steps:
@@ -135,6 +214,7 @@ jobs:
 
   station:
     needs: check
+    if: ${{ inputs.stage != 'voice' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     steps:
@@ -207,6 +287,7 @@ jobs:
 
   workshop:
     needs: check
+    if: ${{ inputs.stage != 'voice' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     steps:
@@ -231,6 +312,7 @@ jobs:
 
   objects:
     needs: check
+    if: ${{ inputs.stage != 'voice' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     steps:
@@ -252,35 +334,6 @@ jobs:
           fi
       - uses: actions/upload-artifact@v4
         with: { name: objects, path: out/obj, retention-days: 7, if-no-files-found: warn }
-
-  music:
-    needs: voice
-    runs-on: ubuntu-24.04
-    timeout-minutes: 360
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with: { name: voice, path: out/voice }
-      - uses: actions/setup-python@v5
-        with: { python-version: '3.11' }
-      - name: The film's score
-        env:
-          GH_TOKEN: "${{ github.token }}"
-          KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
-          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
-        run: |
-          set -e
-          bash production/ci/apt.sh ffmpeg
-          pip install -q numpy scipy pyloudnorm "kaggle>=1.7.4"
-          python -u factory/line/music.py $OD out/voice/timeline.json out/music
-      - uses: actions/upload-artifact@v4
-        with:
-          name: music
-          retention-days: 7
-          path: |
-            out/music/music
-            out/music/music.json
-            out/music/music_report.txt
 
   direct:
     needs: [voice, map, station, workshop, objects]
@@ -373,7 +426,7 @@ jobs:
           python -u factory/maps/library.py tiles out/map art/direction/need.json
 
   stills:
-    needs: [voice, map, station, workshop, objects, music, direct, tiles]
+    needs: [voice, map, station, workshop, objects, direct, tiles]
     if: ${{ !cancelled() && needs.direct.result == 'success' && needs.tiles.result == 'success' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 360
@@ -417,7 +470,7 @@ jobs:
           if [ -f art/music/music.json ]; then
             cp -r art/music/music/. $PUB/music/ && python3 factory/line/merge.py lufs $D/film.json art/music/music.json
           else
-            echo "::warning::NO SCORE - the music job did not finish; stills only, the film cannot be rendered without its score"
+            echo "::warning::NO SCORE - the score step of the voice job did not finish; stills only, the film cannot be rendered without its score"
             echo nomusic > /tmp/nomusic
           fi
           python3 - <<'PY'
@@ -521,14 +574,15 @@ jobs:
         run: |
           set -e
           K=$(python3 factory/line/review.py key $OD factory/engine art/music/music.json)
-          [ -f /tmp/nomusic ] && K="${K}_nomusic"
+          NOM=0; [ -f /tmp/nomusic ] && NOM=1 && K="${K}_nomusic"
+          echo "nomusic=$NOM" >> $GITHUB_OUTPUT
           echo "$K" > factory/engine/out/review/stills_key.txt
           echo "STILLS KEY: $K"
           TOTAL=$(python3 -c "import json; print(json.load(open('factory/engine/src/data/timeline.json'))['total'])")
           P=$(python3 factory/line/review.py parts $TOTAL)
           echo "parts=$P" >> $GITHUB_OUTPUT
           echo "nparts=$(python3 -c "import json; print(len($P))")" >> $GITHUB_OUTPUT
-          if [ "$STAGE" = render ] && python3 factory/line/review.py approved $OD "$K"; then echo "approved=1" >> $GITHUB_OUTPUT; else echo "approved=0" >> $GITHUB_OUTPUT; fi
+          if [ "$STAGE" = render ] && [ "$NOM" = 0 ] && python3 factory/line/review.py approved $OD "$K"; then echo "approved=1" >> $GITHUB_OUTPUT; else echo "approved=0" >> $GITHUB_OUTPUT; fi
       - name: Publish the stills
         env: { GH_TOKEN: "${{ github.token }}" }
         working-directory: factory/engine
@@ -542,6 +596,11 @@ jobs:
           gh release delete "$R" -y --cleanup-tag -R ${{ github.repository }} 2>/dev/null || true
           gh release create "$R" -R ${{ github.repository }} --title "$R" --notes "review stills, station stills, soundtrack preview - order $ORDER - key $(cat out/review/stills_key.txt)" \
             out/review/* out/stills/*.jpg out/stills_station/*.jpg out/*.txt out/station/* src/data/film.json
+      - name: No film without its score
+        if: steps.key.outputs.nomusic == '1'
+        run: |
+          echo "::error::NO SCORE - the stills are published, the film cannot be rendered without its score: see the score step of the voice job (a new cue is made on the Kaggle GPU)"
+          exit 1
       - name: Render only with approved stills
         if: env.STAGE == 'render' && steps.key.outputs.approved != '1'
         run: |

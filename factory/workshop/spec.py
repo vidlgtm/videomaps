@@ -6,7 +6,8 @@ general tools (kit/). This file holds the vocabulary of those tools and checks a
 scenes.json
 {"scenes": {"<id>": {
    "idea":   one sentence - what the viewer sees and why it matters to the story,
-   "seconds": length of the shot (the voice timing replaces it in the production line),
+   "seconds": length of the rendered shot (2-40), taken from the word times of the read (film.yml stage voice ->
+              words.txt); "t" below is shot time; the film holds the last frame if the words last longer,
    "output": "film" (full frame) | "over_map" (transparent, laid over the 2D map),
    "place":  {"kind": PLACE, "surface": MATERIAL, "region": [lon0, lat0, lon1, lat1] (terrain / sea only)},
    "light":  {"mood": MOOD, "weather": WEATHER},

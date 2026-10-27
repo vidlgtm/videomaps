@@ -3,6 +3,7 @@
 as two temporary repository secrets and withdrawn as soon as the run's job has started (always, also on failure);
 the script ends only when the secret list no longer holds them.
 usage: GH_TOKEN=... [KAGGLE_API_TOKEN=... KAGGLE_USERNAME=...] python3 factory/tools/dispatch.py <workflow.yml> [--job name] key=value ...
+(film.yml: --job defaults to "voice", the job with the score step)
 needs: pip install pynacl"""
 import base64, calendar, json, os, sys, time, urllib.request, urllib.error
 
@@ -10,7 +11,7 @@ REPO = os.environ.get("REPO", "vidlgtm/videomaps")
 GH = os.environ["GH_TOKEN"]
 a = sys.argv[1:]
 WF = a[0]
-JOB = a[a.index("--job") + 1] if "--job" in a else None
+JOB = a[a.index("--job") + 1] if "--job" in a else ("voice" if WF == "film.yml" else None)
 inputs = dict(x.split("=", 1) for x in a[1:] if "=" in x)
 NAMES = ("KAGGLE_API_TOKEN", "KAGGLE_USERNAME")
 
