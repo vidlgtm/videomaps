@@ -70,6 +70,7 @@ try {
   d.F.banners.forEach((b: any) => used.add(b.img)); d.F.cutouts.forEach((c: any) => used.add(c.img));
   d.F.docs.forEach((x: any) => { used.add(x.img); (x.sigs ?? []).forEach((g: any) => used.add(g.img)); });
   d.F.clips.forEach((c: any) => used.add(c.src));
+  d.F.icons.forEach((i: any) => used.add(`icons/${i.name}_a${i.az}.png`));
   Object.values(d.FLAG ?? {}).forEach((c: any) => used.add(`flags/4x3/${c}.svg`));
   const seen = new Set<string>();
   const cr = (assets.credits ?? []).filter((c: any) => !c.files || c.files.some((f: string) => used.has(f))).filter((c: any) => {

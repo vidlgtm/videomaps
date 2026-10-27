@@ -5,6 +5,7 @@ name: film
 #   map      : base map from the map library (picked, or defined and added once) + the order's geography -> geo.json
 #   station  : processing station (order-store pictures -> film-ready assets, Manim documents, credits)
 #   workshop : the order's 3D pieces (scenes.json), rendered once after their previews were approved
+#   objects  : the order's 3D icons and models (objects.json), made once after their previews were approved
 #   music    : the film's own score (ACE-Step 1.5 on Kaggle, kept by content) or the house score
 #   direct   : automatic director -> film.json, audit + feedback passes, map tiles this camera path needs
 #   tiles    : missing HD/UHD tiles, built once and kept in the map library
@@ -228,6 +229,30 @@ jobs:
       - uses: actions/upload-artifact@v4
         with: { name: workshop, path: out/ws, retention-days: 7, if-no-files-found: warn }
 
+  objects:
+    needs: check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - name: The order's 3D icons and models (made once, after their previews were approved)
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          set -e
+          mkdir -p out/obj
+          if [ -f $OD/objects.json ]; then
+            pip install -q numpy "pillow==11.2.1" scipy
+            python -u factory/objects/objects.py $OD --stage collect --sha ${{ github.sha }} --repo ${{ github.repository }}
+            cp $OD/out/objects.json out/obj/objects.json
+            cp -r $OD/out/objects_review out/obj/ 2>/dev/null || true
+          else
+            echo "no 3D objects in this order"
+          fi
+      - uses: actions/upload-artifact@v4
+        with: { name: objects, path: out/obj, retention-days: 7, if-no-files-found: warn }
+
   music:
     needs: voice
     runs-on: ubuntu-24.04
@@ -258,7 +283,7 @@ jobs:
             out/music/music_report.txt
 
   direct:
-    needs: [voice, map, station, workshop]
+    needs: [voice, map, station, workshop, objects]
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     steps:
@@ -284,6 +309,10 @@ jobs:
             python3 factory/line/merge.py workshop $OD art/workshop/workshop.json - /tmp/labels
           fi
           python3 factory/line/merge.py labels $OD /tmp/labels $D
+          if [ -f art/objects/objects.json ]; then
+            pip install -q numpy "pillow==11.2.1"
+            python3 factory/line/merge.py objects $OD art/objects/objects.json - $D
+          fi
           python3 - <<'PY'
           import json
           P = json.load(open('art/pack/pack.json')); A = json.load(open('factory/engine/src/data/aspect.json'))
@@ -344,7 +373,7 @@ jobs:
           python -u factory/maps/library.py tiles out/map art/direction/need.json
 
   stills:
-    needs: [voice, map, station, workshop, music, direct, tiles]
+    needs: [voice, map, station, workshop, objects, music, direct, tiles]
     if: ${{ !cancelled() && needs.direct.result == 'success' && needs.tiles.result == 'success' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 360
@@ -384,6 +413,7 @@ jobs:
           for d in archive sig clips flags; do [ -d art/pack/$d ] && cp -r art/pack/$d/. $PUB/$d/; done
           python3 factory/line/merge.py own $OD $PUB
           if [ -f art/workshop/workshop.json ]; then python3 factory/line/merge.py workshop $OD art/workshop/workshop.json $PUB /tmp/labels; fi
+          if [ -f art/objects/objects.json ]; then python3 factory/line/merge.py objects $OD art/objects/objects.json $PUB $D; fi
           if [ -f art/music/music.json ]; then
             cp -r art/music/music/. $PUB/music/ && python3 factory/line/merge.py lufs $D/film.json art/music/music.json
           else

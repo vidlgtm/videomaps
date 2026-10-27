@@ -10,7 +10,7 @@ usage:
   python factory/line/review.py parts <total_s> [frames_per_part=900] [max_parts=18]   render matrix -> JSON list"""
 import glob, hashlib, json, math, os, sys
 
-ORDER_FILES = ("order.json", "narration.json", "storyboard.json", "sources.json", "scenes.json", "store.json")
+ORDER_FILES = ("order.json", "narration.json", "storyboard.json", "sources.json", "scenes.json", "store.json", "objects.json")
 
 
 def times(film, total):

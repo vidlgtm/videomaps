@@ -12,6 +12,10 @@ usage:
         pieces of this repository (never pictures from the web) -> <publicDir>
   python factory/line/merge.py lufs <film.json> <music.json>
         measured loudness of the film's score cues -> film.json music entries
+  python factory/line/merge.py objects <orderDir> <objects.json> <publicDir> <engineDataDir>
+        the order's 3D icons (objects collect stage) -> <publicDir>/icons/<name>_a<az>.png (publicDir - = measure only),
+        <orderDir>/assets.json icons {name: {az, size, bb}} + their store credits, measured content boxes ->
+        <engineDataDir>/icon_boxes.json; models are listed for the workshop
 env: GH_TOKEN, GITHUB_REPOSITORY"""
 import json, os, subprocess, sys
 
@@ -100,6 +104,42 @@ def cmd_lufs(filmp, musicp):
     if miss: fail("score cues missing: " + ", ".join(miss))
 
 
+def icon_box(png):
+    import numpy as np
+    from PIL import Image
+    al = np.asarray(Image.open(png).convert("RGBA"))[..., 3]
+    ys, xs = np.where(al > 8)
+    if not len(xs): fail(f"{png} is empty")
+    h, w = al.shape
+    return [float(round(v, 3)) for v in (xs.min() / w, ys.min() / h, (xs.max() + 1) / w, (ys.max() + 1) / h)]
+
+
+def cmd_objects(odir, objp, pub, data):
+    O = load(objp)
+    if not O: fail(f"{objp} is missing")
+    A = load(f"{odir}/assets.json", {})
+    A.setdefault("icons", {}); A.setdefault("credits", [])
+    B = load(f"{data}/icon_boxes.json", {})
+    for n, ic in O.get("icons", {}).items():
+        if n in A["icons"]: fail(f'3D icon "{n}" has the same name as an icon of assets.json')
+        az = int(ic["az"]); f = ic["files"][str(az)]
+        dest = f"{pub}/icons/{n}_a{az}.png" if pub != "-" else f"/tmp/objects_icons/{n}_a{az}.png"
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        gh_download(O["release"], f, out=dest)
+        bb = icon_box(dest)
+        A["icons"][n] = {"az": az, "size": ic["size"], "bb": bb}
+        B[f"{n}_a{az}"] = bb
+        c = ic.get("credit") or {}
+        if c.get("license"):
+            A["credits"].append({"what": f"{c.get('what')} (3D icon)", "license": c["license"], "author": c.get("author"),
+                                 "page": c.get("page"), "files": [f"icons/{n}_a{az}.png"]})
+        print(f"3D icon {n}: a{az}, size {ic['size']}, content box {bb}", flush=True)
+    json.dump(A, open(f"{odir}/assets.json", "w", encoding="utf-8"), indent=1, ensure_ascii=False)
+    json.dump(B, open(f"{data}/icon_boxes.json", "w"), indent=0)
+    for n, m in O.get("models", {}).items():
+        print(f"3D model {n}: {m['glb']} (for the workshop)", flush=True)
+
+
 def main(a):
     if not a: print(__doc__); sys.exit(1)
     c = a[0]
@@ -107,6 +147,7 @@ def main(a):
     elif c == "labels" and len(a) == 4: cmd_labels(*a[1:])
     elif c == "own" and len(a) == 3: cmd_own(*a[1:])
     elif c == "lufs" and len(a) == 3: cmd_lufs(*a[1:])
+    elif c == "objects" and len(a) == 5: cmd_objects(*a[1:])
     else: print(__doc__); sys.exit(1)
 
 
