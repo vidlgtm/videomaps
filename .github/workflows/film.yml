@@ -99,7 +99,7 @@ jobs:
               echo "voice $VK: made earlier from these exact takes (release $C)"
             else
               rm -f out/voice/timeline.json
-              bash production/ci/apt.sh ffmpeg rubberband-cli
+              bash production/ci/ffmpeg.sh && bash production/ci/apt.sh rubberband-cli
               pip install -q torch==2.5.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cpu
               pip install -q soundfile num2words "numpy<2.3" scipy pyloudnorm pyworld
               if [ -f $OD/store.json ] && python3 -c "import json, sys; sys.exit(0 if any(k.startswith('vo_') for k in json.load(open('$OD/store.json'))['items']) else 1)"; then
@@ -133,7 +133,7 @@ jobs:
         env: { GH_TOKEN: "${{ github.token }}" }
         run: |
           set -e
-          bash production/ci/apt.sh ffmpeg
+          bash production/ci/ffmpeg.sh
           ffmpeg -v error -y -i out/voice/voice.wav -c:a libmp3lame -b:a 128k out/voice/voice_preview.mp3
           R="${TAG}_voice"
           gh release delete "$R" -y --cleanup-tag -R ${{ github.repository }} 2>/dev/null || true
@@ -161,7 +161,7 @@ jobs:
           KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
         run: |
           set -e
-          bash production/ci/apt.sh ffmpeg
+          bash production/ci/ffmpeg.sh
           pip install -q numpy scipy pyloudnorm "kaggle>=1.7.4"
           python -u factory/line/music.py $OD out/voice/timeline.json out/music
       - if: steps.music.outcome == 'success'
@@ -267,7 +267,7 @@ jobs:
                 chmod -R a+rwX out/pack factory/station'
             else
               echo "::warning::Manim image unavailable - building Manim on the runner"
-              bash production/ci/apt.sh libcairo2-dev libpango1.0-dev pkg-config ffmpeg fontconfig
+              bash production/ci/ffmpeg.sh && bash production/ci/apt.sh libcairo2-dev libpango1.0-dev pkg-config fontconfig
               mkdir -p ~/.local/share/fonts && cp fonts/*.ttf ~/.local/share/fonts/ && fc-cache -f > /dev/null
               for f in "Cormorant Garamond" "Great Vibes"; do fc-list : family | grep -qi "$f" || { echo "::error::font $f missing"; exit 1; }; done
               pip install -q "manim==0.22.0" scipy
@@ -442,7 +442,7 @@ jobs:
         with: { python-version: '3.11' }
       - uses: actions/setup-node@v4
         with: { node-version: 20 }
-      - run: bash production/ci/apt.sh ffmpeg unzip && pip install -q numpy scipy "pillow==11.2.1" requests pyshp shapely pyloudnorm
+      - run: bash production/ci/ffmpeg.sh && bash production/ci/apt.sh unzip && pip install -q numpy scipy "pillow==11.2.1" requests pyshp shapely pyloudnorm
       - name: Every asset of the film in place
         env: { GH_TOKEN: "${{ github.token }}" }
         run: |
@@ -638,7 +638,7 @@ jobs:
         with: { node-version: 20 }
       - uses: actions/setup-python@v5
         with: { python-version: '3.11' }
-      - run: bash production/ci/apt.sh ffmpeg && pip install -q numpy pillow
+      - run: bash production/ci/ffmpeg.sh && pip install -q numpy pillow
       - name: Render part (3 browsers x concurrency 1) + self-check
         working-directory: factory/engine
         run: |
@@ -678,7 +678,7 @@ jobs:
         with: { name: direction, path: direction }
       - uses: actions/setup-python@v5
         with: { python-version: '3.11' }
-      - run: bash production/ci/apt.sh ffmpeg && pip install -q "pillow==11.2.1"
+      - run: bash production/ci/ffmpeg.sh && pip install -q "pillow==11.2.1"
       - name: Assemble (frame-exact), QA, publish
         env: { GH_TOKEN: "${{ github.token }}" }
         run: |

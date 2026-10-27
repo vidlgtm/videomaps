@@ -16,7 +16,7 @@ ALLOWED = [
     ("huggingface.co", ""), ("github.com", "/xinntao/Real-ESRGAN/releases/"), ("github.com", "/opencv/opencv_zoo/"),
     ("github.com", "/VAST-AI-Research/TripoSR"), ("github.com", "/Tencent/Hunyuan3D-2"), ("github.com", "/Tencent-Hunyuan/Hunyuan3D-2"),
     ("github.com", "/tatsy/torchmcubes"),
-    ("github.com", "/ace-step/ACE-Step-1.5"),
+    ("github.com", "/ace-step/ACE-Step-1.5"), ("github.com", "/BtbN/FFmpeg-Builds/releases/"),
     # fixed base map of every film (same for all films, not chosen per film)
     ("tiles.maps.eox.at", "/wmts/1.0.0/s2cloudless"), ("s3.amazonaws.com", "/elevation-tiles-prod/"),
     ("eoimages.gsfc.nasa.gov", "/images/imagerecords/"), ("raw.githubusercontent.com", "/nvkelso/natural-earth-vector/"),

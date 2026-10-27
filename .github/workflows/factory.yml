@@ -89,7 +89,7 @@ jobs:
                 chmod -R a+rwX out/pack factory/station'
             else
               echo "::warning::Manim image unavailable - building Manim on the runner"
-              bash production/ci/apt.sh libcairo2-dev libpango1.0-dev pkg-config ffmpeg fontconfig
+              bash production/ci/ffmpeg.sh && bash production/ci/apt.sh libcairo2-dev libpango1.0-dev pkg-config fontconfig
               mkdir -p ~/.local/share/fonts && cp fonts/*.ttf ~/.local/share/fonts/ && fc-cache -f > /dev/null
               for f in "Cormorant Garamond" "Great Vibes"; do fc-list : family | grep -qi "$f" || { echo "::error::font $f missing"; exit 1; }; done
               pip install -q "manim==0.22.0" scipy
@@ -201,7 +201,7 @@ jobs:
         with: { python-version: '3.11' }
       - uses: actions/setup-node@v4
         with: { node-version: 20 }
-      - run: bash production/ci/apt.sh ffmpeg unzip && pip install -q numpy scipy pillow
+      - run: bash production/ci/ffmpeg.sh && bash production/ci/apt.sh unzip && pip install -q numpy scipy pillow
       - name: Assets - station pack + (until phases 3-4) the v5 3D clips, icons, music and voice from our releases + the new tiles
         env: { GH_TOKEN: "${{ github.token }}" }
         working-directory: factory/engine
