@@ -839,7 +839,7 @@ class Stage:
                     and abs(self.ch[p["member"]]["ry"][fi]) < 1e-3]
             if not held: continue
             rend = pixels(os.path.join(out, f"p_{f:04d}{ext}"))[::-1]; rh, rw = rend.shape[:2]
-            self.sc.frame_set(f); self.frame_mats(fi); o, rows = C.cam_rays(self.sc, self.cam, nx, ny)
+            self.sc.frame_set(f); self.frame_mats(fi)
             for p in held:
                 k = p["member"]
                 if k not in imgs: imgs[k] = pixels(p["path"], alpha=bool(p.get("alpha")))     # a cut-out: only its opaque part counts
@@ -857,6 +857,12 @@ class Stage:
                         a = rgb_
                     seen[(k, by, bx)] = a
                 fa = seen[(k, by, bx)]
+                # rays only over the picture (a fine grid, so a small picture is measured as well as a big one)
+                bu0, bu1 = max(0.0, min(q.x for q in cv)), min(1.0, max(q.x for q in cv))
+                bv0, bv1 = max(0.0, 1 - max(q.y for q in cv)), min(1.0, 1 - min(q.y for q in cv))
+                if bu1 - bu0 < 1e-3 or bv1 - bv0 < 1e-3: continue
+                nx = 48; ny = int(np.clip(round(nx * (bv1 - bv0) * rh / max((bu1 - bu0) * rw, 1.0)), 8, 96))
+                o, rows = C.cam_rays(self.sc, self.cam, nx, ny, box=(bu0, bv0, bu1, bv1))
                 hk = np.zeros((ny, nx), bool); ex = np.zeros((ny, nx, 3), np.float32)
                 for j, row in enumerate(rows):
                     for i_, d in enumerate(row):
@@ -876,7 +882,7 @@ class Stage:
                 for dj in range(-1, 2):
                     for di in range(-1, 2): ok &= np.abs(pe[2 + dj:2 + dj + ny, 2 + di:2 + di + nx] - ex).max(-1) < 0.04
                 for j, i_ in zip(*np.nonzero(inner)):
-                    r_ = rend[min(int((j + 0.5) / ny * rh), rh - 1), min(int((i_ + 0.5) / nx * rw), rw - 1)]
+                    r_ = rend[min(int((bv0 + (j + 0.5) / ny * (bv1 - bv0)) * rh), rh - 1), min(int((bu0 + (i_ + 0.5) / nx * (bu1 - bu0)) * rw), rw - 1)]
                     acc_all[k].append((r_, ex[j, i_]))
                     if ok[j, i_]: acc[k].append((r_, ex[j, i_]))
         res = {}

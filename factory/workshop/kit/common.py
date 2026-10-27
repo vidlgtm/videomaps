@@ -277,19 +277,21 @@ def render_frames(sc, out, frames, budget_min=0.0, prefix="f_"):
 
 
 # ------------------------------------------------------------------ preview (checks + exposure)
-def cam_rays(sc, cam, nx=NX, ny=NY):
-    """origin + world directions through the centres of an nx x ny grid of image cells (row 0 = top)"""
+def cam_rays(sc, cam, nx=NX, ny=NY, box=None):
+    """origin + world directions through the centres of an nx x ny grid of image cells (row 0 = top); box = (u0, v0, u1,
+    v1) restricts the grid to that part of the frame (u from the left, v from the top, 0..1)"""
     mw = cam.matrix_world
     fr = list(cam.data.view_frame(scene=sc))
     tr = max(fr, key=lambda v: v.x + v.y); bl = min(fr, key=lambda v: v.x + v.y)
     tl = min(fr, key=lambda v: v.x - v.y); br = max(fr, key=lambda v: v.x - v.y)
     o = mw.translation.copy()
     tr, br, bl, tl = (mw @ v for v in (tr, br, bl, tl))
+    u0, v0, u1, v1 = box or (0.0, 0.0, 1.0, 1.0)
     rows = []
     for j in range(ny):
-        v = (j + 0.5) / ny
+        v = v0 + (j + 0.5) / ny * (v1 - v0)
         a, b = tl.lerp(bl, v), tr.lerp(br, v)
-        rows.append([(a.lerp(b, (i + 0.5) / nx) - o).normalized() for i in range(nx)])
+        rows.append([(a.lerp(b, u0 + (i + 0.5) / nx * (u1 - u0)) - o).normalized() for i in range(nx)])
     return o, rows
 
 
