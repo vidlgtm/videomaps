@@ -11,5 +11,9 @@
    "size": 1.0
   }
  },
- "note": "factory test: two 3D icons from museum photos (CC0)"
+ "note": "factory test: two 3D icons from museum photos (CC0)",
+ "approved": {
+  "helmet": "0bba91ce69519b",
+  "keter": "0d408050f908cd"
+ }
 }
