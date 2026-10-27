@@ -583,7 +583,7 @@ def camera(entries, M, C, T, place, labels=(), fly=None, extra_pts=None):
 
     for i, (t0, dur, a, b) in enumerate(states):
         h0 = t0 + dur; h1 = states[i + 1][0] if i + 1 < len(states) else T
-        if h1 - h0 < 0.3 or b.get("track") or b.get("fly"): continue
+        if h1 - h0 <= 1e-6 or b.get("track") or b.get("fly"): continue          # even a short hold at the end is clean
         f0, f1 = int(min(n - 1, round(h0 * FPS))), int(min(n - 1, round(h1 * FPS)))
         shrink = 1 - DRIFT * (h1 - h0) / 5.0
         for f in [1.0] + sorted(np.geomspace(0.7, 1.8, 41), key=lambda x: abs(math.log(x))):
