@@ -5,6 +5,8 @@
 # Self-check: frames are compared with fresh-page reference stills; any mismatch -> that sub-range is
 # re-rendered frame by frame as stills (fresh page per frame) and checked again.
 set -e
+# frame count of a video (digits only: newer ffprobe prints "967," with -of csv)
+frames() { ffprobe -v error -count_packets -select_streams v:0 -show_entries stream=nb_read_packets -of default=noprint_wrappers=1:nokey=1 "$1" | head -n1 | tr -cd '0-9'; }
 A=$1; B=$2; OUT=$3; W=${WORKERS:-3}; SERVE=${SERVE:-build}; P=${PART:-x}
 QA=${QA_COMPARE:-$(cd "$(dirname "$0")/../../.." && pwd)/production/pipeline/qa_compare.py}
 test -f "$QA" || { echo "qa_compare.py not found: $QA"; exit 1; }
@@ -40,7 +42,7 @@ for s in "${SUBS[@]}"; do
     npx remotion still "$SERVE" Main out/ref/ref_$f.jpg --frame=$f --scale=0.25 --gl=swangle --log=error > /dev/null 2>&1 || true
   done
   NEED=0
-  if [ ! -s out/sub/s_$i.mp4 ] || [ "$(ffprobe -v error -count_packets -select_streams v:0 -show_entries stream=nb_read_packets -of csv=p=0 out/sub/s_$i.mp4)" != "$(( b - a + 1 ))" ]; then
+  if [ ! -s out/sub/s_$i.mp4 ] || [ "$(frames out/sub/s_$i.mp4)" != "$(( b - a + 1 ))" ]; then
     echo "sub $i missing/short" > out/qa/qa_p${P}_s${i}_check1.txt; NEED=1
   elif ! python3 "$QA" out/sub/s_$i.mp4 $a out/ref $FR > out/qa/qa_p${P}_s${i}_check1.txt; then
     NEED=1
@@ -56,4 +58,4 @@ done
 
 for s in "${SUBS[@]}"; do read i a b <<< "$s"; echo "file '$PWD/out/sub/s_$i.mp4'"; done > out/sub/list.txt
 ffmpeg -v error -y -f concat -safe 0 -i out/sub/list.txt -c copy "$OUT"
-echo "part $P frames: $(ffprobe -v error -count_packets -select_streams v:0 -show_entries stream=nb_read_packets -of csv=p=0 "$OUT") (expected $N)"
+echo "part $P frames: $(frames "$OUT") (expected $N)"

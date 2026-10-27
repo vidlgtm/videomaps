@@ -2,13 +2,14 @@
 """Contact sheets of the finished film (12 frames per sheet, 480x270 each, timestamped): one frame every STEP seconds
 plus the review times of the stills (when given).
 usage: qa_sheets.py VIDEO OUT_DIR [STEP=10] [times file]"""
-import os, subprocess, sys
+import os, re, subprocess, sys
 from PIL import Image, ImageDraw
 
 video, out = sys.argv[1], sys.argv[2]
 step = float(sys.argv[3]) if len(sys.argv) > 3 else 10.0
-dur = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", video],
-                           capture_output=True, text=True, check=True).stdout.strip())
+dur = float(re.search(r"\d+(?:\.\d+)?", subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of",
+                                                         "default=noprint_wrappers=1:nokey=1", video],
+                                                        capture_output=True, text=True, check=True).stdout).group())
 T = [round(2 + k * step, 1) for k in range(int((dur - 4) // step) + 1)]
 if len(sys.argv) > 4 and os.path.exists(sys.argv[4]):
     T += [float(x) for x in open(sys.argv[4]).read().split() if 0 <= float(x) < dur - 0.2]

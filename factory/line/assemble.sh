@@ -5,6 +5,8 @@
 # Parts can hold sub-ranges from different encoders (video pass / per-frame fallback) whose time bases differ, so
 # timestamps are regenerated from frame order (setpts=N) and the film is encoded in one continuous pass.
 set -e
+# frame count of a video (digits only: newer ffprobe prints "967," with -of csv)
+frames() { ffprobe -v error -count_packets -select_streams v:0 -show_entries stream=nb_read_packets -of default=noprint_wrappers=1:nokey=1 "$1" | head -n1 | tr -cd '0-9'; }
 D=$1; MIX=$2; TOTAL=$3; TAG=$4
 case "$TAG" in film_*) ;; *) echo "refused: release tag '$TAG' must start with film_"; exit 1;; esac
 SLUG=${FILM_SLUG:-film}; TITLE=${FILM_TITLE:-Film}
@@ -12,7 +14,7 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 ls $D/part_*.mp4 | sort > parts.txt; N=$(wc -l < parts.txt); echo "parts: $N"
 SUM=0
 for f in $(cat parts.txt); do
-  c=$(ffprobe -v error -count_packets -select_streams v:0 -show_entries stream=nb_read_packets -of csv=p=0 $f); SUM=$((SUM + c))
+  c=$(frames "$f"); SUM=$((SUM + c))
 done
 echo "frames in parts: $SUM (expected $TOTAL)"; test $SUM -eq $TOTAL
 test $TOTAL -ge 12600 || { echo "refused: $TOTAL frames is shorter than 7 minutes"; exit 1; }
@@ -21,7 +23,7 @@ IN=""; F=""; C=""; i=0
 for f in $(cat parts.txt); do IN="$IN -i $f"; F="${F}[$i:v]setpts=N/(30*TB)[v$i];"; C="${C}[v$i]"; i=$((i + 1)); done
 ffmpeg -v error -y $IN -filter_complex "${F}${C}concat=n=$N:v=1:a=0,setpts=N/(30*TB),fps=30[out]" -map "[out]" -fps_mode passthrough \
   -c:v libx264 -crf 17 -preset medium -pix_fmt yuv420p -movflags +faststart video.mp4
-FR=$(ffprobe -v error -count_packets -select_streams v:0 -show_entries stream=nb_read_packets -of csv=p=0 video.mp4)
+FR=$(frames video.mp4)
 echo "video: $FR frames"; test $FR -eq $TOTAL
 
 ffmpeg -v error -y -i video.mp4 -i $MIX -map 0:v -map 1:a -c:v copy -c:a aac -b:a 320k -ar 48000 -movflags +faststart \
