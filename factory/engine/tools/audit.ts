@@ -22,8 +22,9 @@ const ignore = (a: Item, b: Item) => {
   if (a.kind === 'name' || b.kind === 'name') return true;
   if (a.id.replace(/^\w+:/, '') === b.id.replace(/^\w+:/, '') && a.kind === b.kind) return true;
   if (a.prio === 100 && b.prio === 100) {
-    if ([a.kind, b.kind].includes('doll') && [a.kind, b.kind].includes('dollL')) return false;
-    return a.kind === 'doll' || b.kind === 'doll' || a.kind === 'end' || b.kind === 'end';
+    const k = [a.kind, b.kind];                     // a 3D doll over a card or a list is a real overlap (end card / credits excepted)
+    if (k.includes('doll')) return k.includes('end') || k.includes('credits') || (a.kind === 'doll' && b.kind === 'doll');
+    return a.kind === 'end' || b.kind === 'end';
   }
   return false;
 };

@@ -635,6 +635,9 @@ export class Director {
       const scr = [...this.F.cutouts, ...this.F.docs, ...this.F.numerals, ...this.F.cards.filter((c) => c.kind !== 'chapter')]
         .filter((e) => e.from > from + 0.5 && e.from < to);
       if (scr.length) to = Math.max(from + 2.2, Math.min(...scr.map((e) => e.from)) - 0.05);
+      // a 3D clip (over the map or full frame) that comes in under the card: the card leaves first (shorter, still readable)
+      const cl = this.F.clips.filter((e) => e.from > from + 0.5 && e.from < to);
+      if (cl.length) to = Math.max(from + 1.5, Math.min(...cl.map((e) => e.from)) - 0.05);
       // the previous paragraph may still be speaking: never cover its last words
       if (ch.cs[0] > 0 && this.pEnd(ch.cs[0] - 1) > from - 0.3) from = this.pEnd(ch.cs[0] - 1) + 0.3;
       this.F.cards.push({kind: 'chapter', num: ch.n ?? undefined, text: ch.title.toUpperCase(), from: r3(from), to: r3(to), _k: `chapter${k}`});
