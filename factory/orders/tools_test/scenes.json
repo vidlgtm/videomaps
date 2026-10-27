@@ -1,0 +1,55 @@
+{"scenes": {
+ "desk_treaty_box": {
+  "idea": "On a walnut desk under a lamp a leather book opens on the 1922 treaty while a casket with Kazan on its lid opens beside a turning globe and a cut-out figure.",
+  "seconds": 7, "output": "film",
+  "place": {"kind": "desk", "surface": "walnut"},
+  "light": {"mood": "lamp"},
+  "cast": {
+   "book": {"is": "book", "from": "store:treaty1922", "material": "leather"},
+   "casket": {"is": "box", "from": "store:kazan", "material": "wood", "where": ["right_of", "book"]},
+   "seal": {"is": "disc", "material": "wax", "size": 0.04, "where": ["in", "casket"]},
+   "earth": {"is": "globe", "at": [37.6, 55.75], "where": ["behind", "casket"]},
+   "figure": {"is": "cutout", "from": "store:lenin", "where": ["left_of", "book"]}},
+  "beats": [
+   {"t": 0.3, "do": "appear", "who": "figure", "how": "scale"},
+   {"t": 1.0, "do": "open", "who": "book"},
+   {"t": 2.4, "do": "open", "who": "casket"},
+   {"t": 3.2, "do": "turn", "who": "earth", "deg": 60},
+   {"t": 4.6, "do": "glow", "who": "seal", "color": "red"}],
+  "camera": [{"t": 0, "move": "wide"}, {"t": 2.0, "move": "push", "dur": 4.5}]},
+ "gallery_banner": {
+  "idea": "In a hazy gallery a cloth banner of old Tallinn unfolds on the wall beside a lit print of soldiers while a silk flag stirs on its pole.",
+  "seconds": 7, "output": "film",
+  "place": {"kind": "wall", "surface": "plaster"},
+  "light": {"mood": "museum", "weather": "haze"},
+  "cast": {
+   "banner": {"is": "cloth", "from": "store:tallinn"},
+   "print": {"is": "print", "from": "store:redarmy", "where": ["left_of", "banner"]},
+   "pole": {"is": "pole", "where": ["right_of", "banner"]},
+   "flag": {"is": "cloth", "material": "silk", "where": ["on", "pole"]}},
+  "beats": [
+   {"t": 0.4, "do": "light", "who": "print"},
+   {"t": 1.0, "do": "unfold", "who": "banner"},
+   {"t": 1.6, "do": "wave", "who": "flag", "wind": 0.8}],
+  "camera": [{"t": 0, "move": "low"}, {"t": 2.5, "move": "orbit", "deg": 25, "dur": 4}]},
+ "iceland_rain_route": {
+  "idea": "Under rain and low cloud the camera flies along the south coast of Iceland while a gold route is drawn across the land toward the north and a flag stands at Reykjavik.",
+  "seconds": 8, "output": "film",
+  "place": {"kind": "terrain", "region": [-24.6, 63.2, -13.3, 66.6]},
+  "light": {"mood": "overcast", "weather": "rain"},
+  "cast": {
+   "pole": {"is": "pole", "at": [-21.9, 64.15]},
+   "flag": {"is": "cloth", "where": ["on", "pole"]}},
+  "beats": [
+   {"t": 1.0, "do": "route", "who": "place", "path": [[-21.9, 64.15], [-18.1, 65.68], [-14.6, 65.27]], "color": "gold"},
+   {"t": 2.0, "do": "wave", "who": "flag"}],
+  "camera": [{"t": 0, "move": "fly", "path": [[-23.9, 63.85], [-20.6, 64.55], [-17.4, 65.15]], "dur": 7.5}]},
+ "nordic_tiles_assemble": {
+  "idea": "Three pieces of the Nordic map, Norway, Sweden and Finland, glide in from apart and lock together into one block laid over the map.",
+  "seconds": 6, "output": "over_map",
+  "place": {"kind": "void"},
+  "light": {"mood": "studio"},
+  "cast": {"nordic": {"is": "tile", "from": "map:NOR+SWE+FIN"}},
+  "beats": [{"t": 0.5, "do": "assemble", "who": "nordic", "into": ["map:NOR", "map:SWE", "map:FIN"], "gap": 0.5, "dur": 2.6}],
+  "camera": [{"t": 0, "move": "top"}, {"t": 3.2, "move": "orbit", "deg": 20, "dur": 2.6}]}
+}}
