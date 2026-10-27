@@ -13,9 +13,12 @@ Object.entries(G.shapes).forEach(([k, v]: any) => (PATHS['shape:' + k] = v));
 (G.breakaway ?? []).forEach((r: any) => (PATHS['brk:' + r.id] = r));
 (G.rivers ?? []).forEach((r: any) => (PATHS['river:' + r.id] = r));
 (G.context ?? []).forEach((r: any) => (PATHS['ctx:' + r.id] = r));
-if (G.shapes.ussr_frontier) PATHS['frontier'] = G.shapes.ussr_frontier;
+if (G.shapes.frontier ?? G.shapes.ussr_frontier) PATHS['frontier'] = G.shapes.frontier ?? G.shapes.ussr_frontier;
 export const CITIES: Record<string, {lonlat: [number, number]; px: [number, number]}> = G.cities;
 export const REPUBLIC_IDS: string[] = G.republics.map((r: any) => r.id);
+/** flag-icons code of a country from the map data (Natural Earth ISO_A2), when the order and the house table have none */
+export const iso2Of = (iso: string): string | undefined =>
+  ([...G.republics, ...(G.context ?? [])].find((r: any) => r.id === iso)?.iso2 as string | undefined) ?? undefined;
 
 /** inverse projection (Newton), world px -> [lon, lat] */
 export function lonlat(wx: number, wy: number): [number, number] {

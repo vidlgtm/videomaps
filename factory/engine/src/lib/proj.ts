@@ -1,19 +1,25 @@
-// Lambert Conformal Conic exactly as in geodata.py (sphere R=6371 km, lat1 45, lat2 62, lat0 55, lon0 90)
+// The map's conformal projection exactly as in factory/maps/mapdef.py (sphere R = 6371 km), read from geo.json:
+// kind "lcc" (Lambert conformal conic: lat0, lat1, lat2, lon0; the v5 map: 55, 45, 62, 90) or "merc" (Mercator, cone_n = 0).
 import geo from '../data/geo.json';
 const G: any = geo;
 const R = 6371000, D = Math.PI / 180;
-const lat0 = 55 * D, lat1 = 45 * D;
+export const KIND: string = G.kind ?? 'lcc';
 export const LON0: number = G.lon0;
-export const N: number = G.cone_n;
-const F = (Math.cos(lat1) * Math.pow(Math.tan(Math.PI / 4 + lat1 / 2), N)) / N;
-const rho = (latDeg: number) => (R * F) / Math.pow(Math.tan(Math.PI / 4 + (latDeg * D) / 2), N);
-const rho0 = (R * F) / Math.pow(Math.tan(Math.PI / 4 + lat0 / 2), N);
+export const N: number = KIND === 'merc' ? 0 : G.cone_n;
+const lat0 = (G.lat0 ?? 55) * D, lat1 = (G.lat1 ?? 45) * D;
+const F = KIND === 'merc' ? 0 : (Math.cos(lat1) * Math.pow(Math.tan(Math.PI / 4 + lat1 / 2), N)) / N;
+const rho = (latDeg: number) => (R * F) / Math.pow(Math.tan(Math.PI / 4 + (Math.max(-89.9, Math.min(89.9, latDeg)) * D) / 2), N);
+const rho0 = KIND === 'merc' ? 0 : (R * F) / Math.pow(Math.tan(Math.PI / 4 + lat0 / 2), N);
 export const WORLD_W: number = G.width, WORLD_H: number = G.height;
 export const KM_PER_PX: number = G.res_m / 1000;
 export function px(lon: number, lat: number): [number, number] {
   let dl = lon - LON0;
   while (dl > 180) dl -= 360;
   while (dl < -180) dl += 360;
+  if (KIND === 'merc') {
+    const la = Math.max(-85, Math.min(85, lat)) * D;
+    return [(R * dl * D - G.minx) / G.res_m, (G.maxy - R * Math.log(Math.tan(Math.PI / 4 + la / 2))) / G.res_m];
+  }
   const th = N * dl * D, r = rho(lat);
   return [(r * Math.sin(th) - G.minx) / G.res_m, (G.maxy - (rho0 - r * Math.cos(th))) / G.res_m];
 }

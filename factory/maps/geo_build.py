@@ -1,0 +1,295 @@
+#!/usr/bin/env python3
+"""GEOGRAPHY of one order on a library map -> geo.json for the director and the engine (same format as the v5 film).
+Sources: Natural Earth 10 m (countries with lakes, admin-1 regions, disputed areas, rivers, populated places) and the
+order store (historical shapes the order brings as GeoJSON, with their licence). Everything is projected with the map's
+own formulas (mapdef.py), so borders sit exactly on the terrain.
+
+ids written (the places of order.json / storyboard.json):
+  rep:<ISO3>      the film's countries (order.json "countries")          republics
+  ctx:<ISO3>      every other country on the canvas (names for the era sets)   context
+  shape:<id>      historical shapes (order.json "shapes") + shape:frontier (outline of the film's countries)
+  rr:<name>       admin-1 regions (order.json "regions": {"Name": ["ISO3", "name regex"]})
+  brk:<name>      disputed areas (order.json "disputed": {"Name": "name regex"})
+  river:<name>    rivers on the canvas (Natural Earth scalerank <= 6 + order.json "rivers")
+  cities          capitals + large cities on the canvas + the order's capitals and point places
+order.json "shapes": {"<id>": {"store": "<store key of a GeoJSON>", "where": {"<property>": "regex"}}
+                             | {"union": ["ISO3" | "shape:<id>" | "rr:<name>" | "brk:<name>", ...], "minus": [...]}
+                             | {"admin1": ["ISO3", "name regex"]}}
+usage: python factory/maps/geo_build.py <mapDir> <orderDir> <storeDir|-> <out geo.json>
+exit code 2 = the order names a country, region or shape that does not exist (all problems listed)."""
+import json, os, re, sys, time
+import numpy as np
+import requests
+from shapely.geometry import shape as to_shape, box, Polygon, LineString, MultiLineString, Point
+from shapely.ops import transform, unary_union, polylabel
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import mapdef
+
+NE = "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/"
+UA = {"User-Agent": "videomaps-geo/1.0 (https://github.com/vidlgtm/videomaps)"}
+os.makedirs("cache", exist_ok=True)
+ERR = []
+
+
+def fetch(name):
+    p = f"cache/{name}"
+    if not os.path.exists(p) or os.path.getsize(p) == 0:
+        for i in range(6):
+            try:
+                r = requests.get(NE + name, timeout=600, headers=UA); r.raise_for_status()
+                open(p + ".part", "wb").write(r.content); os.replace(p + ".part", p); break
+            except Exception:
+                if i == 5: raise
+                time.sleep(3 + 4 * i)
+    return json.load(open(p, encoding="utf-8"))["features"]
+
+
+def props(f):
+    return {k.lower(): v for k, v in (f.get("properties") or {}).items()}
+
+
+def geom(f):
+    try:
+        g = to_shape(f["geometry"])
+        return g if g.is_valid else g.buffer(0)
+    except Exception:
+        return None
+
+
+class Geo:
+    def __init__(self, md, order, store_dir):
+        self.md, self.o, self.store_dir = md, order, store_dir
+        lb = md.lonlat_box()
+        self.llbox = box(max(-180, lb[0] - 3), max(-89.5, lb[1] - 3), min(180, lb[2] + 3), min(89.5, lb[3] + 3))
+        self.frame = box(-300, -300, md.W + 300, md.H + 300)
+        self.adm0 = fetch("ne_10m_admin_0_countries_lakes.geojson")
+        self._adm1 = None; self._brk = None
+        self.cache = {}
+
+    # ---------------------------------------------------------------- projection helpers (as the v5 geodata)
+    def to_px(self, g):
+        g = g.intersection(self.llbox)
+        if g.is_empty: return g
+        g = transform(lambda x, y: self.md.fwd(np.asarray(x), np.asarray(y)), g)
+        g = g if g.is_valid else g.buffer(0)
+        return g.intersection(self.frame)
+
+    def pxy(self, lon, lat):
+        x, y = self.md.fwd(lon, lat); return [round(float(x), 1), round(float(y), 1)]
+
+    @staticmethod
+    def path_d(g, tol=0.4, min_area=1.5):
+        if g is None or g.is_empty: return ""
+        polys = [g] if isinstance(g, Polygon) else [p for p in getattr(g, "geoms", []) if isinstance(p, Polygon)]
+        out = []
+        for p in polys:
+            if p.area < min_area: continue
+            p = p.simplify(tol, preserve_topology=True)
+            for ring in [p.exterior] + list(p.interiors):
+                c = np.asarray(ring.coords)
+                if len(c) < 4: continue
+                out.append("M" + "L".join(f"{x:.1f},{y:.1f}" for x, y in c[:-1]) + "Z")
+        return "".join(out)
+
+    @staticmethod
+    def line_d(g, tol=0.6):
+        if g is None or g.is_empty: return ""
+        lines = [g] if isinstance(g, LineString) else [l for l in getattr(g, "geoms", []) if isinstance(l, LineString)]
+        out = []
+        for l in lines:
+            c = np.asarray(l.simplify(tol).coords)
+            if len(c) >= 2: out.append("M" + "L".join(f"{x:.1f},{y:.1f}" for x, y in c))
+        return "".join(out)
+
+    @staticmethod
+    def label_pt(gp):
+        polys = [gp] if isinstance(gp, Polygon) else [p for p in gp.geoms if isinstance(p, Polygon)]
+        big = max(polys, key=lambda p: p.area)
+        pt = polylabel(big, tolerance=1.0)
+        return [round(pt.x, 1), round(pt.y, 1)]
+
+    def feat(self, fid, g, extra=None, tol=0.4):
+        if g is None or g.is_empty: return None
+        gp = self.to_px(g)
+        if gp.is_empty or gp.area < 2: return None
+        gp = gp.buffer(0.35).buffer(-0.35)                     # weld slivers between source parts
+        f = {"id": fid, "d": self.path_d(gp, tol), "label": self.label_pt(gp), "bbox": [round(v, 1) for v in gp.bounds],
+             "area_px": round(gp.area)}
+        if extra: f.update(extra)
+        return f
+
+    # ---------------------------------------------------------------- sources
+    def country(self, iso):
+        key = "c:" + iso
+        if key in self.cache: return self.cache[key]
+        hits = []
+        for f in self.adm0:
+            p = props(f)
+            if iso in (p.get("adm0_a3"), p.get("iso_a3"), p.get("iso_a3_eh")): hits.append(f)
+        if not hits:
+            ERR.append(f'country "{iso}" is not in Natural Earth (use its ADM0_A3 code)'); self.cache[key] = None; return None
+        g = unary_union([geom(f) for f in hits if geom(f) is not None])
+        p = props(hits[0])
+        self.cache[key] = g
+        self.cache["n:" + iso] = p.get("name_en") or p.get("name") or iso
+        iso2 = str(p.get("iso_a2_eh") or p.get("iso_a2") or "").lower()
+        self.cache["i2:" + iso] = iso2 if re.fullmatch(r"[a-z]{2}", iso2) else None
+        return g
+
+    def adm1(self):
+        if self._adm1 is None: self._adm1 = fetch("ne_10m_admin_1_states_provinces_lakes.geojson")
+        return self._adm1
+
+    def admin1(self, iso, pattern):
+        sel = [geom(f) for f in self.adm1() if props(f).get("adm0_a3") == iso and re.search(pattern, str(props(f).get("name") or ""), re.I)]
+        sel = [g for g in sel if g is not None]
+        if not sel: ERR.append(f'admin-1 region "{pattern}" not found in {iso}'); return None
+        return unary_union(sel)
+
+    def disputed(self, pattern):
+        if self._brk is None: self._brk = fetch("ne_10m_admin_0_disputed_areas.geojson")
+        for f in self._brk:
+            if any(isinstance(v, str) and re.search(pattern, v, re.I) for v in props(f).values()):
+                return geom(f)
+        ERR.append(f'disputed area "{pattern}" not found'); return None
+
+    def store_geojson(self, key, where):
+        sj = os.path.join(self.o["_dir"], "store.json")
+        items = json.load(open(sj))["items"] if os.path.exists(sj) else {}
+        it = items.get(key)
+        if not it: ERR.append(f'shape store key "{key}" is not in store.json'); return None
+        p = os.path.join(self.store_dir, it["file"]) if self.store_dir != "-" else None
+        if not p or not os.path.exists(p): ERR.append(f"store file {it['file']} is missing"); return None
+        fs = json.load(open(p, encoding="utf-8"))
+        fs = fs["features"] if fs.get("type") == "FeatureCollection" else [fs]
+        if where:
+            fs = [f for f in fs if all(re.search(rx, str(props(f).get(k.lower(), "")), re.I) for k, rx in where.items())]
+        gs = [geom(f) for f in fs]
+        gs = [g for g in gs if g is not None and not g.is_empty]
+        if not gs: ERR.append(f'shape "{key}": no feature matches {where}'); return None
+        return unary_union(gs)
+
+    def resolve(self, ref, shapes_spec, regions, depth=0):
+        """'ISO3' | 'rep:ISO3' | 'ctx:ISO3' | 'shape:<id>' | 'rr:<name>' | 'brk:<name>' -> lon/lat geometry"""
+        if depth > 12: ERR.append(f"shape {ref}: circular definition"); return None
+        if ref.startswith("shape:"): return self.shape(ref[6:], shapes_spec, regions, depth + 1)
+        if ref.startswith("rr:"):
+            r = regions.get(ref[3:])
+            if not r: ERR.append(f'region "{ref}" is not in order.json "regions"'); return None
+            return self.admin1(r[0], r[1])
+        if ref.startswith("brk:"):
+            rx = (self.o.get("disputed") or {}).get(ref[4:])
+            if not rx: ERR.append(f'disputed area "{ref}" is not in order.json "disputed"'); return None
+            return self.disputed(rx)
+        iso = ref.split(":", 1)[1] if ref.startswith(("rep:", "ctx:")) else ref
+        return self.country(iso)
+
+    def shape(self, sid, spec, regions, depth=0):
+        key = "s:" + sid
+        if key in self.cache: return self.cache[key]
+        s = spec.get(sid)
+        if s is None: ERR.append(f'shape "{sid}" is not in order.json "shapes"'); return None
+        g = None
+        if "store" in s: g = self.store_geojson(s["store"], s.get("where"))
+        elif "admin1" in s: g = self.admin1(s["admin1"][0], s["admin1"][1])
+        elif "union" in s:
+            parts = [self.resolve(r, spec, regions, depth + 1) for r in s["union"]]
+            parts = [p for p in parts if p is not None]
+            g = unary_union(parts) if parts else None
+        else: ERR.append(f'shape "{sid}": needs "store", "union" or "admin1"')
+        if g is not None and s.get("minus"):
+            cut = [self.resolve(r, spec, regions, depth + 1) for r in s["minus"]]
+            cut = [c for c in cut if c is not None]
+            if cut: g = g.difference(unary_union(cut)).buffer(-0.01).buffer(0.01)   # opening removes dataset-mismatch slivers
+        self.cache[key] = g
+        return g
+
+
+def main(a):
+    if len(a) < 4: print(__doc__); sys.exit(1)
+    mdir, odir, sdir, out = a
+    md = mapdef.load(os.path.join(mdir, "map.json"))
+    o = json.load(open(os.path.join(odir, "order.json"), encoding="utf-8")); o["_dir"] = odir
+    G = Geo(md, o, sdir)
+    geo = {**md.geo_header(), "republics": [], "shapes": {}, "rus_republics": [], "breakaway": [], "context": [], "rivers": [], "cities": {}}
+    film = list(o.get("countries") or [])
+    for iso in film:
+        g = G.country(iso)
+        f = G.feat(iso, g, {"name": G.cache.get("n:" + iso, iso), "iso2": G.cache.get("i2:" + iso)})
+        if f: geo["republics"].append(f)
+        elif g is not None: ERR.append(f"country {iso} is outside the map canvas")
+    regions = o.get("regions") or {}
+    for name, (iso, rx) in regions.items():
+        f = G.feat(name, G.admin1(iso, rx), {"name": name})
+        if f: geo["rus_republics"].append(f)
+    for name, rx in (o.get("disputed") or {}).items():
+        f = G.feat(name, G.disputed(rx), {"name": name})
+        if f: geo["breakaway"].append(f)
+    spec = o.get("shapes") or {}
+    for sid in spec:
+        f = G.feat(sid, G.shape(sid, spec, regions))
+        if f: geo["shapes"][sid] = f
+        else: ERR.append(f'shape "{sid}" is empty or outside the map canvas')
+    # outline of the film's countries (border "frontier")
+    U = [G.to_px(G.cache["c:" + i]) for i in film if G.cache.get("c:" + i) is not None]
+    if U:
+        U = unary_union(U).buffer(0.35).buffer(-0.35)
+        polys = [U] if isinstance(U, Polygon) else sorted([p for p in U.geoms if isinstance(p, Polygon)], key=lambda p: -p.area)
+        geo["shapes"]["frontier"] = {"id": "frontier", "d": G.line_d(MultiLineString([p.exterior for p in polys if p.area > 400]), 1.0)}
+    # every other country on the canvas
+    seen = set(film)
+    for f in G.adm0:
+        p = props(f); iso = p.get("adm0_a3")
+        if not iso or iso in seen: continue
+        g = geom(f)
+        if g is None or not g.intersects(G.llbox): continue
+        try: gp = G.to_px(g)
+        except Exception: continue
+        if gp.is_empty or gp.area < 30: continue
+        seen.add(iso)
+        iso2 = str(p.get("iso_a2_eh") or p.get("iso_a2") or "").lower()
+        geo["context"].append({"id": iso, "name": p.get("name_en") or p.get("name"), "d": G.path_d(gp, 0.6, 3), "label": G.label_pt(gp),
+                               "iso2": iso2 if re.fullmatch(r"[a-z]{2}", iso2) else None})
+    # rivers
+    want = [str(r).lower() for r in (o.get("rivers") or [])]
+    by = {}
+    for f in fetch("ne_10m_rivers_lake_centerlines.geojson"):
+        p = props(f); nm = p.get("name_en") or p.get("name")
+        if not nm: continue
+        rank = p.get("scalerank") if p.get("scalerank") is not None else 9
+        if rank > 6 and nm.lower() not in want: continue
+        g = geom(f)
+        if g is None or not g.intersects(G.llbox): continue
+        by.setdefault(nm, []).append(g)
+    for nm, gs in sorted(by.items()):
+        gp = G.to_px(unary_union(gs))
+        if gp.is_empty or gp.length < 60: continue
+        geo["rivers"].append({"id": nm, "d": G.line_d(gp, 0.8)})
+    for r in want:
+        if not any(x["id"].lower() == r for x in geo["rivers"]): ERR.append(f'river "{r}" not found on the canvas')
+    # cities: capitals + large cities on the canvas, then the order's own points
+    for f in fetch("ne_10m_populated_places_simple.geojson"):
+        p = props(f)
+        rank = p.get("scalerank") if p.get("scalerank") is not None else 10
+        if not (p.get("adm0cap") in (1, 1.0) or rank <= 3): continue
+        lon, lat = float(p.get("longitude")), float(p.get("latitude"))
+        if not G.llbox.contains(Point(lon, lat)): continue
+        xy = G.pxy(lon, lat)
+        if 0 <= xy[0] <= md.W and 0 <= xy[1] <= md.H:
+            geo["cities"][p.get("name")] = {"lonlat": [lon, lat], "px": xy}
+    for iso, c in (o.get("capitals") or {}).items():        # capitals given as a name must be a known city
+        if isinstance(c, str) and c not in geo["cities"] and c not in (o.get("places") or {}):
+            ERR.append(f'capital "{c}" of {iso}: not a Natural Earth city on the canvas - give [lon, lat] or add it to "places"')
+    if ERR:
+        print("GEOGRAPHY ERROR - the order names things the map cannot draw:")
+        for e in ERR: print("  -", e)
+        sys.exit(2)
+    json.dump(geo, open(out, "w"), separators=(",", ":"))
+    print(f"geo.json {os.path.getsize(out) / 1e6:.2f} MB: {len(geo['republics'])} countries, {len(geo['context'])} neighbours, "
+          f"{len(geo['shapes'])} shapes, {len(geo['rus_republics'])} regions, {len(geo['breakaway'])} disputed, {len(geo['rivers'])} rivers, "
+          f"{len(geo['cities'])} cities | map {md.kind} {md.W}x{md.H} {md.res / 1000:.3f} km/px")
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

@@ -1,7 +1,7 @@
 // THE AUTOMATIC DIRECTOR: the order's beats (WHAT, pinned to words) -> every element of the film (HOW: exact times,
 // camera, positions, sizes, colours, sides, sound). Rules come from factory/rules/constitution.json and our film v5.
 import {Cues} from './cues';
-import {Gazetteer, Place, PATHS, unionBox, Box, lonlat, px, hasLabel} from './geo';
+import {Gazetteer, Place, PATHS, unionBox, Box, lonlat, px, hasLabel, iso2Of} from './geo';
 import {CamKey, CamPath, frameBox, framePoint, overviewKey, keyDistance, keyState, inSafe, unproject, scr} from './cam';
 import * as BX from './boxes';
 import {arr, clamp, r2, r3, fail, hash} from './util';
@@ -50,7 +50,7 @@ export class Director {
     this.COL = {...(K.look?.palette ?? {}), ...tints, TATAR: '#E2BF6A', KFSSR: '#6C8EBF', HIST: '#9E7A55'};
     this.ISO.forEach((i, k) => { if (!this.COL[i]) this.COL[i] = QUILT[(hash(i) + k) % QUILT.length]; });
     this.FLAG = {};
-    this.ISO.forEach((i) => { this.FLAG[i] = o.flags?.[i] ?? ISO2[i] ?? fail(`no flag code for ${i}: add "flags": {"${i}": "<flag-icons code>"} to order.json`); });
+    this.ISO.forEach((i) => { this.FLAG[i] = o.flags?.[i] ?? ISO2[i] ?? iso2Of(i) ?? fail(`no flag code for ${i}: add "flags": {"${i}": "<flag-icons code>"} to order.json`); });
     Object.entries(o.flags ?? {}).forEach(([k, v]) => (this.FLAG[k] = v));
   }
 
