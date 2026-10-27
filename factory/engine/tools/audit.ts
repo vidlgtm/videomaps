@@ -10,6 +10,7 @@ import * as fs from 'fs';
 import {frameLayout, inter, covered, Item} from '../src/lib/layout';
 import {CLIPS} from '../src/script';
 import caucL from '../src/data/caucasus_labels.json';
+import clipLabels from '../src/data/clip_labels.json';
 import {cameraAt} from '../src/lib/camera';
 import {project} from '../src/lib/proj';
 import {TOTAL} from '../src/lib/cues';
@@ -113,13 +114,20 @@ const keep = (g: string, min: number) => done[g].filter((v) => (v.f1 - v.f0) / 3
   .map((v) => ({...v, t0: +(v.f0 / 30).toFixed(2), t1: +(v.f1 / 30).toFixed(2), worst: Math.round(v.worst), ...(v.fw !== undefined ? {tm: +(v.fw / 30).toFixed(2)} : {})}));
 life.forEach(endLife);
 smothered.sort((x, y) => x.f0 - y.f0);
-// the 3D label track (data/caucasus_labels.json) belongs to the one clip that declares it (assets.json clips.<id>.labels)
+// every labelled clip has its own label track (data/clip_labels.json by labels file; the v5 track as fallback), the track
+// covers every frame the clip shows, and one track belongs to one clip only
 const cliplabels: {problem: string}[] = [];
-const hasTrack = Object.keys((caucL as any).tracks ?? {}).length > 0;
 const lc = CLIPS.filter((c: any) => c.labels), lsrc = [...new Set(lc.map((c) => c.src))];
-if (hasTrack && !lc.length) cliplabels.push({problem: 'a 3D label track exists but no clip carries it (its labels would never show)'});
-if (lsrc.length > 1) cliplabels.push({problem: `one label track bound to ${lsrc.length} different clips: ${lsrc.join(', ')}`});
-lc.filter((c) => c.kind !== 'cauc').forEach((c) => cliplabels.push({problem: `label track on a clip that is not a full-frame 3D clip: ${c.src}`}));
+const trackOf = (c: any) => (clipLabels as any)[c.labels] ?? (c.labels === 'caucasus_labels.json' ? caucL : null);
+lc.forEach((c: any) => {
+  const L: any = trackOf(c);
+  if (!L || !Object.keys(L.tracks ?? {}).length) { cliplabels.push({problem: `label track ${c.labels} of ${c.src} is missing or empty`}); return; }
+  const need = Math.max(...c.steps.map((s: any) => s.s1)) * (L.fps ?? 30);
+  if ((L.frames ?? 0) < need - 1) cliplabels.push({problem: `label track ${c.labels} has ${L.frames} frames, ${c.src} shows ${Math.ceil(need)}`});
+});
+const bound = new Map<string, Set<string>>();
+lc.forEach((c: any) => { if (!bound.has(c.labels)) bound.set(c.labels, new Set()); bound.get(c.labels)!.add(c.src); });
+bound.forEach((srcs, lab) => { if (srcs.size > 1) cliplabels.push({problem: `label track ${lab} bound to ${srcs.size} different clips: ${[...srcs].join(', ')}`}); });
 const res = {overlaps: keep('overlap', 0.2), offscreen: keep('off', 0.4), unsafe: keep('safe', 1.0), smothered, cliplabels};
 fs.writeFileSync(OUT, JSON.stringify(res, null, 1));
 for (const v of res.overlaps) console.log(`OVERLAP  ${mmss(v.f0)}-${mmss(v.f1)}  ${v.a} [${v.ka}] x ${v.b} [${v.kb}]  ${v.worst}px2`);

@@ -6,6 +6,8 @@
 # re-rendered frame by frame as stills (fresh page per frame) and checked again.
 set -e
 A=$1; B=$2; OUT=$3; W=${WORKERS:-3}; SERVE=${SERVE:-build}; P=${PART:-x}
+QA=${QA_COMPARE:-$(cd "$(dirname "$0")/../../.." && pwd)/production/pipeline/qa_compare.py}
+test -f "$QA" || { echo "qa_compare.py not found: $QA"; exit 1; }
 mkdir -p out/sub out/qa out/ref
 N=$((B - A + 1)); SZ=$(( (N + W - 1) / W ))
 
@@ -40,14 +42,14 @@ for s in "${SUBS[@]}"; do
   NEED=0
   if [ ! -s out/sub/s_$i.mp4 ] || [ "$(ffprobe -v error -count_packets -select_streams v:0 -show_entries stream=nb_read_packets -of csv=p=0 out/sub/s_$i.mp4)" != "$(( b - a + 1 ))" ]; then
     echo "sub $i missing/short" > out/qa/qa_p${P}_s${i}_check1.txt; NEED=1
-  elif ! python3 ../pipeline/qa_compare.py out/sub/s_$i.mp4 $a out/ref $FR > out/qa/qa_p${P}_s${i}_check1.txt; then
+  elif ! python3 "$QA" out/sub/s_$i.mp4 $a out/ref $FR > out/qa/qa_p${P}_s${i}_check1.txt; then
     NEED=1
   fi
   if [ $NEED = 1 ]; then
     echo "part $P sub $i ($a-$b): mismatch -> stills mode"; cat out/qa/qa_p${P}_s${i}_check1.txt
     echo "fallback part $P sub $i frames $a-$b" > out/qa/qa_p${P}_s${i}_fallback.txt
     stills_sub $i $a $b
-    python3 ../pipeline/qa_compare.py out/sub/s_$i.mp4 $a out/ref $FR > out/qa/qa_p${P}_s${i}_check2.txt \
+    python3 "$QA" out/sub/s_$i.mp4 $a out/ref $FR > out/qa/qa_p${P}_s${i}_check2.txt \
       || echo "STILL MISMATCH part $P sub $i" | tee out/qa/qa_p${P}_s${i}_FAIL.txt
   fi
 done

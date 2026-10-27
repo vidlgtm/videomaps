@@ -6,9 +6,11 @@ stage preview (no GPU): scene check (spec.py) + no repeats (novelty.py) -> data 
               (+ <lkey>_labels.json) in the release
 stage render : only scenes whose current preview passed -> Kaggle GPU within each scene's time budget -> <rkey>.mp4,
               <rkey>_sheet.jpg, <rkey>.json -> <orderDir>/out/workshop.json (clip assets for the director)
+stage clips  : the film line - <orderDir>/out/workshop.json from pieces already rendered (no GPU; fails when a piece
+              of the current version is not rendered yet)
 keys: dkey = data (store files + prep code); vkey = look (scene + kit code + dkey);
       lkey = preview (vkey + preview code); rkey = clip (vkey + exposure + kernel code)
-usage: python3 factory/workshop/run.py <orderDir> --stage preview|render [--blender PATH] [--release TAG] [--sha SHA] [--repo o/n] [--dry]
+usage: python3 factory/workshop/run.py <orderDir> --stage preview|render|clips [--blender PATH] [--release TAG] [--sha SHA] [--repo o/n] [--dry]
 env  : GH_TOKEN; KAGGLE_API_TOKEN + KAGGLE_USERNAME when the render stage has pieces to render"""
 import base64, hashlib, json, os, re, shutil, subprocess, sys, tarfile, time
 from pathlib import Path
@@ -60,7 +62,7 @@ if errs:
 if novelty.main(str(ORDER)): fail("a scene repeats an earlier one (see REPEATED above): describe a new idea")
 print(f"scene check ok: {len(S)} scenes, no repeats", flush=True)
 meta_o = json.load(open(ORDER / "scenes.json", encoding="utf-8"))
-if meta_o.get("preview_only") and STAGE == "render": fail("this order is for previews only (preview_only)")
+if meta_o.get("preview_only") and STAGE in ("render", "clips"): fail("this order is for previews only (preview_only)")
 store = json.load(open(ORDER / "store.json", encoding="utf-8")).get("items", {}) if (ORDER / "store.json").exists() else {}
 KITCODE = b"".join((KIT / f).read_bytes() for f in sorted(os.listdir(KIT)) if f.endswith(".py"))
 PREP, PREV, KERNEL = (HERE / "prep.py").read_bytes(), (HERE / "preview.py").read_bytes(), (HERE / "kaggle_kernel.py").read_bytes()
@@ -161,7 +163,7 @@ if STAGE == "preview":
     sys.exit(1 if any_bad else 0)
 
 # ------------------------------------------------------------------ stage render
-if STAGE != "render": fail(f"unknown stage {STAGE}")
+if STAGE not in ("render", "clips"): fail(f"unknown stage {STAGE}")
 todo, missing = [], []
 for j in jobs:
     pn = f"{j['lkey']}_preview.json"
@@ -177,6 +179,9 @@ for j in jobs:
 if missing: fail("render needs a passing preview first:\n  " + "\n  ".join(missing))
 print(f"pieces {len(jobs)} · rendered before {len(jobs) - len(todo)} · to render {len(todo)}", flush=True)
 failed = []
+if todo and STAGE == "clips":
+    fail("3D pieces not rendered yet (workshop render stage, after their previews are approved): "
+         + ", ".join(j["id"] for j in todo))
 if todo:
     TOKEN, USER = os.environ.get("KAGGLE_API_TOKEN", ""), os.environ.get("KAGGLE_USERNAME", "")
     if not TOKEN or not USER: fail("pieces to render need the Kaggle key (KAGGLE_API_TOKEN + KAGGLE_USERNAME secrets for this run)")

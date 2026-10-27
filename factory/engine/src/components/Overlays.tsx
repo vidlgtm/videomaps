@@ -2,9 +2,10 @@ import React from 'react';
 import {AbsoluteFill, Img, staticFile} from 'remotion';
 import * as echarts from 'echarts';
 import {env, clamp, ease, easeOut, prog, lerp} from '../lib/anim';
-import {CARDS, PORTRAITS, CHART, DOLL_LABELS, FLAGPOLE, CLIPS, ISO15, FLAG_CODE, COL} from '../script';
+import {CARDS, PORTRAITS, CHART, DOLL_LABELS, FLAGPOLE, CLIPS, ISO15, FLAG_CODE, COL, Clip} from '../script';
 import {FONTS} from '../fonts';
 import cauc from '../data/caucasus_labels.json';
+import clipLabels from '../data/clip_labels.json';
 import doll from '../data/matryoshka_timing.json';
 
 const GOLD = COL.GOLD;
@@ -209,18 +210,29 @@ const Flagpole: React.FC<{t: number}> = ({t}) => {
 // never covers a more important one (it is lifted on a longer stem, continuously, so nothing jumps)
 const CAUC_NAMES: [string, string][] = [['Grozny', 'CHECHNYA'], ['Sukhumi', 'ABKHAZIA'], ['Tskhinvali', 'SOUTH OSSETIA'],
   ['Tbilisi', 'GEORGIA'], ['Mount Elbrus', 'Mount Elbrus'], ['CASPIAN SEA', 'Caspian Sea'], ['BLACK SEA', 'Black Sea']];
+// source time of a stepped clip at film time t (the label track follows the frames the clip really shows)
+const clipSrcTime = (c: Clip, t: number) => {
+  let s = c.steps[0];
+  for (const x of c.steps) if (t >= x.at) s = x;
+  return s.s0 + Math.min(Math.max(t - s.at, 0) * (s.rate ?? 1), s.s1 - s.s0);
+};
+// every labelled clip carries its own track (data/clip_labels.json, keyed by the clip's labels file); the v5 film's
+// track (data/caucasus_labels.json) stays the fallback
 const CaucLabels: React.FC<{t: number}> = ({t}) => {
-  const clip = CLIPS.find((c) => c.kind === 'cauc' && !!c.labels && t >= c.from - 0.1 && t <= c.to + 0.1);
+  const clip = CLIPS.find((c) => !!c.labels && t >= c.from - 0.1 && t <= c.to + 0.1);
   if (!clip) return null;
   const o = env(t, clip.from + 0.6, clip.to, 0.6, 0.5);
   if (o <= 0) return null;
-  const f = Math.floor((t - clip.from) * 30);
-  const tr: any = (cauc as any).tracks;
+  const L: any = (clipLabels as any)[clip.labels!] ?? cauc;
+  const f = Math.floor(clipSrcTime(clip, t) * (L.fps ?? 30));
+  const dx = clip.dx ?? 0;
+  const tr: any = L.tracks;
   const placed: {x0: number; x1: number; y0: number; y1: number}[] = [];
   const out: React.ReactNode[] = [];
-  (((cauc as any).names?.length ? (cauc as any).names : CAUC_NAMES) as [string, string, string?][]).forEach(([k, name, st]) => {
-    const a = tr[k]?.[Math.min(Math.max(f, 0), (tr[k]?.length ?? 1) - 1)];
-    if (!a || !a[2]) return;
+  ((L.names?.length ? L.names : CAUC_NAMES) as [string, string, string?][]).forEach(([k, name, st]) => {
+    const a0 = tr[k]?.[Math.min(Math.max(f, 0), (tr[k]?.length ?? 1) - 1)];
+    if (!a0 || !a0[2]) return;
+    const a = [a0[0] + dx, a0[1], a0[2]];
     const sea = st === 'sea' || k.includes('SEA');
     const chech = st === 'hot' || k === 'Grozny';
     const fs = chech ? 34 : sea ? 30 : 24;

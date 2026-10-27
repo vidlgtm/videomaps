@@ -1,0 +1,602 @@
+name: film
+# PRODUCTION LINE (folder factory/): one order -> one film, on GitHub runners (+ the Kaggle GPU for the score only).
+#   check    : result tag, order files, hermetic check (pictures only from the order store), order store entries
+#   voice    : the voice takes (one per paragraph) -> one consistent read + word timeline + subtitles; at least 7 min
+#   map      : base map from the map library (picked, or defined and added once) + the order's geography -> geo.json
+#   station  : processing station (order-store pictures -> film-ready assets, Manim documents, credits)
+#   workshop : the order's 3D pieces (scenes.json), rendered once after their previews were approved
+#   music    : the film's own score (ACE-Step 1.5 on Kaggle, kept by content) or the house score
+#   direct   : automatic director -> film.json, audit + feedback passes, map tiles this camera path needs
+#   tiles    : missing HD/UHD tiles, built once and kept in the map library
+#   stills   : every asset in place, final audit, review stills + station stills + soundtrack preview -> release <tag>_stills
+#              stage render continues only when order.json "approved": {"stills": "<key of these stills>"}
+#   render   : parallel parts (3 browsers each, self-check)   final: frame-exact assembly, QA -> release <tag>
+# Result tags start with film_; earlier releases are only read.
+on:
+  workflow_dispatch:
+    inputs:
+      order: { description: 'order folder (factory/orders/<name>)', required: true }
+      stage: { description: 'stills (review stills + soundtrack) | render (the film; stills approved in order.json)', default: 'stills' }
+      tag: { description: 'result release tag, film_... (empty = film_<order>)', default: '' }
+concurrency:
+  group: film-${{ inputs.order }}
+  cancel-in-progress: false
+permissions:
+  contents: write
+env:
+  ORDER: ${{ inputs.order }}
+  STAGE: ${{ inputs.stage || 'stills' }}
+  TAG: ${{ inputs.tag || format('film_{0}', inputs.order) }}
+  OD: factory/orders/${{ inputs.order }}
+  REL: https://github.com/${{ github.repository }}/releases/download
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - name: Result tag and stage
+        run: |
+          case "$TAG" in film_*) echo "tag $TAG ok";; *) echo "::error::tag must start with film_"; exit 1;; esac
+          case "$STAGE" in stills|render) echo "stage $STAGE";; *) echo "::error::stage must be stills or render"; exit 1;; esac
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - name: Hermetic check - pictures only from the order store
+        run: python3 factory/rules/hermetic.py
+      - name: Order files
+        run: |
+          set -e
+          test -d "$OD" || { echo "::error::$OD does not exist"; exit 1; }
+          for f in order.json narration.json storyboard.json; do test -f "$OD/$f" || { echo "::error::$OD/$f is missing"; exit 1; }; done
+          python3 -c "import json; [json.load(open('$OD/' + f, encoding='utf-8')) for f in ('order.json', 'narration.json', 'storyboard.json')]; print('order files ok')"
+      - name: Order store - every entry in its release, licences allowed
+        if: hashFiles(format('factory/orders/{0}/store.json', inputs.order)) != ''
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: python3 factory/intake/store.py verify $OD
+
+  voice:
+    needs: check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - name: Voice - the takes -> one read, word timeline, subtitles
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          set -e
+          mkdir -p out/voice
+          M=$(python3 -c "import json; v=(json.load(open('$OD/order.json', encoding='utf-8')).get('voice') or {}).get('master'); print(v['release'] + ' ' + v['file'] if v else '')")
+          if [ -n "$M" ]; then
+            set -- $M
+            gh release download "$1" -R ${{ github.repository }} -p "$2" -O out/voice/voice.wav
+            cp $OD/data/timeline.json out/voice/timeline.json
+            python3 factory/line/srt.py out/voice/timeline.json out/voice/subtitles.srt
+            echo "master voice $1/$2 with its timeline"
+          else
+            bash production/ci/apt.sh ffmpeg rubberband-cli
+            pip install -q torch==2.5.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cpu
+            pip install -q soundfile num2words "numpy<2.3" scipy pyloudnorm pyworld
+            if [ -f $OD/store.json ] && python3 -c "import json, sys; sys.exit(0 if any(k.startswith('vo_') for k in json.load(open('$OD/store.json'))['items']) else 1)"; then
+              R=$(python3 -c "import json; print(json.load(open('$OD/store.json'))['release'])")
+              mkdir -p $OD/store_files && gh release download "$R" -R ${{ github.repository }} -p 'vo_*' -D $OD/store_files --clobber
+            fi
+            python -u factory/line/voice.py $OD out/voice
+          fi
+          python3 - <<'PY'
+          import json
+          t = json.load(open('out/voice/timeline.json'))
+          print(f"FILM LENGTH {t['total']:.2f} s = {t['total'] / 60:.2f} min, {len(t['words'])} words")
+          if t['total'] < 420:
+              print(f"::error::LENGTH: the film is {t['total'] / 60:.1f} min - films are at least 7 minutes (longer script, new takes)")
+              raise SystemExit(1)
+          PY
+      - uses: actions/upload-artifact@v4
+        with: { name: voice, path: out/voice, retention-days: 7 }
+
+  map:
+    needs: check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - uses: actions/cache@v4
+        with: { path: cache, key: map-sources-v1 }
+      - name: Base map from the library + the order's geography
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          set -e
+          bash production/ci/apt.sh unzip
+          pip install -q numpy scipy "pillow==11.2.1" requests pyshp shapely
+          python -u factory/maps/library.py pick $OD out/map
+          python -u factory/maps/library.py base out/map
+          if python3 -c "import json, sys; sys.exit(0 if json.load(open('out/map/pick.json'))['legacy'] else 1)"; then
+            cp factory/engine/src/data/geo.json out/map/geo.json; echo "legacy map: geo.json of the v5 film"
+          else
+            S=-
+            if [ -f $OD/store.json ]; then
+              R=$(python3 -c "import json; print(json.load(open('$OD/store.json'))['release'])")
+              mkdir -p $OD/store_files
+              gh release download "$R" -R ${{ github.repository }} -p '*.geojson' -D $OD/store_files --clobber 2>/dev/null || echo "no shapes in the order store"
+              S=$OD/store_files
+            fi
+            python -u factory/maps/geo_build.py out/map $OD $S out/map/geo.json
+          fi
+          mkdir -p /tmp/eng/src/data /tmp/eng/public out/mapdata
+          python -u factory/maps/library.py engine out/map /tmp/eng
+          cp out/map/map.json out/map/pick.json /tmp/eng/src/data/hd_index.json /tmp/eng/src/data/uhd_index.json out/map/geo.json out/mapdata/
+          python -u factory/maps/terrain.py sheet out/map && cp out/map/sheet.jpg out/mapdata/map_sheet.jpg || echo "::warning::no map sheet"
+      - uses: actions/upload-artifact@v4
+        with: { name: map, path: out/mapdata, retention-days: 7 }
+
+  station:
+    needs: check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - name: Order store - the order's pictures with their licences
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          set -e
+          mkdir -p $OD/store_files
+          if [ -f $OD/store.json ]; then
+            R=$(python3 -c "import json; print(json.load(open('$OD/store.json'))['release'])")
+            gh release download "$R" -R ${{ github.repository }} -D $OD/store_files --clobber
+          fi
+          echo "order store: $(ls $OD/store_files | wc -l) files"
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.u2net
+            ~/.cache/huggingface
+            factory/station/cache
+          key: station-models-v1
+      - name: Processing station - photos, signatures and flags -> film-ready assets + credits
+        run: |
+          set -e
+          pip install -q torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          pip install -q "transformers==4.57.6" "rembg[cpu]" spandrel "pillow==11.2.1" requests numpy scipy opencv-python-headless cairosvg
+          python -u factory/station/station.py process $OD
+      - name: Manim documents from the order's texts (official Manim image)
+        run: |
+          set -e
+          mkdir -p out/pack/clips
+          if ls out/station_tmp/docs_json/*.json > /dev/null 2>&1; then
+            M=manimcommunity/manim:v0.22.0
+            for i in 1 2 3; do timeout 600 docker pull -q $M && break; echo "::warning::docker pull try $i failed"; sleep 20; done
+            if docker image inspect $M > /dev/null 2>&1; then
+              docker run --rm --user root --entrypoint bash -v "$GITHUB_WORKSPACE":/w -w /w $M -c '
+                set -e
+                pip install -q scipy
+                mkdir -p /usr/local/share/fonts/house && cp fonts/*.ttf /usr/local/share/fonts/house/ && fc-cache -f > /dev/null 2>&1
+                for f in "Cormorant Garamond" "Great Vibes"; do
+                  fc-list : family | grep -qi "$f" || { echo "::error::font $f not visible to Manim"; exit 1; }
+                done
+                for j in out/station_tmp/docs_json/*.json; do
+                  n=$(basename $j .json)
+                  (cd factory/station && DOC_JSON=/w/$j manim render -qh --fps 30 -r 1920,1080 doc_scene.py Doc -o $n 2>&1 | tail -3)
+                  cp "$(find factory/station/media -name "$n.mp4" | head -1)" out/pack/clips/$n.mp4
+                done
+                chmod -R a+rwX out/pack factory/station'
+            else
+              echo "::warning::Manim image unavailable - building Manim on the runner"
+              bash production/ci/apt.sh libcairo2-dev libpango1.0-dev pkg-config ffmpeg fontconfig
+              mkdir -p ~/.local/share/fonts && cp fonts/*.ttf ~/.local/share/fonts/ && fc-cache -f > /dev/null
+              for f in "Cormorant Garamond" "Great Vibes"; do fc-list : family | grep -qi "$f" || { echo "::error::font $f missing"; exit 1; }; done
+              pip install -q "manim==0.22.0" scipy
+              for j in out/station_tmp/docs_json/*.json; do
+                n=$(basename $j .json)
+                (cd factory/station && DOC_JSON=$GITHUB_WORKSPACE/$j manim render -qh --fps 30 -r 1920,1080 doc_scene.py Doc -o $n 2>&1 | tail -3)
+                cp "$(find factory/station/media -name "$n.mp4" | head -1)" out/pack/clips/$n.mp4
+              done
+            fi
+          fi
+          ls -la out/pack/clips
+      - name: Clip lengths, review sheets, report
+        run: python -u factory/station/station.py finish $OD
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: pack, path: out/pack, retention-days: 7, if-no-files-found: warn }
+
+  workshop:
+    needs: check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - name: The order's 3D pieces (rendered once, after their previews were approved)
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          set -e
+          mkdir -p out/ws
+          if [ -f $OD/scenes.json ]; then
+            pip install -q numpy "pillow==11.2.1" requests
+            python -u factory/workshop/run.py $OD --stage clips --sha ${{ github.sha }} --repo ${{ github.repository }}
+            cp $OD/out/workshop.json out/ws/workshop.json
+            cp -r $OD/out/ws_review out/ws/ 2>/dev/null || true
+          else
+            echo "no 3D pieces in this order"
+          fi
+      - uses: actions/upload-artifact@v4
+        with: { name: workshop, path: out/ws, retention-days: 7, if-no-files-found: warn }
+
+  music:
+    needs: voice
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: voice, path: out/voice }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - name: The film's score
+        env:
+          GH_TOKEN: "${{ github.token }}"
+          KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+        run: |
+          set -e
+          bash production/ci/apt.sh ffmpeg
+          pip install -q numpy scipy pyloudnorm "kaggle>=1.7.4"
+          python -u factory/line/music.py $OD out/voice/timeline.json out/music
+      - uses: actions/upload-artifact@v4
+        with:
+          name: music
+          retention-days: 7
+          path: |
+            out/music/music
+            out/music/music.json
+            out/music/music_report.txt
+
+  direct:
+    needs: [voice, map, station, workshop]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { path: art }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: The line's parts for the director (voice timeline, map, station pack, 3D pieces, label tracks)
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          set -e
+          D=factory/engine/src/data
+          cp $OD/data/*.json $D/ 2>/dev/null || true
+          mkdir -p $OD/data $OD/out
+          cp art/voice/timeline.json $OD/data/timeline.json && cp art/voice/timeline.json $D/timeline.json
+          cp art/map/geo.json art/map/hd_index.json art/map/uhd_index.json $D/
+          cp art/pack/pack.json $OD/out/pack.json
+          mkdir -p /tmp/labels
+          if [ -f art/workshop/workshop.json ]; then
+            python3 factory/line/merge.py workshop $OD art/workshop/workshop.json - /tmp/labels
+          fi
+          python3 factory/line/merge.py labels $OD /tmp/labels $D
+          python3 - <<'PY'
+          import json
+          P = json.load(open('art/pack/pack.json')); A = json.load(open('factory/engine/src/data/aspect.json'))
+          for sect in ('archive', 'cutouts', 'docs'):
+              for v in P.get(sect, {}).values():
+                  if v.get('file') and v.get('aspect'): A[v['file']] = v['aspect']
+          json.dump(A, open('factory/engine/src/data/aspect.json', 'w'), indent=0); print('aspects from the station pack:', len(A))
+          PY
+      - name: Automatic director -> film.json, type-check, audit, feedback passes, tiles this camera path needs
+        working-directory: factory/engine
+        run: |
+          set -e
+          npm ci --no-audit --no-fund --loglevel=error
+          mkdir -p out
+          npx -y tsx ../director/main.ts ../orders/$ORDER
+          npx tsc --noEmit -p .
+          best=999999; bp=0
+          for pass in 1 2 3 4 5 6; do
+            npx -y tsx tools/audit.ts out/audit$pass.json > out/audit$pass.txt; tail -n 40 out/audit$pass.txt
+            n=$(python3 -c "import json; a=json.load(open('out/audit$pass.json')); print(len(a['overlaps']) + len(a['offscreen']) + len(a.get('smothered', [])) + len(a.get('cliplabels', [])))")
+            echo "pass $pass: $n problems"
+            if [ "$n" -lt "$best" ]; then best=$n; bp=$pass; cp src/data/film.json out/film_best.json; cp ../orders/$ORDER/out/director_report.txt out/director_report_best.txt; fi
+            if [ "$n" = "0" ] || [ $pass = 6 ]; then break; fi
+            npx -y tsx ../director/main.ts ../orders/$ORDER --feedback out/audit$pass.json
+          done
+          cp out/film_best.json src/data/film.json; echo "BEST pass $bp: $best problems"
+          npx -y tsx tools/uhd_need.ts out/need.json | tail -n 6
+          cp src/data/film.json src/data/clip_labels.json src/data/aspect.json out/
+          cp ../orders/$ORDER/assets.json out/assets_line.json 2>/dev/null || true
+          cp ../orders/$ORDER/out/patches.json out/ 2>/dev/null || true
+          cp out/director_report_best.txt out/director_report.txt
+          cp ../orders/$ORDER/out/CREDITS.txt out/ 2>/dev/null || true
+          ls -la out
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: direction, path: factory/engine/out, retention-days: 7 }
+
+  tiles:
+    needs: [map, direct]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: map, path: art/map }
+      - uses: actions/download-artifact@v4
+        with: { name: direction, path: art/direction }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - uses: actions/cache@v4
+        with: { path: cache, key: map-sources-v1 }
+      - name: Missing HD/UHD tiles of this camera path -> map library
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          set -e
+          pip install -q numpy scipy "pillow==11.2.1" requests pyshp shapely
+          mkdir -p out/map && cp art/map/map.json art/map/pick.json out/map/
+          python -u factory/maps/library.py tiles out/map art/direction/need.json
+
+  stills:
+    needs: [voice, map, station, workshop, music, direct, tiles]
+    if: ${{ !cancelled() && needs.direct.result == 'success' && needs.tiles.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    outputs:
+      approved: ${{ steps.key.outputs.approved }}
+      parts: ${{ steps.key.outputs.parts }}
+      nparts: ${{ steps.key.outputs.nparts }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { path: art }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: bash production/ci/apt.sh ffmpeg unzip && pip install -q numpy scipy "pillow==11.2.1" requests pyshp shapely pyloudnorm
+      - name: Every asset of the film in place
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          set -e
+          E=factory/engine; PUB=$E/public; D=$E/src/data
+          mkdir -p $PUB/music $PUB/sfx $PUB/flags/4x3 $PUB/archive $PUB/icons $PUB/clips $PUB/hd $PUB/uhd $PUB/fonts $PUB/sig $PUB/ws
+          cp $OD/data/*.json $D/ 2>/dev/null || true
+          cp art/voice/timeline.json $D/timeline.json && cp art/voice/voice.wav $PUB/voice.wav
+          cp art/direction/film.json art/direction/clip_labels.json art/direction/aspect.json $D/
+          # base map + every tile this camera path needs, from the map library
+          mkdir -p out/map && cp art/map/map.json art/map/pick.json art/map/geo.json out/map/
+          python -u factory/maps/library.py base out/map
+          python -u factory/maps/library.py tiles out/map art/direction/need.json
+          python -u factory/maps/library.py engine out/map $E
+          # house sound effects (same for every film) + fonts + flags
+          curl -sfL --retry 3 -o /tmp/sfx.zip "$REL/stage1/sfx.zip" && (cd $PUB/sfx && unzip -q -o /tmp/sfx.zip)
+          (mkdir -p /tmp/s2 && cd /tmp/s2 && python $GITHUB_WORKSPACE/production/pipeline/sfx2.py > /dev/null && cp out/sfx/*.wav $GITHUB_WORKSPACE/$PUB/sfx/)
+          cp fonts/*.ttf $PUB/fonts/
+          (cd /tmp && npm i --no-audit --no-fund --loglevel=error flag-icons@7.6.0 && cp -r node_modules/flag-icons/flags/4x3/. $GITHUB_WORKSPACE/$PUB/flags/4x3/)
+          # the processing station's pack, earlier pieces of this repository named by the order, the 3D pieces, the score
+          for d in archive sig clips flags; do [ -d art/pack/$d ] && cp -r art/pack/$d/. $PUB/$d/; done
+          python3 factory/line/merge.py own $OD $PUB
+          if [ -f art/workshop/workshop.json ]; then python3 factory/line/merge.py workshop $OD art/workshop/workshop.json $PUB /tmp/labels; fi
+          if [ -f art/music/music.json ]; then
+            cp -r art/music/music/. $PUB/music/ && python3 factory/line/merge.py lufs $D/film.json art/music/music.json
+          else
+            echo "::warning::NO SCORE - the music job did not finish; stills only, the film cannot be rendered without its score"
+            echo nomusic > /tmp/nomusic
+          fi
+          python3 - <<'PY'
+          import json, os, numpy as np
+          from PIL import Image, ImageFilter
+          A = 'factory/engine/public/archive'
+          for i in json.load(open('factory/engine/src/data/film.json')).get('depth_ids', []):
+              if os.path.exists(f'{A}/{i}_fg.png'): continue
+              try:
+                  im = Image.open(f'{A}/{i}.jpg').convert('RGB')
+                  if im.width > 1100: im = im.resize((1100, round(im.height * 1100 / im.width)), Image.LANCZOS)
+                  d = np.asarray(Image.open(f'{A}/{i}_depth.png').convert('L').resize(im.size, Image.BICUBIC)).astype(np.float32)
+              except FileNotFoundError as e:
+                  print('no depth layer for', i, e); continue
+              lo, hi = np.percentile(d, 3), np.percentile(d, 97)
+              n = np.clip((d - lo) / max(hi - lo, 1.0), 0, 1)
+              a = np.clip((n - 0.55) / 0.25, 0, 1); a = a * a * (3 - 2 * a)
+              m = Image.fromarray((a * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(1.6))
+              out = im.copy(); out.putalpha(m); out.save(f'{A}/{i}_fg.png', optimize=True)
+          PY
+          (cd $E && python ../../production/pipeline/measure_assets.py)
+          python3 - <<'PY'
+          import json, os, re, sys
+          E = 'factory/engine'; F = json.load(open(f'{E}/src/data/film.json')); miss = []
+          for f in ['voice.wav', 'basemap_v2.jpg', 'fonts/Inter.ttf', 'fonts/Cinzel.ttf']:
+              if not os.path.exists(f'{E}/public/{f}') or not os.path.getsize(f'{E}/public/{f}'): miss.append(f)
+          s = json.dumps(F)
+          for m in set(re.findall(r'"((?:music|clips|archive|icons|sig|ws)/[^"]+\.(?:mp3|mp4|webm|jpg|png|svg))"', s)):
+              if not os.path.exists(f'{E}/public/' + m): miss.append(m)
+          for c in F['clips']:
+              if not os.path.exists(f'{E}/public/' + c['src']): miss.append(c['src'])
+          for i in F['icons']:
+              if not os.path.exists(f"{E}/public/icons/{i['name']}_a{i['az']}.png"): miss.append(f"icons/{i['name']}_a{i['az']}.png")
+          for e in F['sfx']:
+              if not os.path.exists(f"{E}/public/sfx/{e['f']}.wav"): miss.append(f"sfx/{e['f']}.wav")
+          if not os.path.exists('/tmp/nomusic'):
+              for m in F['music']:
+                  if not os.path.exists(f"{E}/public/{m['src']}"): miss.append(m['src'])
+          miss = sorted(set(miss))
+          if miss: print('MISSING:', miss); sys.exit(1)
+          print('all referenced assets present')
+          PY
+          du -sh $PUB
+      - name: Final audit, review stills, station stills, soundtrack preview
+        working-directory: factory/engine
+        run: |
+          set -e
+          npm ci --no-audit --no-fund --loglevel=error
+          npx tsc --noEmit -p .
+          mkdir -p out/stills out/stills_station out/audio out/review
+          npx -y tsx tools/audit.ts out/audit_final.json > out/audit_final.txt; tail -n 30 out/audit_final.txt
+          npx -y tsx tools/blur.ts 0.25 1.5 > out/blur.txt 2>&1 || true; tail -n 12 out/blur.txt
+          TOTAL=$(python3 -c "import json; print(json.load(open('src/data/timeline.json'))['total'])")
+          S=$(python3 ../line/review.py times src/data/film.json $TOTAL); echo "$S" > out/review_times.txt
+          echo "review stills at: $S"
+          node scripts/stills4.mjs out/stills $S
+          S="$S" python3 - <<'PY'
+          import json, os
+          F = json.load(open('src/data/film.json')); P = json.load(open('../../art/pack/pack.json'))
+          cmp = [float(x) for x in os.environ['S'].split()]
+          docclips = {v['clip'] for v in P.get('docs', {}).values() if v.get('clip')}
+          items, seen = [], set()
+          for k, kind in (('banners', 'banner'), ('docs', 'document'), ('cutouts', 'portrait')):
+              for e in sorted(F[k], key=lambda e: e['from']):
+                  if e['img'] in seen: continue
+                  seen.add(e['img'])
+                  if any(x['img'] == e['img'] and x['from'] <= T <= x['to'] for x in F[k] for T in cmp): continue
+                  d = e['to'] - e['from']; n = len(e.get('sigs') or [])
+                  t = min(e['from'] + 3.8, e['to'] - 0.45) if n else e['from'] + min(1.6, 0.55 * d)
+                  items.append([round(t, 2), f"{kind} {e['img'].split('/')[-1].rsplit('.', 1)[0].replace('_cut', '')}" + (f" ({n} signatures)" if n else '')])
+          for c in sorted(F['clips'], key=lambda c: c['from']):
+              if c['src'] in docclips and c['src'] not in seen:
+                  seen.add(c['src']); items.append([round(c['to'] - 0.5, 2), f"Manim document {c['src'].split('/')[-1][:-4]}"])
+          items.sort(); keep = []
+          for t, l in items:
+              if keep and t - keep[-1][0] < 0.8: keep[-1][1] += ' + ' + l
+              else: keep.append([t, l])
+          keep = keep[:20]
+          json.dump({f"s{str(t).replace('.', '_')}.jpg": l for t, l in keep}, open('out/stills_station/labels.json', 'w'), indent=1)
+          open('/tmp/station_times', 'w').write(' '.join(str(t) for t, _ in keep))
+          print('station stills:', keep)
+          PY
+          if [ -s /tmp/station_times ]; then
+            node scripts/stills4.mjs out/stills_station $(cat /tmp/station_times)
+            for f in out/stills_station/t*.jpg; do mv "$f" "out/stills_station/s${f##*/t}"; done
+          fi
+          # soundtrack preview: the exact mix of the film (voice + score + sound effects), mastered
+          node scripts/build_audio.mjs && EVENTS_OUT=out/audio_events.json node out/audio_events.cjs
+          python ../../production/pipeline/mix.py out/audio_events.json public out/audio
+          python ../../production/pipeline/master.py out/audio | tee out/audio/audio_report.txt
+          FR=$(python3 -c "import json, math; print(math.ceil(json.load(open('src/data/timeline.json'))['total'] * 30))")
+          ffmpeg -v error -y -i out/audio/mix_final.wav -af "atrim=start=0:end=$(python3 -c "print($FR / 30)"),asetpts=PTS-STARTPTS" -c:a pcm_s24le out/audio/mix_range.wav
+          echo $FR > out/audio/frames.txt
+          ffmpeg -v error -y -i out/audio/mix_range.wav -c:a libmp3lame -b:a 192k out/review/soundtrack_preview.mp3
+          mkdir -p out/master && cp out/audio/mix_range.wav out/audio/audio_report.txt out/audio/frames.txt out/review_times.txt out/master/
+          TITLE=$(python3 -c "import json; print(json.load(open('../orders/$ORDER/order.json', encoding='utf-8'))['title'])")
+          python3 ../line/review_pdf.py out/review/REVIEW_stills.pdf public/fonts/Inter.ttf "$TITLE" --map ../../art/map/map_sheet.jpg \
+            --station ../../art/pack/sheets --stills out/stills --instation out/stills_station
+      - id: key
+        name: Approval key of these stills; render matrix
+        run: |
+          set -e
+          K=$(python3 factory/line/review.py key $OD factory/engine art/music/music.json)
+          [ -f /tmp/nomusic ] && K="${K}_nomusic"
+          echo "$K" > factory/engine/out/review/stills_key.txt
+          echo "STILLS KEY: $K"
+          TOTAL=$(python3 -c "import json; print(json.load(open('factory/engine/src/data/timeline.json'))['total'])")
+          P=$(python3 factory/line/review.py parts $TOTAL)
+          echo "parts=$P" >> $GITHUB_OUTPUT
+          echo "nparts=$(python3 -c "import json; print(len($P))")" >> $GITHUB_OUTPUT
+          if [ "$STAGE" = render ] && python3 factory/line/review.py approved $OD "$K"; then echo "approved=1" >> $GITHUB_OUTPUT; else echo "approved=0" >> $GITHUB_OUTPUT; fi
+      - name: Publish the stills
+        env: { GH_TOKEN: "${{ github.token }}" }
+        working-directory: factory/engine
+        run: |
+          set -e
+          shopt -s nullglob
+          R="${TAG}_stills"
+          cp ../../art/direction/director_report.txt ../../art/direction/audit*.txt ../../art/direction/CREDITS.txt out/ 2>/dev/null || true
+          cp ../../art/music/music_report.txt ../../art/map/map_sheet.jpg out/review/ 2>/dev/null || true
+          mkdir -p out/station && cp ../../art/pack/sheets/* ../../art/pack/station_report.txt out/station/ 2>/dev/null || true
+          gh release delete "$R" -y --cleanup-tag -R ${{ github.repository }} 2>/dev/null || true
+          gh release create "$R" -R ${{ github.repository }} --title "$R" --notes "review stills, station stills, soundtrack preview - order $ORDER - key $(cat out/review/stills_key.txt)" \
+            out/review/* out/stills/*.jpg out/stills_station/*.jpg out/*.txt out/station/* src/data/film.json
+      - name: Render only with approved stills
+        if: env.STAGE == 'render' && steps.key.outputs.approved != '1'
+        run: |
+          echo "::error::the stills $(cat factory/engine/out/review/stills_key.txt) are not approved: order.json \"approved\": {\"stills\": \"$(cat factory/engine/out/review/stills_key.txt)\"} after the review"
+          exit 1
+      - if: steps.key.outputs.approved == '1'
+        uses: actions/upload-artifact@v4
+        with:
+          name: film-assets
+          retention-days: 5
+          path: |
+            factory/engine/public
+            factory/engine/src
+      - if: steps.key.outputs.approved == '1'
+        uses: actions/upload-artifact@v4
+        with:
+          name: audio-master
+          retention-days: 5
+          path: factory/engine/out/master
+
+  render:
+    needs: stills
+    if: ${{ needs.stills.outputs.approved == '1' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        part: ${{ fromJson(needs.stills.outputs.parts) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: film-assets, path: factory/engine }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: bash production/ci/apt.sh ffmpeg && pip install -q numpy pillow
+      - name: Render part (3 browsers x concurrency 1) + self-check
+        working-directory: factory/engine
+        run: |
+          set -e
+          npm ci --no-audit --no-fund --loglevel=error
+          npx remotion bundle src/index.ts --out-dir=build --log=error > /dev/null 2>&1 && npx remotion still build Main /tmp/probe.jpg --frame=0 --scale=0.1 --gl=swangle --log=error > /dev/null 2>&1 \
+            && export SERVE=build || export SERVE=src/index.ts
+          TOTAL=$(node -e "const t=require('./src/data/timeline.json'); console.log(Math.ceil(t.total*30))")
+          FA=0; FB=$(( TOTAL - 1 ))
+          CNT=$(( FB - FA + 1 )); N=${{ needs.stills.outputs.nparts }}; P=${{ matrix.part }}; SZ=$(( (CNT + N - 1) / N ))
+          A=$(( FA + P * SZ )); B=$(( A + SZ - 1 )); [ $B -gt $FB ] && B=$FB
+          if [ $A -gt $FB ]; then echo "part $P empty"; exit 0; fi
+          PART=$(printf %02d $P) WORKERS=3 bash scripts/render_chunk.sh $A $B out/part_$(printf %02d $P).mp4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 'part-${{ matrix.part }}'
+          retention-days: 5
+          if-no-files-found: ignore
+          path: |
+            factory/engine/out/part_*.mp4
+            factory/engine/out/qa/
+
+  final:
+    needs: [stills, render]
+    if: ${{ needs.stills.outputs.approved == '1' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { pattern: 'part-*', path: parts, merge-multiple: true }
+      - uses: actions/download-artifact@v4
+        with: { name: audio-master, path: audio }
+      - uses: actions/download-artifact@v4
+        with: { name: voice, path: voice }
+      - uses: actions/download-artifact@v4
+        with: { name: direction, path: direction }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: bash production/ci/apt.sh ffmpeg && pip install -q "pillow==11.2.1"
+      - name: Assemble (frame-exact), QA, publish
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          set -e
+          SLUG=$(python3 -c "import json; print(json.load(open('$OD/order.json', encoding='utf-8'))['slug'])")
+          TITLE=$(python3 -c "import json; print(json.load(open('$OD/order.json', encoding='utf-8'))['title'])")
+          cp voice/subtitles.srt ${SLUG}_subtitles.srt
+          cp direction/CREDITS.txt ${SLUG}_CREDITS.txt 2>/dev/null || touch ${SLUG}_CREDITS.txt
+          FILM_SLUG="$SLUG" FILM_TITLE="$TITLE" EXTRA_ASSETS="${SLUG}_subtitles.srt ${SLUG}_CREDITS.txt" REVIEW_TIMES=audio/review_times.txt \
+            bash factory/line/assemble.sh parts audio/mix_range.wav $(cat audio/frames.txt) "$TAG"

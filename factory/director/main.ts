@@ -1,6 +1,6 @@
 // FACTORY - automatic director. usage (from the repo root, after npm ci in factory/engine):
 //   npx tsx factory/director/main.ts <orderDir> [--feedback audit.json] [--out factory/engine/src/data/film.json]
-// Reads: <order>/order.json, narration.json, storyboard.json, assets.json, out/pack.json (processing station),
+// Reads: <order>/order.json, narration.json, storyboard.json, assets.json (+ the line's 3D pieces), out/pack.json (processing station),
 //        data/timeline.json (voice job) + the rules. Also writes <order>/out/CREDITS.txt (YouTube description).
 // Writes: film.json (every element of the film) + <order>/out/director_report.txt. Fails with a clear message on any
 // mistake in the order (cue not in the narration, unknown place, missing asset).
@@ -29,7 +29,7 @@ try {
   const pack = exists(packFile) ? readJSON(packFile) : null;
   if (pack) {
     for (const k of ['archive', 'cutouts', 'docs', 'sig']) assets[k] = {...(assets[k] ?? {}), ...(pack[k] ?? {})};
-    assets.credits = pack.credits ?? []; if (pack.credits_fixed) assets.credits_fixed = pack.credits_fixed;
+    assets.credits = [...(pack.credits ?? []), ...(assets.credits ?? [])]; if (pack.credits_fixed) assets.credits_fixed = pack.credits_fixed;
     o.flag_aspect = {...(o.flag_aspect ?? {}), ...Object.fromEntries(Object.entries(pack.flags ?? {}).map(([c, f]: any) => [c, f.aspect]))};
     console.log(`station pack: ${Object.keys(pack.archive ?? {}).length} banner photos, ${Object.keys(pack.cutouts ?? {}).length} portraits, ${Object.keys(pack.docs ?? {}).length} documents, ${Object.keys(pack.sig ?? {}).length} signatures`);
   }

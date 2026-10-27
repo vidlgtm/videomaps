@@ -1281,5 +1281,41 @@
  "end": {
   "text": "WHY THE SOVIET UNION BROKE INTO EXACTLY 15 COUNTRIES",
   "sub": "Sources: Constitution of the USSR (1936, 1977) · 1939 & 1989 Soviet censuses · Alma-Ata Declaration (1991) · Natural Earth · historical-basemaps"
- }
+ },
+ "map": {
+  "use": "ussr_v5"
+ },
+ "voice": {
+  "master": {
+   "release": "voice4",
+   "file": "voice.wav"
+  },
+  "note": "v5 master voice + its timeline data/timeline.json (regression of the v5 film); new films: one take per paragraph"
+ },
+ "music": {
+  "use": "house"
+ },
+ "own_assets": [
+  {
+   "release": "cauc3",
+   "file": "caucasus.mp4",
+   "to": "caucasus.mp4"
+  },
+  {
+   "release": "assets4",
+   "file": "matryoshka.webm",
+   "to": "matryoshka.webm"
+  },
+  {
+   "release": "assets4",
+   "file": "icons.zip",
+   "to": "icons",
+   "unzip": true
+  },
+  {
+   "release": "opening",
+   "file": "opening.mp4",
+   "to": "clips/opening.mp4"
+  }
+ ]
 }

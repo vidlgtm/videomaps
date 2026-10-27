@@ -23,7 +23,8 @@ export type Portrait = {img: string; name: string; sub?: string; caption?: strin
 /** stepped clip playback: from film time `at`, play source seconds s0..s1 (then hold the last frame) */
 export type Step = {at: number; s0: number; s1: number; rate?: number};
 /** 'manim' / 'doll' = transparent overlay video (webm alpha); 'cauc' = full-frame clip (3D fly-over, Manim document);
- *  `labels` = this clip carries the 3D label track (data/caucasus_labels.json) - set only from assets.json clips.<id>.labels */
+ *  `labels` = this clip carries its own 3D label track (data/clip_labels.json[labels], the v5 track as fallback) - set only from
+ *  assets.json clips.<id>.labels (3D pieces of the workshop bring theirs) */
 export type Clip = {src: string; from: number; to: number; steps: Step[]; kind: 'manim' | 'doll' | 'cauc'; dx?: number; labels?: string};
 export type Sfx = {f: string; t: number; v?: number};
 export type Music = {src: string; from: number; to: number; lufs: number; xin?: number; xout?: number};

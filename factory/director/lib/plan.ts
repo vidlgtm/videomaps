@@ -572,9 +572,8 @@ export class Director {
     const el: any = {kind: C.kind === 'manim' ? 'cauc' : C.kind, src: C.src, from: r3(from), to: r3(to), steps: st};
     if (rb.b.labels && C.dx_with_labels) el.dx = C.dx_with_labels;
     if (C.labels) {
-      if (C.kind !== 'cauc') fail(`assets.json clip "${v}": a label track (labels) needs a full-frame 3D clip (kind cauc)`);
-      const other = this.F.clips.find((c: any) => c.labels && c.src !== C.src);
-      if (other) fail(`assets.json clip "${v}": only one clip per film can carry the 3D label track (already on ${other.src})`);
+      const other = this.F.clips.find((c: any) => c.labels === C.labels && c.src !== C.src);
+      if (other) fail(`assets.json clip "${v}": label track ${C.labels} already belongs to ${other.src} (one track per clip)`);
       el.labels = C.labels;
     }
     this.push('clips', el, `${rb.key}/clip`);

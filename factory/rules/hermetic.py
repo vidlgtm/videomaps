@@ -15,6 +15,7 @@ ALLOWED = [
     ("download.blender.org", ""), ("download.pytorch.org", ""), ("pypi.org", ""), ("registry.npmjs.org", ""),
     ("huggingface.co", ""), ("github.com", "/xinntao/Real-ESRGAN/releases/"), ("github.com", "/opencv/opencv_zoo/"),
     ("github.com", "/VAST-AI-Research/TripoSR"), ("github.com", "/Tencent/Hunyuan3D-2"),
+    ("github.com", "/ace-step/ACE-Step-1.5"),
     # fixed base map of every film (same for all films, not chosen per film)
     ("tiles.maps.eox.at", "/wmts/1.0.0/s2cloudless"), ("s3.amazonaws.com", "/elevation-tiles-prod/"),
     ("eoimages.gsfc.nasa.gov", "/images/imagerecords/"), ("raw.githubusercontent.com", "/nvkelso/natural-earth-vector/"),
@@ -30,9 +31,9 @@ def files():
         for f in fs:
             if f.endswith(CODE): yield os.path.join(d, f)
     wf = os.path.join(ROOT, ".github", "workflows")
-    for f in ("factory.yml", "workshop.yml"):
+    for f in sorted(os.listdir(wf)) if os.path.isdir(wf) else []:
         p = os.path.join(wf, f)
-        if os.path.exists(p):
+        if f.endswith((".yml", ".yaml")):
             yield p
             for m in set(re.findall(r"(production/[\w./-]+\.(?:py|sh|mjs|js|ts))", open(p, encoding="utf-8").read())):
                 if os.path.exists(os.path.join(ROOT, m)): yield os.path.join(ROOT, m)

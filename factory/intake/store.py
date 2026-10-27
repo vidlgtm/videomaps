@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """ORDER STORE - every picture an order uses (photos, document pages, signatures, extra flags, and later 3D models,
-textures, HDRIs), fetched with its licence and kept as an asset of the release "store_<order>" of this repository,
-listed in <orderDir>/store.json. The factory reads pictures only from there and never downloads them from a website.
+textures, HDRIs), the voice takes (keys vo_<paragraph id>, mp3 / wav / flac) and historical shapes (GeoJSON), fetched
+with its licence and kept as an asset of the release "store_<order>" of this repository, listed in <orderDir>/store.json. The factory reads pictures only from there and never downloads them from a website.
 
 usage:
   python factory/intake/store.py commons <orderDir> <key> "<Commons file name>" [--page N] [--replace]
@@ -23,7 +23,8 @@ COMMONS = "https://commons.wikimedia.org/w/api.php"
 UA = "videomaps-intake-bot/1.0 (https://github.com/vidlgtm/videomaps)"
 STD_W = (3840, 1920, 1280, 960)
 EXT = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif", "image/svg+xml": "svg",
-       "image/tiff": "tif", "model/gltf-binary": "glb", "image/vnd.radiance": "hdr", "image/x-exr": "exr"}
+       "image/tiff": "tif", "model/gltf-binary": "glb", "image/vnd.radiance": "hdr", "image/x-exr": "exr",
+       "audio/mpeg": "mp3", "audio/wav": "wav", "audio/flac": "flac", "application/geo+json": "geojson"}
 
 
 def die(msg):
@@ -126,8 +127,18 @@ def sniff(raw):
     if h[:4] == b"glTF": return "model/gltf-binary"
     if h.startswith(b"#?RADIANCE") or h.startswith(b"#?RGBE"): return "image/vnd.radiance"
     if h[:4] == b"\x76\x2f\x31\x01": return "image/x-exr"
+    if h[:4] == b"RIFF" and raw[8:12] == b"WAVE": return "audio/wav"
+    if h[:4] == b"fLaC": return "audio/flac"
+    if h[:3] == b"ID3" or (len(h) > 1 and h[0] == 0xFF and (h[1] & 0xE0) == 0xE0): return "audio/mpeg"
     head = raw[:2048].lstrip().lower()
     if head.startswith(b"<?xml") or head.startswith(b"<svg") or b"<svg" in head: return "image/svg+xml"
+    if head.startswith(b"{"):
+        try:
+            j = json.loads(raw.decode("utf-8"))
+            if isinstance(j, dict) and j.get("type") in ("FeatureCollection", "Feature", "Polygon", "MultiPolygon", "GeometryCollection"):
+                return "application/geo+json"
+        except (UnicodeDecodeError, ValueError):
+            return None
     return None
 
 
@@ -210,6 +221,7 @@ def local_file(order, key, path, lic, who, src, title, replace):
     if path.lower().endswith(".hdr"): mime = "image/vnd.radiance"
     if path.lower().endswith(".exr"): mime = "image/x-exr"
     raw = open(path, "rb").read()
+    if not sniff(raw) and mime not in EXT: die(f"{path}: unsupported file type {mime}")
     put(order, key, raw, mime, {"licence": lic, "author": author_clean(who), "source": src, "title": title or os.path.basename(path),
                                 "page": None, "from": "file"}, replace)
 
