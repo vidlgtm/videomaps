@@ -313,6 +313,7 @@ class Stage:
             self.objs.setdefault(n, []); self.mats.setdefault(n, [])
             self.rigs += [(n, r) for r in (fn(self, n, c, m, e) or [])]
             return
+        if m.get("upright"): m = dict(m, d=m["d0"], h=m["h0"])           # hung on a wall: built lying, the root stands it up
         kind, val = self.src(n); mat = c.get("material", MATERIAL.get(noun, "painted"))
         objs, mats = [], []
         if noun in ("sheet", "print"):
@@ -543,8 +544,11 @@ class Stage:
                 fl = 1 + 0.25 * np.sin(2 * np.pi * 7.3 * t) + 0.15 * np.sin(2 * np.pi * 13.1 * t + 0.7)
                 keys(ld, "energy", 0.15 * PAPER_LIGHT * (0.35 * Lm) ** 2 * on * fl * np.sin(np.pi * np.clip(b, 0, 1)) ** 0.5)
         for n, sp in self.spots.items():
-            m = self.L[n]; Lm = max(0.25, max(m["w"], m["d"]))
-            c = Vector((m["x"], m["y"], m["z"] + m["h"])); at = c + Vector((-0.35, -0.8, 2.2)) * Lm
+            m = self.L[n]; Lm = max(0.25, max(m["w"], m["d"], m["h"] if m.get("upright") else 0.0))
+            if m.get("upright"):                                       # a picture on the wall: lit from the front, a little above
+                c = Vector((m["x"], m["y"] - m["d"] / 2, m["z"] + m["h"] / 2)); at = c + Vector((-0.3, -2.2, 0.8)) * Lm
+            else:
+                c = Vector((m["x"], m["y"], m["z"] + m["h"])); at = c + Vector((-0.35, -0.8, 2.2)) * Lm
             P0 = PAPER_LIGHT * (at - c).length_squared
             ob = self.spot(f"{n}_spot", at, c, (1.0, 0.9, 0.76), P0, Lm, 0.5)
             ob.data.shadow_soft_size = 0.15 * Lm; ob.visible_glossy = False

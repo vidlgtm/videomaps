@@ -118,6 +118,7 @@ def overlap(p, q):
 
 def hang(m):
     """a flat member hung on a wall: its face turns to the camera (x 90 deg), its box becomes upright"""
+    m["w0"], m["d0"], m["h0"] = m["w"], m["d"], m["h"]                     # the member is built lying, then stood up
     m["d"], m["h"] = max(m["h"], 0.004), m["d"]; m["rx0"] = 90.0; m["oz"] = m["h"] / 2; m["rot"] = 0.0; m["upright"] = True
 
 
