@@ -49,6 +49,8 @@ def licence_check(short, nonfree=False):
 def author_clean(a):
     a = plain(a)
     a = re.sub(r"^(photographer|photograph|photo|author|by)\s*[:.]?\s*", "", a, flags=re.I).strip(" .")
+    m = re.search(r"donated to Wikimedia Commons as part of a project by (?:the )?(.+?)(?:\.|$)", a, re.I)   # museum open access
+    if m: return ("The " if m.group(1).lower().startswith("metropolitan") else "") + m.group(1).strip(" ,.")
     if not a or re.match(r"unknown|anonymous|unidentified", a, re.I) or (re.search(r"\bunknown\b", a, re.I) and len(a) < 48): return "unknown author"
     a = re.sub(r"\s*\((life ?time|died|born|lived)[^)]*\)?.*$", "", a, flags=re.I).strip(" ,.")
     a = re.sub(r"^(.+?) from [A-Z][\w .,-]*$", r"\1", a)

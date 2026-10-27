@@ -3,10 +3,15 @@ fill and rim lights that turn with the camera so every azimuth is lit the same w
 ground shadow - the engine adds a soft contact shadow). The camera distance and lens shift are solved per view so the
 object fills the same share of every frame, is centred and never touches the frame edge.
 Inputs: a TripoSR mesh (.obj with vertex colours) or a GLB with its own materials and textures.
+With --ref (the cut-out picture the object was made from) the colours follow the picture: the vertex colours of a
+TripoSR mesh are matched to the picture's colour statistics (mean and spread of L*, a*, b* - TripoSR's colours come out
+paler and flatter than the photograph), and the exposure is calibrated on a quick probe render so the object's mean
+brightness equals the picture's.
 usage: blender -b --python-exit-code 1 -P render_obj.py -- --mesh FILE --out DIR --name N [--res 768] [--samples 256]
-       [--views 0,90,180,270] [--elev 32] [--fill 0.78] [--gpu OPTIX]
+       [--views 0,90,180,270] [--elev 32] [--fill 0.78] [--gpu OPTIX] [--ref PICTURE.png]
 writes DIR/<name>_a<az>.png and DIR/<name>_render.json (mesh counts, size, colour source, framing per view)"""
 import bpy, json, math, os, sys, time
+import numpy as np
 from mathutils import Vector
 from bpy_extras.object_utils import world_to_camera_view
 
@@ -16,6 +21,7 @@ MESH, OUT, NAME = opt("--mesh"), opt("--out"), opt("--name")
 RES, SAMPLES = int(opt("--res", 768)), int(opt("--samples", 256))
 VIEWS = [int(v) for v in opt("--views", "0,90,180,270").split(",")]
 ELEV, FILL, GPU = math.radians(float(opt("--elev", 32))), float(opt("--fill", 0.78)), opt("--gpu")
+REF = opt("--ref")
 os.makedirs(OUT, exist_ok=True)
 T0 = time.time()
 
@@ -108,6 +114,57 @@ else:
     colour = "texture" if imgs else "materials"
 bpy.context.view_layer.update()
 
+
+def srgb_lin(c): return np.where(c <= 0.04045, c / 12.92, ((c + 0.055) / 1.055) ** 2.4)
+
+
+def lin_srgb(c): return np.where(c <= 0.0031308, c * 12.92, 1.055 * np.power(np.maximum(c, 0.0), 1 / 2.4) - 0.055)
+
+
+XYZ = np.array([[0.4124, 0.3576, 0.1805], [0.2126, 0.7152, 0.0722], [0.0193, 0.1192, 0.9505]]); WHITE = np.array([0.95047, 1.0, 1.08883])
+
+
+def to_lab(srgb):
+    xyz = srgb_lin(np.clip(srgb, 0, 1)) @ XYZ.T / WHITE
+    f = np.where(xyz > 0.008856, np.cbrt(xyz), 7.787 * xyz + 16 / 116)
+    return np.stack([116 * f[:, 1] - 16, 500 * (f[:, 0] - f[:, 1]), 200 * (f[:, 1] - f[:, 2])], -1)
+
+
+def from_lab(lab):
+    fy = (lab[:, 0] + 16) / 116; fx = fy + lab[:, 1] / 500; fz = fy - lab[:, 2] / 200
+    f = np.stack([fx, fy, fz], -1); xyz = np.where(f > 0.206893, f ** 3, (f - 16 / 116) / 7.787) * WHITE
+    return np.clip(lin_srgb(np.clip(xyz @ np.linalg.inv(XYZ).T, 0, None)), 0, 1)
+
+
+def image_px(path):
+    """RGBA pixels of a PNG as stored (sRGB values, straight alpha)"""
+    im = bpy.data.images.load(os.path.abspath(path), check_existing=False)
+    try: im.colorspace_settings.name = "Non-Color"
+    except Exception: pass
+    a_ = np.empty(im.size[0] * im.size[1] * 4, np.float32); im.pixels.foreach_get(a_); bpy.data.images.remove(im)
+    return a_.reshape(-1, 4)
+
+
+ref_px = None
+if REF and os.path.exists(REF):
+    q = image_px(REF); q = q[q[:, 3] > 0.5][:, :3]
+    if len(q) > 200000: q = q[np.linspace(0, len(q) - 1, 200000).astype(int)]
+    if len(q) >= 64: ref_px = q
+colour_match = None
+if ref_px is not None and colour == "vertex":                      # TripoSR colours -> the picture's colour statistics
+    at = me.color_attributes[0]; nv = len(at.data)
+    cs = np.empty(nv * 4, np.float32); at.data.foreach_get("color_srgb", cs); cs = cs.reshape(-1, 4)
+    lv, lr = to_lab(cs[:, :3].astype(np.float64)), to_lab(ref_px.astype(np.float64))
+    mv, sv, mr, sr = lv.mean(0), lv.std(0) + 1e-6, lr.mean(0), lr.std(0)
+    gain = np.clip(sr / sv, [0.6, 0.5, 0.5], [4.0, 2.0, 2.0])
+    cs[:, :3] = from_lab((lv - mv) * gain + mr); at.data.foreach_set("color_srgb", cs.ravel())
+    me.update()
+    colour_match = {"before": [round(float(x), 2) for x in np.r_[mv, sv]], "picture": [round(float(x), 2) for x in np.r_[mr, sr]],
+                    "gain": [round(float(x), 3) for x in gain]}
+    print("colour match (L a b mean | std): mesh", colour_match["before"], "picture", colour_match["picture"], flush=True)
+    for nd in mat.node_tree.nodes:                                   # the picture's own saturation, no extra boost
+        if nd.type == "HUE_SAT": nd.inputs["Saturation"].default_value = 1.0; nd.inputs["Value"].default_value = 1.0
+
 # light rig (the v5 icon lights, as seen from azimuth 270) turned with the camera
 RIG = [("key", (3.5, -3.0, 5.0), 900, 3.0, (1.0, 0.96, 0.9)), ("fill", (-4.0, -2.0, 2.5), 250, 4.0, (0.85, 0.9, 1.0)),
        ("rim", (-1.0, 4.5, 3.5), 450, 2.0, (1, 1, 1))]
@@ -142,7 +199,14 @@ def extent():
 
 
 info = {"name": NAME, "verts": len(me.vertices), "faces": len(me.polygons), "dims": [round(d / size, 4) for d in dims],
-        "colour": colour, "views": {}}
+        "colour": colour, "views": {}, "colour_match": colour_match}
+
+
+def mean_lum(px):
+    return float((srgb_lin(np.clip(px[:, :3], 0, 1)) @ np.array([0.2126, 0.7152, 0.0722])).mean())
+
+
+calibrated = ref_px is None
 for az in VIEWS:
     for lo, loc in lights:
         r = math.radians(az - 270)
@@ -160,6 +224,21 @@ for az in VIEWS:
         cam.data.shift_x += ((e[0] + e[2]) / 2 - 0.5); cam.data.shift_y += ((e[1] + e[3]) / 2 - 0.5)
         bpy.context.view_layer.update()
     e = extent()
+    if not calibrated:                                    # exposure: the object as bright as the picture (probe renders)
+        calibrated = True; target_l = mean_lum(ref_px); ev = 0.0
+        res0, spp0 = sc.render.resolution_x, sc.cycles.samples
+        sc.render.resolution_x = sc.render.resolution_y = 192; sc.cycles.samples = 24
+        for _ in range(2):
+            sc.render.filepath = os.path.join(OUT, f"{NAME}_probe.png"); bpy.ops.render.render(write_still=True)
+            q = image_px(sc.render.filepath); q = q[q[:, 3] > 0.5]
+            if len(q) < 64: break
+            step = float(np.clip(math.log2(max(target_l, 1e-4) / max(mean_lum(q), 1e-4)), -2.0, 2.0))
+            ev = float(np.clip(ev + step, -3.0, 3.0)); sc.view_settings.exposure = ev
+            if abs(step) < 0.05: break
+        sc.render.resolution_x = sc.render.resolution_y = res0; sc.cycles.samples = spp0
+        try: os.remove(os.path.join(OUT, f"{NAME}_probe.png"))
+        except OSError: pass
+        info["exposure"] = round(ev, 3); print(f"exposure calibrated to the picture: {ev:+.2f} EV", flush=True)
     sc.render.filepath = os.path.join(OUT, f"{NAME}_a{az}.png")
     t = time.time()
     bpy.ops.render.render(write_still=True)

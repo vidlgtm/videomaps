@@ -511,5 +511,28 @@ def route(st, r, pts, parent, radius):
     sv = prog * s[-1]; hp = np.stack([np.interp(sv, s, P_[:, k]) for k in range(3)], -1)
     ST.keys(head, "location", hp)
     ST.keys(head, "scale", np.repeat(np.where((prog > 1e-3) & (prog < 0.999), 1.0, 1e-3)[:, None], 3, 1))
-    st.route_objs.append((ob, head))
+    st.route_objs.append((ob, head, P_, prog, hp) if parent is None else (ob, head))
     return ob
+
+
+SCREEN_LINE = 0.0032          # a route on the ground of a region: about 6 px wide in a 1920 px frame, near or far
+
+
+def route_widths(st):
+    """routes drawn on the ground of a terrain or sea place keep a steady width on screen (a fixed width in km is a band
+    near the lens and a hair far off): each point's radius follows its distance to the camera from the moment the line
+    reaches it, the bright head follows the camera every frame"""
+    recs = [r for r in st.route_objs if len(r) == 5]
+    if not recs: return
+    cam = np.array([P.cam_pos(st.plan, fi) for fi in range(st.n)])
+    k = 0.5 * SCREEN_LINE * 2 * math.atan(P.SENSOR / 2 / P.LENS)     # radius per unit of distance to the camera
+    for ob, head, P_, prog, hp in recs:
+        cu = ob.data; base = max(float(cu.bevel_depth), 1e-9)
+        s = np.r_[0, np.cumsum(np.linalg.norm(np.diff(P_, axis=0), axis=1))]; frac = s / max(s[-1], 1e-9)
+        sp = cu.splines[0]
+        for i, p in enumerate(P_):
+            f0 = int(min(st.n - 1, np.searchsorted(prog, frac[i] - 1e-6)))
+            d = float(np.median(np.linalg.norm(cam[f0:] - p, axis=1)))
+            sp.points[i].radius = max(0.02, k * d / base)
+        dh = np.linalg.norm(cam - hp, axis=1); vis = (prog > 1e-3) & (prog < 0.999)
+        ST.keys(head, "scale", np.repeat(np.where(vis, np.maximum(k * dh / base, 1e-3), 1e-3)[:, None], 3, 1))

@@ -40,9 +40,9 @@ NAME = re.compile(r"^[a-z][a-z0-9_]{1,30}$")
 IMAGE = ("image/jpeg", "image/png", "image/webp")
 GLB = "model/gltf-binary"
 # final recipes: change the version only when the result must change (it makes every object of that kind again)
-ICON_FINAL = "triposr@107cefd mc320 | blender 768px 256spp | v1"
-MODEL_FINAL = "hunyuan3d-2@f8db630 dit-v2-0 50 steps octree 380 + paint-v2-0-turbo | blender 768px 160spp | v1"
-STANDIN = "triposr cpu mc160 | blender 384px 24spp | v1"
+ICON_FINAL = "triposr@107cefd mc320 | blender 768px 256spp | colours matched to the picture | v2"
+MODEL_FINAL = "hunyuan3d-2@f8db630 dit-v2-0 50 steps octree 380 + paint-v2-0-turbo | blender 768px 160spp | exposure matched | v2"
+STANDIN = "triposr cpu mc160 | blender 384px 24spp | colours matched to the picture | v2"
 RENDER = (HERE / "render_obj.py").read_bytes()
 CUTCODE = (HERE / "cut.py").read_bytes()
 KERNEL = (HERE / "objects_kernel.py").read_text()
@@ -170,9 +170,9 @@ def store_path(o):
     return p, None
 
 
-def blender(mesh, out, name, res, samples):
+def blender(mesh, out, name, res, samples, ref=None):
     cmd = [BLENDER, "-b", "--python-exit-code", "1", "-P", str(HERE / "render_obj.py"), "--", "--mesh", str(mesh), "--out", str(out),
-           "--name", name, "--res", str(res), "--samples", str(samples), "--views", ",".join(map(str, AZ))]
+           "--name", name, "--res", str(res), "--samples", str(samples), "--views", ",".join(map(str, AZ))] + (["--ref", str(ref)] if ref else [])
     r = subprocess.run(cmd, capture_output=True, text=True)
     for l in r.stdout.splitlines():
         if l.startswith(("rendered", "OBJECT ERROR")): print("   ", l, flush=True)
@@ -241,7 +241,8 @@ if STAGE == "preview":
         t, final, views, M = time.time(), o["engine"] == "glb", {}, {}
         if not o["errs"]:
             mesh = o.get("src") if final else o.get("mesh")
-            info, err = blender(mesh, wd / "views", o["rkey"] if final else n, 768 if final else 384, 128 if final else 24)
+            info, err = blender(mesh, wd / "views", o["rkey"] if final else n, 768 if final else 384, 128 if final else 24,
+                                None if final else o.get("cut"))
             if err: o["errs"].append(err)
             else:
                 views = {az: str(wd / "views" / f"{o['rkey'] if final else n}_a{az}.png") for az in AZ}

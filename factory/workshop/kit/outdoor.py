@@ -224,20 +224,22 @@ def haze_room(st):
 
 
 def precip(st, kind):
-    """rain streaks or snow flakes in a box that follows the camera: every flake moves in the world (true parallax), wraps
-    round the box out of sight, and none comes nearer the lens than 15 % of the camera distance (no blurred bars)"""
+    """rain streaks or snow flakes in a box in front of the camera that follows it: every flake moves in the world (true
+    parallax) and wraps round the box out of sight; the box covers the near half of the view only (rain and snow are seen
+    as streaks and flakes close to the eye, not as posts standing on far land) and none comes nearer the lens than 15 %
+    of the camera distance (no blurred bars)"""
     rng = np.random.default_rng(7 if kind == "rain" else 11)
-    N = 5000 if kind == "rain" else 3500
+    N = 6000 if kind == "rain" else 4000
     base = rng.random((N, 3)); ph = rng.random(N) * 2 * np.pi
     plan = st.plan; fr = np.zeros((st.n, N, 3), np.float32)
-    Dm = float(np.median(plan["dist"])); B = 2.4 * Dm
+    Dm = float(np.median(plan["dist"])); B = 0.9 * Dm
     v = np.array([0.08, 0.03, -1.6]) * Dm if kind == "rain" else np.array([0.03, 0.01, -0.12]) * Dm
     for fi in range(st.n):
         t = fi / P.FPS; cp = P.cam_pos(plan, fi); tg = plan["target"][fi]
+        f = (tg - cp) / max(np.linalg.norm(tg - cp), 1e-9); c = cp + 0.5 * B * f
         p = base * B + v * t
         if kind == "snow": p = p + 0.04 * Dm * np.stack([np.sin(1.3 * t + ph), np.cos(0.9 * t + ph), np.zeros(N)], -1)
-        p = cp + ((p - cp) % B) - B / 2
-        f = (tg - cp) / max(np.linalg.norm(tg - cp), 1e-9)
+        p = c + ((p - c) % B) - B / 2
         near = np.linalg.norm(p - cp, axis=1) < 0.15 * plan["dist"][fi]
         p[near] = cp - 3.0 * Dm * f                                 # out of sight behind the camera
         fr[fi] = p
@@ -247,13 +249,13 @@ def precip(st, kind):
         g = M.Graph("rain"); g.N.remove(g.tc)
         p_ = g.node("ShaderNodeBsdfPrincipled", Roughness=0.1); p_.inputs["Base Color"].default_value = (0.8, 0.84, 0.9, 1)
         tr = g.node("ShaderNodeBsdfTransparent"); mt = g.finish(g.mix_shader(0.72, p_.outputs[0], tr.outputs[0]), presence=False)
-        r = np.full(N, 0.0011 * Dm)
+        r = np.full(N, 0.00035 * Dm)
         C.points_object("rain", fr[0], r, mt, cache=pc, streak=(28.0, (math.radians(6), 0.0, 0.0)))
     else:
         g = M.Graph("snow"); g.N.remove(g.tc)
         p_ = g.node("ShaderNodeBsdfPrincipled", Roughness=0.6); p_.inputs["Base Color"].default_value = (0.92, 0.93, 0.95, 1)
         mt = g.finish(p_.outputs[0], presence=False)
-        C.points_object("snow", fr[0], 0.0016 * Dm * (0.6 + 0.8 * rng.random(N)), mt, cache=pc)
+        C.points_object("snow", fr[0], 0.0007 * Dm * (0.6 + 0.8 * rng.random(N)), mt, cache=pc)
 
 
 def weather(st):

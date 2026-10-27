@@ -60,7 +60,7 @@ def view_metrics(png):
             "margin": round(float(min(box[0], box[1], 1 - box[2], 1 - box[3])), 4), "luma": round(float(luma.mean()), 4),
             "clipped": round(float((px.max(1) >= 254).mean()), 4), "crushed": round(float((px.max(1) <= 3).mean()), 4),
             "holes": round(float((filled & ~m).sum() / max(1, filled.sum())), 4), "sat": round(float(sat.mean()), 4),
-            "lab": [round(float(v), 2) for v in _lab(px).mean(0)]}
+            "lab": [round(float(v), 2) for v in _lab(px).mean(0)], "lstat": [round(float(_lab(px)[:, 0].mean()), 2), round(float(_lab(px)[:, 0].std()), 2)]}
 
 
 def check_views(views, cut_png, final, mesh=None):
@@ -80,15 +80,21 @@ def check_views(views, cut_png, final, mesh=None):
     if cut_png and os.path.exists(cut_png) and good:
         a, m = _fg(cut_png)
         px = a[m][:, :3]
-        ref = _lab(px).mean(0)
+        lr = _lab(px); ref = lr.mean(0); ref_l = (float(lr[:, 0].mean()), float(lr[:, 0].std()))
         mx, mn = px.max(1), px.min(1)
         ref_sat = float(np.where(mx > 0, (mx - mn) / np.maximum(mx, 1), 0).mean())
         dE = {az: float(np.linalg.norm(np.array(v["lab"]) - ref)) for az, v in good.items()}
-        best = min(dE.values())
-        M["colour"] = {"ref_lab": [round(float(x), 2) for x in ref], "ref_sat": round(ref_sat, 4),
-                       "dE": {k: round(x, 1) for k, x in dE.items()}}
-        if best > 35: errs.append(f"the colours are far from the picture (mean colour difference {best:.0f} ΔE)")
-        elif best > 18: warns.append(f"the colours differ from the picture (mean colour difference {best:.0f} ΔE)")
+        dEm = float(np.median(list(dE.values())))                  # every azimuth counts, not only the best one
+        dL = float(np.median([abs(v["lstat"][0] - ref_l[0]) for v in good.values()]))
+        con = float(np.median([v["lstat"][1] for v in good.values()])) / max(ref_l[1], 1e-6)
+        M["colour"] = {"ref_lab": [round(float(x), 2) for x in ref], "ref_sat": round(ref_sat, 4), "ref_l": [round(x, 2) for x in ref_l],
+                       "dE": {k: round(x, 1) for k, x in dE.items()}, "dE_median": round(dEm, 1), "dL": round(dL, 1), "contrast": round(con, 3)}
+        if dEm > 30: errs.append(f"the colours are far from the picture (mean colour difference {dEm:.0f} ΔE)")
+        elif dEm > 18: warns.append(f"the colours differ from the picture (mean colour difference {dEm:.0f} ΔE)")
+        if dL > 20: errs.append(f"the object is much brighter or darker than the picture ({dL:.0f} L*)")
+        elif dL > 12: warns.append(f"the object's brightness differs from the picture ({dL:.0f} L*)")
+        if ref_l[1] > 8 and con < 0.55: errs.append(f"the object lost the picture's light and dark ({con:.0%} of its contrast)")
+        elif ref_l[1] > 8 and con < 0.75: warns.append(f"the object is flatter than the picture ({con:.0%} of its contrast)")
         if ref_sat > 0.15 and max(v["sat"] for v in good.values()) < 0.05: errs.append("the colours of the picture were lost (grey object)")
     if mesh:
         if mesh.get("colour") == "none": errs.append("the 3D object has no colours")

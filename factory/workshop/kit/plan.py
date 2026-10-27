@@ -9,7 +9,8 @@ SIZE = {"sheet": 0.42, "print": 0.24, "canvas": 0.55, "cutout": 0.5, "cloth": 0.
         "box": 0.30, "disc": 0.06, "globe": 0.36, "model": 0.30, "text": 0.07, "pole": 1.8, "table": 1.4, "plinth": 1.0,
         "frame": 0.50, "wall": 3.0, "candle": 0.16, "terrain": 1.0}
 OUTDOOR = {"terrain", "sea", "sky"}
-UNIT_GEO = 0.07 / 1.8         # on a terrain or sea place a pole of size M stands 7 % of the region high: every size alike
+UNIT_GEO = 0.03 / 1.8         # on a terrain or sea place a pole of size M stands 3 % of the region high (about half the
+                              # height a flight keeps over the ground, so it is seen from above): every size alike
 HUNG = {"sheet", "print", "canvas", "frame", "cloth", "text"}    # what hangs on the wall of a "wall" place
 WALL_C = 1.45                 # height of the centre of the hung row (m)
 FLAT = {"sheet", "print", "canvas", "frame", "block", "text"}
@@ -186,6 +187,24 @@ def layout(cast, aspects, sizes=None, place="desk", unit=1.0, fixed=None, groups
             R = M.get(ref)
             if R is None or not R["placed"]: continue
             g = GAP * max(m["w"], R["w"])
+            if place == "wall" and r not in ("on", "in", "around"):
+                if cast[n]["is"] in HUNG and r != "in_front_of":        # a flat thing beside a hung one hangs on the wall too
+                    if not m.get("upright"): hang(m)
+                    m["y"] = R["y"] - R["d"] / 2 + m["d"] / 2 if R.get("upright") else -m["d"] / 2 - 0.004
+                    zc = R["z"] + R["h"] / 2 if R.get("upright") else WALL_C
+                    if r in ("left_of", "right_of", "beside", "behind", "against"):
+                        sgn = -1 if r == "left_of" else 1
+                        m["x"] = R["x"] + sgn * (R["w"] / 2 + g + m["w"] / 2); m["z"] = zc - m["h"] / 2
+                    elif r == "above":
+                        m["x"] = R["x"]; m["z"] = (R["z"] + R["h"] if R.get("upright") else WALL_C) + g
+                    else:                                                # under
+                        m["x"] = R["x"]; m["z"] = max(0.3, (R["z"] if R.get("upright") else WALL_C) - g - m["h"])
+                    m["placed"] = True; continue
+                if R.get("upright"):                                     # a standing thing next to a hung one: on the floor
+                    sgn = -1 if r == "left_of" else (1 if r in ("right_of", "beside") else 0)
+                    m["x"] = R["x"] + sgn * (R["w"] / 2 + g + m["w"] / 2)
+                    m["y"] = R["y"] - R["d"] / 2 - 0.45 - m["d"] / 2; m["z"] = 0.0
+                    m["placed"] = True; continue
             if r in ("on", "in"):
                 sib = [x for x in rel if cast[x]["where"] in (["on", ref], ["in", ref])]
                 cnt = len(sib); idx = sib.index(n)
@@ -464,12 +483,16 @@ def camera(entries, M, C, T, place, labels=(), fly=None, extra_pts=None):
     names = list(M)
     E0 = ELEV.get(place, 40.0); A0 = -90.0 + jitter("camera", place, 7.0)
 
-    def pts_of(name):
-        """every place the member(s) will be while on their support (falling in from above the frame is not framed)"""
+    def pts_of(name, w=None):
+        """every place the member(s) will be while on their support during the frames w = (f0, f1) of a shot (the whole
+        scene when w is None; falling in from above the frame is not framed)"""
         out = []
+        f0, f1 = (0, n - 1) if w is None else (max(0, min(n - 1, w[0])), max(0, min(n - 1, w[1])))
         for k in ([name] if name else names):
             ch, m = C[k], M[k]
-            frs = [fi for fi in list(range(0, n, 15)) + [n - 1] if ch["presence"][fi] >= 0.5 and abs(ch["dz"][fi]) < 0.05 + 0.2 * m["h"]]
+            frs = [fi for fi in list(range(f0, f1 + 1, 15)) + [f1] if ch["presence"][fi] >= 0.5 and abs(ch["dz"][fi]) < 0.05 + 0.2 * m["h"]]
+            if not frs and w is not None:                            # not there in this shot: where it is in the scene
+                frs = [fi for fi in list(range(0, n, 15)) + [n - 1] if ch["presence"][fi] >= 0.5 and abs(ch["dz"][fi]) < 0.05 + 0.2 * m["h"]]
             out += [box_points(m, ch, fi) for fi in frs] or [box_points(m)]
             if k in labels:                                         # the label sits under the member's front edge
                 q = box_points(m); q[:, 1] -= 0.18 * max(m["d"], 0.1); out.append(q)
@@ -477,8 +500,8 @@ def camera(entries, M, C, T, place, labels=(), fly=None, extra_pts=None):
 
     def center(p): return 0.5 * (p.min(0) + p.max(0))
 
-    def frame_state(kind, name, st):
-        p = pts_of(name); c = center(p)
+    def frame_state(kind, name, st, w=None):
+        p = pts_of(name, w); c = center(p)
         el = {"top": 86.0, "low": 14.0}.get(kind, st["E"] if st else E0)
         az = st["A"] if st else A0
         marg = 0.12 if kind == "close" else 0.08
@@ -490,7 +513,9 @@ def camera(entries, M, C, T, place, labels=(), fly=None, extra_pts=None):
 
     es = sorted(entries, key=lambda e: e["t"])
     first = es[0]
-    st = frame_state(first["move"] if first["move"] in ("wide", "close", "top", "low") else "wide", first.get("to"), None)
+    win = lambda t0_, t1_: (int(round(t0_ * FPS)), int(round(min(t1_, T) * FPS)) - 1)
+    st = frame_state(first["move"] if first["move"] in ("wide", "close", "top", "low") else "wide", first.get("to"), None,
+                     win(0.0, es[1]["t"] if len(es) > 1 else T))
     if first["move"] == "fly" and fly and 0 in fly:                 # a flight from the first frame: it starts on its path
         p0, t0_ = fly[0](0.0); v = p0 - t0_; dd = float(np.linalg.norm(v))
         st = dict(st, T=t0_, D=dd, A=math.degrees(math.atan2(v[1], v[0])), E=math.degrees(math.asin(np.clip(v[2] / dd, -1, 1))))
@@ -510,18 +535,21 @@ def camera(entries, M, C, T, place, labels=(), fly=None, extra_pts=None):
         if cur.get("track") and mv != "track":                         # leave a tracking shot from where it got to
             cur = dict(cur, T=cur["T"] + offset(cur["track"], e["t"]), track=None)
         g = dict(cur); g.pop("rack_from", None)
-        if mv in ("wide", "close", "top", "low"): g = frame_state(mv, nm, cur)
+        w = win(float(e["t"]), nxt)                                    # what this shot shows: from its start to the next one
+        if mv in ("wide", "close", "top", "low"): g = frame_state(mv, nm, cur, w)
         elif mv == "push":                                             # always closer than before
-            if nm: g = frame_state("close", nm, cur); g["D"] = min(g["D"], 0.8 * cur["D"])
+            if nm: g = frame_state("close", nm, cur, w); g["D"] = min(g["D"], 0.8 * cur["D"])
             else: g["D"] = cur["D"] * 0.62
         elif mv == "pull":
-            g = frame_state("wide", None, cur) if not nm else frame_state("wide", nm, cur); g["D"] = max(g["D"], cur["D"] * 1.5)
+            g = frame_state("wide", None, cur, w) if not nm else frame_state("wide", nm, cur, w); g["D"] = max(g["D"], cur["D"] * 1.5)
         elif mv in ("orbit", "crane", "tilt"):
-            if nm: g["T"] = center(pts_of(nm)); g["pts"] = nm               # the move ends framed on that member
+            p_ = pts_of(nm if nm else g.get("pts"), w)
+            g["T"] = center(p_)                                        # the move ends framed on what is there by then
+            if nm: g["pts"] = nm
             if mv == "orbit": g["A"] = cur["A"] + float(e.get("deg", 35))
             elif mv == "crane": g["E"] = min(86.0, cur["E"] + float(e.get("h", 0.3)) * 50.0)
             else: g["E"] = float(np.clip(cur["E"] + float(e.get("deg", -15)), 6.0, 88.0))
-            g["D"] = fit(pts_of(g["pts"]), g["T"], g["E"], g["A"], 0.08)
+            g["D"] = fit(p_, g["T"], g["E"], g["A"], 0.08)
         elif mv == "dolly":
             a = math.radians(cur["A"] + 90.0); sd = float(e.get("side", 1.0))
             g["T"] = cur["T"] + sd * 0.28 * cur["D"] * np.array([math.cos(a), math.sin(a), 0.0])

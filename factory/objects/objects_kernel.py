@@ -183,7 +183,8 @@ for j in todo:
     t = time.time()
     samples = 256 if j["kind"] == "icon" else 160
     r = sh(f"/tmp/blender/blender -b --python-exit-code 1 -P /tmp/vm/factory/objects/render_obj.py -- --mesh {j['mesh']} "
-           f"--out {W} --name {j['rkey']} --res 768 --samples {samples} --views {VIEWS} --gpu OPTIX", check=False, timeout=3600)
+           f"--out {W} --name {j['rkey']} --res 768 --samples {samples} --views {VIEWS} --gpu OPTIX --ref {j['cut_path']}",
+           check=False, timeout=3600)
     for l in r.stdout.splitlines():
         if l.startswith(("GPU devices", "rendered", "OBJECT ERROR")): log(j["name"], l[:200])
     pngs = [f"{j['rkey']}_a{az}.png" for az in VIEWS.split(",")]

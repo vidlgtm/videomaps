@@ -607,6 +607,7 @@ class Stage:
             f = (Vector(p) - fb).length if fa is None else (1 - x) * (Vector(p) - fa).length + x * (Vector(p) - fb).length
             fd.append(f)
         keys(cam, "location", np.array(loc)); keys(cam, "rotation_quaternion", np.array(rot))
+        PR.route_widths(self)                                           # lines on a region: steady width on screen
         cd.dof.use_dof = True
         keys(cd.dof, "focus_distance", np.array(fd)); keys(cd.dof, "aperture_fstop", plan["fstop"])
 
@@ -706,11 +707,11 @@ class Stage:
 
     def checks(self):
         """labels (tracks for the overlay), cast members cut by the frame or showing as a thin sliver while they are held,
-        members passing through each other"""
+        members passing through each other, pictures seen almost edge-on, a cast lost in a big empty frame"""
         sc, cam = self.sc, self.cam
         LAB = self.labels; tracks = {f"{x['who']}#{i}": [] for i, x in enumerate(LAB)}
         CHW = 0.5 * 45
-        cut, sliver, lout, lover, overl = {}, {}, {}, {}, {}
+        cut, sliver, lout, lover, overl, edgeon, cover = {}, {}, {}, {}, {}, {}, []
         support = {(n, c["where"][1]) for n, c in self.cast.items() if c.get("where") and c["where"][0] in ("on", "in")}
         support |= {(b["who"], b.get("on")) for b in self.beats if b["do"] == "stack"}
         for fr in range(1, self.n + 1):
@@ -734,6 +735,24 @@ class Stage:
             # (during a camera move things cross the frame edge naturally; a big support such as a plinth may be cut)
             if not self.plan["steady"][fi]: continue
             subj = self.plan["subject"][fi]
+            for p in self.pics:                                        # a picture turned almost edge-on shows as a line
+                n = p["member"]
+                if p.get("obj") is None or p.get("deforms") or p.get("pieces") or not self.visible(n, fi) or self.moving(n, fi): continue
+                if self.ch[n]["open"][fi] not in (0.0, 1.0) or (self.L[n]["noun"] == "box" and self.ch[n]["open"][fi] > 0): continue
+                mw = p["obj"].matrix_world; nrm = (mw.to_3x3() @ Vector((0.0, 0.0, 1.0))).normalized()
+                vd = (mw.translation - cam.matrix_world.translation).normalized()
+                if abs(nrm.dot(vd)) < 0.3: edgeon.setdefault(n, []).append(round(t, 1))
+            if self.place not in P.OUTDOOR:                            # how much of the frame the cast fills
+                bx = []
+                for n in self.L:
+                    if not self.visible(n, fi): continue
+                    vs = [world_to_camera_view(sc, cam, p) for p in self.corners(n, fi)]
+                    if any(p.z <= 0 for p in vs): continue
+                    bx.append((min(p.x for p in vs), min(p.y for p in vs), max(p.x for p in vs), max(p.y for p in vs)))
+                if bx:
+                    x0 = max(0.0, min(b[0] for b in bx)); y0 = max(0.0, min(b[1] for b in bx))
+                    x1 = min(1.0, max(b[2] for b in bx)); y1 = min(1.0, max(b[3] for b in bx))
+                    cover.append((max(0.0, x1 - x0) * max(0.0, y1 - y0), round(t, 1)))
             for n in self.L:
                 if not self.visible(n, fi) or self.moving(n, fi): continue
                 vs = [world_to_camera_view(sc, cam, p) for p in self.corners(n, fi)]
@@ -775,6 +794,10 @@ class Stage:
         for k, ts in sliver.items(): E.append(f"only a thin sliver of {k} shows at the frame edge ({ts[0]:.1f}-{ts[-1]:.1f} s)")
         for k, ts in cut.items(): E.append(f"{k} is cut by the frame edge while it is held ({ts[0]:.1f}-{ts[-1]:.1f} s)")
         for k, ts in overl.items(): E.append(f"{k[0]} and {k[1]} pass through each other ({ts[0]:.1f}-{ts[-1]:.1f} s)")
+        for k, ts in edgeon.items(): E.append(f"the picture of {k} is seen almost edge-on while it is held ({ts[0]:.1f}-{ts[-1]:.1f} s)")
+        if cover:
+            a_, t_ = min(cover)
+            if a_ < 0.12: W.append(f"the cast fills only {a_:.0%} of the frame at {t_:.1f} s (frame it closer)")
         return {"cut": cut, "sliver": sliver, "overlap": {f"{a}+{b}": v for (a, b), v in overl.items()}}
 
     def crosses(self, k, fi, x0, x1, y0, y1):
@@ -789,12 +812,13 @@ class Stage:
 
     def fidelity(self, out, key_frames, ext):
         """rendered picture pixels against the picture files at the key frames where a picture is held lit and whole"""
-        def pixels(path):
+        def pixels(path, alpha=False):
             im = bpy.data.images.load(os.path.abspath(path), check_existing=False)
             try: im.colorspace_settings.name = "Non-Color"
             except Exception: pass
             w_, h_ = im.size; a_ = np.empty(w_ * h_ * 4, np.float32); im.pixels.foreach_get(a_); bpy.data.images.remove(im)
-            return a_.reshape(h_, w_, 4)[..., :3]
+            a_ = a_.reshape(h_, w_, 4)
+            return a_ if alpha else a_[..., :3]
         lin_ = lambda c: np.where(c <= 0.04045, c / 12.92, ((c + 0.055) / 1.055) ** 2.4)
         srgb = lambda c: np.where(c <= 0.0031308, c * 12.92, 1.055 * np.power(np.maximum(c, 0.0), 1 / 2.4) - 0.055)
         yl = lambda c: lin_(c) @ np.array([0.2126, 0.7152, 0.0722])
@@ -814,7 +838,7 @@ class Stage:
             self.sc.frame_set(f); self.frame_mats(fi); o, rows = C.cam_rays(self.sc, self.cam, nx, ny)
             for p in held:
                 k = p["member"]
-                if k not in imgs: imgs[k] = pixels(p["path"])
+                if k not in imgs: imgs[k] = pixels(p["path"], alpha=bool(p.get("alpha")))     # a cut-out: only its opaque part counts
                 fa = imgs[k]; mw = p["obj"].matrix_world
                 cv = [world_to_camera_view(self.sc, self.cam, mw @ Vector((sx * p["iw"] / 2 - p.get("ox", 0.0), sy * p["ih"] / 2 - p.get("oy", 0.0), 0.0)))
                       for sx in (-1, 1) for sy in (-1, 1)]
@@ -824,7 +848,9 @@ class Stage:
                     a = fa
                     if by > 1 or bx > 1:
                         h2, w2 = a.shape[0] // by * by, a.shape[1] // bx * bx
-                        a = srgb(lin_(a[:h2, :w2]).reshape(h2 // by, by, w2 // bx, bx, 3).mean(axis=(1, 3)))
+                        rgb_ = srgb(lin_(a[:h2, :w2, :3]).reshape(h2 // by, by, w2 // bx, bx, 3).mean(axis=(1, 3)))
+                        if a.shape[2] == 4: rgb_ = np.concatenate([rgb_, a[:h2, :w2, 3:].reshape(h2 // by, by, w2 // bx, bx, 1).min(axis=(1, 3))], -1)
+                        a = rgb_
                     seen[(k, by, bx)] = a
                 fa = seen[(k, by, bx)]
                 hk = np.zeros((ny, nx), bool); ex = np.zeros((ny, nx, 3), np.float32)
@@ -835,7 +861,9 @@ class Stage:
                         x, y = r[1].x + p.get("ox", 0.0), r[1].y + p.get("oy", 0.0)
                         if not (abs(x) < p["iw"] / 2 and abs(y) < p["ih"] / 2): continue
                         u, v = x / p["iw"] + 0.5, y / p["ih"] + 0.5
-                        ex[j, i_] = fa[min(max(int(v * fa.shape[0]), 0), fa.shape[0] - 1), min(max(int(u * fa.shape[1]), 0), fa.shape[1] - 1)]
+                        px_ = fa[min(max(int(v * fa.shape[0]), 0), fa.shape[0] - 1), min(max(int(u * fa.shape[1]), 0), fa.shape[1] - 1)]
+                        if fa.shape[2] == 4 and px_[3] < 0.98: continue          # transparent part of a cut-out: what is behind shows
+                        ex[j, i_] = px_[:3]
                         hk[j, i_] = True
                 ok = hk.copy(); pk = np.pad(hk, 2, constant_values=False); pe = np.pad(ex, ((2, 2), (2, 2), (0, 0)))
                 for dj in range(-2, 3):

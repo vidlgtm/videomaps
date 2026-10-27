@@ -9,7 +9,7 @@
    "width": 3791,
    "height": 3792,
    "licence": "CC0",
-   "author": "This file was donated to Wikimedia Commons as part of a proje…",
+   "author": "The Metropolitan Museum of Art",
    "source": "https://commons.wikimedia.org/wiki/File:Helmet_MET_DP124368.jpg",
    "title": "Helmet MET DP124368.jpg",
    "page": null,
@@ -44,6 +44,21 @@
    "title": "Torah crown (keter) MET DP334408.jpg",
    "page": null,
    "from": "https://upload.wikimedia.org/wikipedia/commons/4/43/Torah_crown_%28keter%29_MET_DP334408.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+   "stored": "2026-10-27"
+  },
+  "keter_full": {
+   "file": "keter_full.jpg",
+   "sha256": "1ed9e9c2f232f19f84b2d65a24822e7fb5302e887b476e5633c99aa37ba6571f",
+   "bytes": 1886870,
+   "mime": "image/jpeg",
+   "width": 3913,
+   "height": 3096,
+   "licence": "CC0",
+   "author": "Andrea Zambelli",
+   "source": "https://commons.wikimedia.org/wiki/File:Torah_crown_(keter)_MET_DP334411.jpg",
+   "title": "Torah crown (keter) MET DP334411.jpg",
+   "page": null,
+   "from": "https://upload.wikimedia.org/wikipedia/commons/0/00/Torah_crown_%28keter%29_MET_DP334411.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
    "stored": "2026-10-27"
   },
   "lenin": {
