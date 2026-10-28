@@ -1,0 +1,155 @@
+{
+ "photos": {
+  "kazan": {
+   "src": "kazan",
+   "use": "banner",
+   "what": "Kazan Kremlin"
+  },
+  "tallinn": {
+   "src": "tallinn",
+   "use": "banner",
+   "what": "Tallinn"
+  },
+  "lenin": {
+   "src": "lenin",
+   "use": "portrait",
+   "what": "Lenin (1920)"
+  },
+  "redarmy": {
+   "src": "redarmy",
+   "use": "banner",
+   "what": "Red Army in Moscow"
+  },
+  "treaty1922": {
+   "src": "treaty1922",
+   "use": "document",
+   "what": "Treaty on the Creation of the USSR (1922)"
+  },
+  "stalin": {
+   "src": "stalin",
+   "use": "portrait",
+   "what": "Stalin"
+  },
+  "gulag": {
+   "src": "gulag",
+   "use": "banner",
+   "what": "White Sea Canal"
+  },
+  "const1936": {
+   "src": "const1936",
+   "use": "document",
+   "what": "USSR Constitution (1936)"
+  },
+  "const1936_a13": {
+   "src": "const1936_a13",
+   "use": "document",
+   "what": "USSR Constitution (1936)"
+  },
+  "const1936_a17": {
+   "src": "const1936_a17",
+   "use": "document",
+   "what": "USSR Constitution (1936)"
+  },
+  "winterwar": {
+   "src": "winterwar",
+   "use": "banner",
+   "what": "Winter War"
+  },
+  "crimea1954": {
+   "src": "crimea1954",
+   "use": "document",
+   "what": "Transfer of Crimea (1954)"
+  },
+  "gorbachev": {
+   "src": "gorbachev",
+   "use": "portrait",
+   "what": "Gorbachev (1987)"
+  },
+  "balticway": {
+   "src": "balticway",
+   "use": "banner",
+   "what": "Baltic Way"
+  },
+  "lithuania90": {
+   "src": "lithuania90",
+   "use": "banner",
+   "what": "Lithuania, 11 Mar 1990"
+  },
+  "tanks91": {
+   "src": "tanks91",
+   "use": "banner",
+   "what": "Moscow, 20 Aug 1991"
+  },
+  "belovezha": {
+   "src": "belovezha",
+   "use": [
+    "document",
+    "scene"
+   ],
+   "what": "Belovezha, 8 Dec 1991"
+  },
+  "viskuli": {
+   "src": "viskuli",
+   "use": "banner",
+   "what": "Viskuli, 8 Dec 1991"
+  },
+  "almaata": {
+   "src": "almaata",
+   "use": "banner",
+   "what": "Alma-Ata, 21 Dec 1991"
+  },
+  "grozny": {
+   "src": "grozny",
+   "use": "banner",
+   "what": "Grozny 1995"
+  },
+  "bender": {
+   "src": "bender",
+   "use": "banner",
+   "what": "Bender 1992"
+  },
+  "sukhumi": {
+   "src": "sukhumi",
+   "use": "banner",
+   "what": "Sukhumi"
+  }
+ },
+ "documents": {
+  "article72": {
+   "layout": "article",
+   "head": "CONSTITUTION OF THE USSR  ·  1977",
+   "title": "Article 72",
+   "body": [
+    "Each Union Republic shall retain",
+    "the right freely to secede",
+    "from the USSR."
+   ],
+   "underline": 1,
+   "what": "Constitution of the USSR (1977), Article 72"
+  },
+  "uti": {
+   "layout": "maxim",
+   "title": "Uti possidetis juris",
+   "gloss": [
+    "new states inherit the borders",
+    "they held as administrative units"
+   ],
+   "seal": "1991",
+   "what": "Uti possidetis juris"
+  }
+ },
+ "signatures": {
+  "yeltsin": {
+   "src": "yeltsin",
+   "what": "Signature of Boris Yeltsin"
+  },
+  "kravchuk": {
+   "src": "kravchuk",
+   "what": "Signature of Leonid Kravchuk"
+  },
+  "shushkevich": {
+   "src": "shushkevich",
+   "what": "Signature of Stanislav Shushkevich"
+  }
+ }
+}
