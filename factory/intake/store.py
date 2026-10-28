@@ -169,7 +169,8 @@ def put(order, key, raw, mime, meta, replace):
     item = {"file": name, "sha256": hashlib.sha256(raw).hexdigest(), "bytes": len(raw), "mime": mime, "width": w, "height": h,
             **meta, "stored": time.strftime("%Y-%m-%d", time.gmtime())}
     m["items"][key] = item; save_manifest(order, m)
-    print(f'stored {key}: {name} {len(raw):,} B {w}x{h} | {item["licence"]} | {item["author"]} | {item["source"]}', flush=True)
+    size = f"{w}x{h}" if w and h else item.get("mime", "")
+    print(f'stored {key}: {name} {len(raw):,} B {size} | {item["licence"]} | {item["author"]} | {item["source"]}', flush=True)
 
 
 # ------------------------------------------------------------------ Wikimedia Commons
