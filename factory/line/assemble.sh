@@ -28,14 +28,16 @@ echo "frames in parts: $SUM (expected $TOTAL)"; test $SUM -eq $TOTAL
 # frames into 129 s.)
 read -r WID HEI <<< "$(ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0:s=x "$(head -n1 parts.txt)" | head -n1 | tr 'x' ' ' | tr -cd '0-9 ')"
 FS=$(( WID * HEI * 3 / 2 ))                          # bytes of one yuv420p frame
-dec() { ffmpeg -v error -nostdin -ignore_editlist 1 -i "$1" -map 0:v:0 -vf "settb=1/30,setpts=N" -fps_mode passthrough \
-          -pix_fmt yuv420p -f rawvideo -; }
+# (rawvideo has no timestamps: the muxer only logs "non monotonically increasing dts" at the sub-range joins of a part
+#  and writes every frame - fps_mode passthrough never drops one; that line is not a decode error)
+dec() { ffmpeg -v error -nostdin -ignore_editlist 1 -i "$1" -map 0:v:0 -fps_mode passthrough -pix_fmt yuv420p -f rawvideo -; }
 BAD=0
 for f in $(cat parts.txt); do
   wh=$(ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0:s=x "$f" | head -n1 | tr -cd '0-9x')
-  p=$(frames "$f"); by=$(dec "$f" 2> "$f.err" | wc -c); e=$(grep -c . "$f.err" || true)
+  p=$(frames "$f"); by=$(dec "$f" 2> "$f.err" | wc -c); e=$(grep -v "non monotonically increasing dts to muxer" "$f.err" | grep -c . || true)
   echo "$(basename "$f"): ${wh}, packets $p, decoded frames $(( by / FS )) (+$(( by % FS )) bytes), decode errors $e"
-  [ "$wh" = "${WID}x${HEI}" ] && [ $(( by % FS )) -eq 0 ] && [ $(( by / FS )) -eq "$p" ] && [ "$e" -eq 0 ] || { BAD=1; head -5 "$f.err"; }
+  [ "$wh" = "${WID}x${HEI}" ] && [ $(( by % FS )) -eq 0 ] && [ $(( by / FS )) -eq "$p" ] && [ "$e" -eq 0 ] \
+    || { BAD=1; grep -v "non monotonically increasing dts to muxer" "$f.err" | head -5; }
 done
 [ $BAD = 0 ] || { echo "refused: a part does not decode to exactly its frames (see above)"; exit 1; }
 for f in $(cat parts.txt); do dec "$f"; done | ffmpeg -v error -nostdin -y -f rawvideo -pix_fmt yuv420p -s "${WID}x${HEI}" -framerate 30 -i - \
