@@ -13,6 +13,8 @@ name: film
 #   stills   : every asset in place, final audit, review stills + station stills + soundtrack preview -> release <tag>_stills
 #              stage render continues only when order.json "approved": {"stills": "<key of these stills>"}
 #   render   : parallel parts (3 browsers each, self-check)   final: frame-exact assembly, QA -> release <tag>
+#              (parts_from=<run id>: the parts of an earlier render of the order when only its assembly failed)
+#   the check job also runs the assembly self-test, so the final step is proven before anything renders
 # stage voice: check + voice only -> release <tag>_voice (words.txt = the time of every word, timeline, subtitles,
 #              listening copy), to time the 3D shots and the plan on the real read before anything else runs.
 # Result tags start with film_; earlier releases are only read.
@@ -22,11 +24,14 @@ on:
       order: { description: 'order folder (factory/orders/<name>)', required: true }
       stage: { description: 'voice (the read + word times only) | stills (review stills + soundtrack) | render (the film; stills approved in order.json)', default: 'stills' }
       tag: { description: 'result release tag, film_... (empty = film_<order>)', default: '' }
+      parts_from: { description: 'render only: the run id of an earlier render of this order whose parts all succeeded and only the assembly failed - its parts are used, nothing renders again', default: '' }
+run-name: film ${{ inputs.order }} ${{ inputs.stage || 'stills' }}${{ inputs.parts_from && format(' (parts of run {0})', inputs.parts_from) || '' }}
 concurrency:
   group: film-${{ inputs.order }}
   cancel-in-progress: false
 permissions:
   contents: write
+  actions: read
 env:
   ORDER: ${{ inputs.order }}
   STAGE: ${{ inputs.stage || 'stills' }}
@@ -58,6 +63,8 @@ jobs:
         if: hashFiles(format('factory/orders/{0}/store.json', inputs.order)) != ''
         env: { GH_TOKEN: "${{ github.token }}" }
         run: python3 factory/intake/store.py verify $OD
+      - name: Assembly self-test - the final step (same script, same ffmpeg) on small parts, before anything renders
+        run: bash production/ci/ffmpeg.sh && pip install -q "pillow==11.2.1" && bash factory/line/selftest_assembly.sh
 
   voice:
     needs: check
@@ -623,7 +630,7 @@ jobs:
 
   render:
     needs: stills
-    if: ${{ needs.stills.outputs.approved == '1' }}
+    if: ${{ needs.stills.outputs.approved == '1' && inputs.parts_from == '' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     strategy:
@@ -663,13 +670,22 @@ jobs:
 
   final:
     needs: [stills, render]
-    if: ${{ needs.stills.outputs.approved == '1' }}
+    if: ${{ !cancelled() && needs.stills.outputs.approved == '1' && (needs.render.result == 'success' || (inputs.parts_from != '' && needs.render.result == 'skipped')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
       - uses: actions/download-artifact@v4
+        if: ${{ inputs.parts_from == '' }}
         with: { pattern: 'part-*', path: parts, merge-multiple: true }
+      - name: Parts of an earlier run - same order, same approved stills, nothing that makes the parts changed since
+        if: ${{ inputs.parts_from != '' }}
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: python3 factory/line/reuse_parts.py "${{ inputs.parts_from }}" "$OD"
+      - uses: actions/download-artifact@v4
+        if: ${{ inputs.parts_from != '' }}
+        with: { pattern: 'part-*', path: parts, merge-multiple: true, run-id: "${{ inputs.parts_from }}", github-token: "${{ github.token }}" }
       - uses: actions/download-artifact@v4
         with: { name: audio-master, path: audio }
       - uses: actions/download-artifact@v4
