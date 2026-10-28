@@ -103,7 +103,7 @@
    ]
   },
   "gallery_banner": {
-   "idea": "In a hazy gallery a cloth banner of old Tallinn unfolds on the wall beside a lit print of soldiers while a silk flag stirs on its pole.",
+   "idea": "In a hazy gallery a cloth banner of old Tallinn unfolds on the wall beside a lit print of soldiers while the Soviet flag stirs on its pole.",
    "seconds": 3,
    "output": "film",
    "place": {
@@ -136,6 +136,7 @@
     },
     "flag": {
      "is": "cloth",
+     "from": "store:ussr_flag",
      "material": "silk",
      "where": [
       "on",
@@ -221,9 +222,5 @@
    ]
   }
  },
- "approved": {
-  "desk_treaty_box": "829c1114f3f7c5",
-  "gallery_banner": "3a24e6f9bd7aad",
-  "nordic_tiles_assemble": "c4f29310c68ba3"
- }
+ "approved": {}
 }

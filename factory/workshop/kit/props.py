@@ -188,8 +188,9 @@ def globe(st, n, c, m, e):
     st.objs[n] = objs; st.mats[n] = [wood, brass, ea]
     st.globes[n] = {"sphere": sp, "axis": ax, "r": r, "spin0": spin0}
 
-    def rig(ch, ex):                                                # "turn" spins the Earth, not the stand
-        ST.keys(sp, "rotation_euler", np.stack([np.zeros(st.n), np.zeros(st.n), spin0 + ch["rz"]], -1))
+    def rig(ch, ex):                    # "turn" spins the Earth, not the stand; it comes to rest facing "at"
+        rz = np.asarray(ch["rz"], np.float64)
+        ST.keys(sp, "rotation_euler", np.stack([np.zeros(st.n), np.zeros(st.n), spin0 + rz - rz[-1]], -1))
     return [rig]
 
 

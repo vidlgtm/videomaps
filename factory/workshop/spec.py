@@ -15,8 +15,10 @@ scenes.json
                                     "text:<words>" | "none",
                          "material": MATERIAL, "size": metres or "S"|"M"|"L", "where": [RELATION, "<name>" | "place"],
                          "region": [lon0, lat0, lon1, lat1] (a terrain block), "at": [lon, lat] (on a terrain or sea
-                         place; on a globe: the longitude facing the camera)}},
-             map refs: ISO3 | shape:<id> | rr:<region> | brk:<disputed area> (order.json); obj: = a model of objects.json
+                         place; on a globe: the place it faces when its turns end - the shot lands on it)}},
+             map refs: ISO3 | shape:<id> | rr:<region> | brk:<disputed area> (order.json); obj: = a model of objects.json;
+             a country is its home land (its dependencies and lands with their own ISO 3166-1 entry, e.g. Svalbard or
+             French Guiana, are left out); a cloth on a pole is a flag and shows its picture from the order store
    "beats":  [{"t": seconds, "do": VERB, "who": "<name>" ("place" for a route on a terrain or sea place), ...parameters}],
    "camera": [{"t": seconds, "move": MOVE, "to": "<name>", ...parameters}]   (the first one sets the opening framing)
 }}}
@@ -139,6 +141,9 @@ def check(order):
             sz = c.get("size")
             if sz is not None and not (sz in ("S", "M", "L") or (isinstance(sz, (int, float)) and 0.01 <= sz <= 50)): E(f'{cw}: size is metres (0.01-50) or S/M/L')
             wh = c.get("where")
+            if nn == "cloth" and kind != "store" and isinstance(wh, list) and len(wh) == 2 and wh[0] == "on" and \
+                    isinstance(cast.get(wh[1]), dict) and cast[wh[1]].get("is") == "pole":
+                E(f'{cw}: a cloth on a pole is a flag - "from": "store:<key>", the picture of that flag in the order store')
             if wh is not None:
                 if not (isinstance(wh, list) and len(wh) == 2 and wh[0] in RELATIONS and (wh[1] in cast or wh[1] == "place") and wh[1] != n):
                     E(f'{cw}: "where" is [relation, other cast name or "place"], relations: {", ".join(sorted(RELATIONS))}')

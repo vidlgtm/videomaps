@@ -16,7 +16,7 @@ files next to it):
   models      : GLB files from the order store or from the objects stage (release objects_cache, objects.json collected)
   cut-outs    : the figure of an order-store picture (its own transparency, otherwise rembg), cropped to the figure
 Sources: base-map sources only (factory/rules/hermetic.py); heavy libraries are imported only when a scene needs them."""
-import hashlib, json, math, os, sys
+import hashlib, json, math, os, re, sys
 import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -205,11 +205,41 @@ def geo_resolver(order, store_dir):
 
     def ref(r):
         from shapely.ops import unary_union
-        gs = [G.resolve(x, shapes, regions) for x in r.split("+")]
+        gs = [home_land(gb, x, G.resolve(x, shapes, regions)) for x in r.split("+")]
         gs = [main_body(unwrap_lon(g)) if g is not None and not g.is_empty else g for g in gs]
         gs = [g for g in gs if g is not None and not g.is_empty]
         return unary_union(gs) if gs else None
     return ref, gb
+
+
+_UNITS = {}
+
+
+def home_land(gb, ref, g):
+    """a country as a piece of the map is its home land: the Natural Earth map units of that country that are
+    dependencies or have their own ISO 3166-1 entry (Svalbard, Jan Mayen and Bouvet Island of Norway; French Guiana,
+    Guadeloupe, Martinique, Reunion and Mayotte of France; the Caribbean Netherlands) are left out, as atlases and data
+    sets list them apart; regions, disputed areas and drawn shapes are kept as they are"""
+    iso = ref.split(":", 1)[1] if ref.startswith(("rep:", "ctx:")) else ref
+    if g is None or g.is_empty or not re.fullmatch(r"[A-Z0-9]{3}", iso): return g
+    if "all" not in _UNITS:
+        from shapely.prepared import prep
+        _UNITS["all"] = [(gb.props(f), gb.geom(f)) for f in gb.fetch("ne_10m_admin_0_map_units.geojson")]
+        _UNITS["all"] = [(p, gu, prep(gu)) for p, gu in _UNITS["all"] if gu is not None]
+    away = [(p.get("geounit") or p.get("name"), pg) for p, gu, pg in _UNITS["all"] if p.get("adm0_a3") == iso and
+            (p.get("type") == "Dependency" or str(p.get("iso_a3") or "-99") not in ("-99", iso))]
+    if not away: return g
+    from shapely.ops import unary_union
+    polys = [g] if g.geom_type == "Polygon" else [q for q in getattr(g, "geoms", []) if q.geom_type == "Polygon"]
+    keep, left = [], set()
+    for q in polys:
+        pt = q.representative_point()
+        hit = next((name for name, pg in away if pg.contains(pt)), None)
+        if hit: left.add(hit)
+        else: keep.append(q)
+    if not keep: return g
+    if left: print(f"{iso}: home land only - left out {', '.join(sorted(left))} (own entries of ISO 3166-1 / dependencies)", flush=True)
+    return unary_union(keep)
 
 
 def main_body(g):

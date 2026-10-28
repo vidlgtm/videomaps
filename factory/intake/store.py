@@ -4,7 +4,8 @@ textures, HDRIs), the voice takes (keys vo_<paragraph id>, mp3 / wav / flac) and
 with its licence and kept as an asset of the release "store_<order>" of this repository, listed in <orderDir>/store.json. The factory reads pictures only from there and never downloads them from a website.
 
 usage:
-  python factory/intake/store.py commons <orderDir> <key> "<Commons file name>" [--page N] [--replace]
+  python factory/intake/store.py commons <orderDir> <key> "<Commons file name>" [--page N] [--raster] [--replace]
+        --raster: a drawing (SVG) is kept as its standard PNG rendering, 1920 px wide (3D scenes take raster pictures)
   python factory/intake/store.py file    <orderDir> <key> <local file> --licence "<licence>" --author "<author>"
                                          --source <page url> [--title "<title>"] [--replace]
   python factory/intake/store.py verify  <orderDir> [--deep]     (every entry is in the release; --deep: sha256 too)
@@ -188,7 +189,7 @@ def commons_info(title, page=None, width=None):
     return ii
 
 
-def commons(order, key, title, page, replace):
+def commons(order, key, title, page, replace, raster=False):
     ii = commons_info(title, page)
     md = ii.get("extmetadata", {})
     short = plain(md.get("LicenseShortName", {}).get("value"))
@@ -199,6 +200,11 @@ def commons(order, key, title, page, replace):
     big = max(ii["width"], ii["height"])
     if page:                                                    # one page of a djvu / pdf / tif: its standard rendering
         url = ii["thumburl"]; mime = None
+    elif raster and mime == "image/svg+xml":                    # a drawing as its standard 1920 px PNG rendering
+        w = 1920 if ii["width"] >= ii["height"] else max(320, round(1920 * ii["width"] / ii["height"]))
+        j = commons_info(title, width=w)
+        if not j.get("thumburl"): die(f"{title}: no PNG rendering")
+        url = j["thumburl"]; mime = None
     elif mime in ("image/jpeg", "image/png", "image/webp", "image/gif", "image/svg+xml") and ii.get("size", 0) <= 45e6 and big <= 9000:
         url = ii["url"]                                         # the original
     else:                                                       # huge or tif: the largest standard rendering
@@ -255,7 +261,7 @@ def main(a):
     rep = "--replace" in a
     if cmd == "commons":
         if len(a) < 4: die("commons <orderDir> <key> <Commons file name> [--page N]")
-        commons(order, a[2], a[3], int(opt("--page")) if opt("--page") else None, rep)
+        commons(order, a[2], a[3], int(opt("--page")) if opt("--page") else None, rep, "--raster" in a)
     elif cmd == "file":
         if len(a) < 4: die("file <orderDir> <key> <local file> --licence .. --author .. --source ..")
         local_file(order, a[2], a[3], opt("--licence"), opt("--author"), opt("--source"), opt("--title"), rep)

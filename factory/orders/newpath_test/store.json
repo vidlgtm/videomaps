@@ -346,6 +346,21 @@
    "from": "file",
    "stored": "2026-10-28"
   },
+  "ussr_flag": {
+   "file": "ussr_flag.png",
+   "sha256": "b9029b24edfc57a9d82bd5f8d2bc6133a3a6b1f86fbac178565914b42df35539",
+   "bytes": 10720,
+   "mime": "image/png",
+   "width": 1920,
+   "height": 960,
+   "licence": "Public domain",
+   "author": "created by rotemliss from Image:Flag of the Soviet Union.svg",
+   "source": "https://commons.wikimedia.org/wiki/File:Flag_of_the_Soviet_Union_(1936_–_1955).svg",
+   "title": "Flag of the Soviet Union (1936 – 1955).svg",
+   "page": null,
+   "from": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/86/Flag_of_the_Soviet_Union_%281936_%E2%80%93_1955%29.svg/1920px-Flag_of_the_Soviet_Union_%281936_%E2%80%93_1955%29.svg.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "stored": "2026-10-28"
+  },
   "viskuli": {
    "file": "viskuli.jpg",
    "sha256": "da969de9dfad55166e05a7f081a8b97d3eeb9730557663d8e41bcf0ffc44d067",
