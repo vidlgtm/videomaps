@@ -3,7 +3,7 @@
 # release TAG (must start with film_; earlier releases are never touched).
 # usage: assemble.sh PARTS_DIR MIX_WAV TOTAL_FRAMES TAG      env: FILM_SLUG FILM_TITLE EXTRA_ASSETS REVIEW_TIMES
 # Parts can hold sub-ranges from different encoders (video pass / per-frame fallback) whose time bases differ, so
-# timestamps are regenerated from frame order (setpts=N) and the film is encoded in one continuous pass.
+# timestamps are regenerated from frame order (time base 1/30, pts = frame number) and the film is encoded in one pass.
 set -e
 # frame count of a video (digits only: newer ffprobe prints "967," with -of csv)
 frames() { ffprobe -v error -count_packets -select_streams v:0 -show_entries stream=nb_read_packets -of default=noprint_wrappers=1:nokey=1 "$1" | head -n1 | tr -cd '0-9'; }
@@ -20,11 +20,20 @@ echo "frames in parts: $SUM (expected $TOTAL)"; test $SUM -eq $TOTAL
 test $TOTAL -ge 12600 || { echo "refused: $TOTAL frames is shorter than 7 minutes"; exit 1; }
 
 IN=""; F=""; C=""; i=0
-for f in $(cat parts.txt); do IN="$IN -i $f"; F="${F}[$i:v]setpts=N/(30*TB)[v$i];"; C="${C}[v$i]"; i=$((i + 1)); done
-ffmpeg -v error -y $IN -filter_complex "${F}${C}concat=n=$N:v=1:a=0,setpts=N/(30*TB),fps=30[out]" -map "[out]" -fps_mode passthrough \
+# time base 1/30 first: N/(30*TB) in a time base that does not divide 1/30 s rounds two frames onto one tick and the fps
+# filter then drops one of them (ffmpeg 8: 32 frames lost in a 9.7 min film) - with settb=1/30 every frame keeps its own tick
+for f in $(cat parts.txt); do IN="$IN -i $f"; F="${F}[$i:v]settb=1/30,setpts=N[v$i];"; C="${C}[v$i]"; i=$((i + 1)); done
+ffmpeg -v error -y $IN -filter_complex "${F}${C}concat=n=$N:v=1:a=0,settb=1/30,setpts=N[out]" -map "[out]" -fps_mode passthrough -r 30 \
   -c:v libx264 -crf 17 -preset medium -pix_fmt yuv420p -movflags +faststart video.mp4
 FR=$(frames video.mp4)
-echo "video: $FR frames"; test $FR -eq $TOTAL
+if [ "$FR" != "$TOTAL" ]; then                        # second way: the concat demuxer, the same exact re-timing
+  echo "video: $FR frames (expected $TOTAL) - joining again with the concat demuxer"
+  for f in $(cat parts.txt); do echo "file '$PWD/$f'"; done > parts_list.txt
+  ffmpeg -v error -y -f concat -safe 0 -i parts_list.txt -vf "settb=1/30,setpts=N" -fps_mode passthrough -r 30 \
+    -c:v libx264 -crf 17 -preset medium -pix_fmt yuv420p -movflags +faststart video.mp4
+  FR=$(frames video.mp4)
+fi
+echo "video: $FR frames"; test "$FR" -eq "$TOTAL"
 
 ffmpeg -v error -y -i video.mp4 -i $MIX -map 0:v -map 1:a -c:v copy -c:a aac -b:a 320k -ar 48000 -movflags +faststart \
   -metadata title="$TITLE" ${SLUG}_final_1080p.mp4
