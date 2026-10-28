@@ -3,6 +3,9 @@
 Sources: Natural Earth 10 m (countries with lakes, admin-1 regions, disputed areas, rivers, populated places) and the
 order store (historical shapes the order brings as GeoJSON, with their licence). Everything is projected with the map's
 own formulas (mapdef.py), so borders sit exactly on the terrain.
+Worldview: Natural Earth draws borders de facto (who holds the land: Crimea inside Russia). Countries are drawn in the
+de jure view of the United States (Natural Earth point of view "usa": Crimea in Ukraine, Abkhazia and South Ossetia in
+Georgia, Baikonur in Kazakhstan, Northern Cyprus in Cyprus), with the boundary lakes cut out as in the drawing data.
 
 ids written (the places of order.json / storyboard.json):
   rep:<ISO3>      the film's countries (order.json "countries")          republics
@@ -30,6 +33,9 @@ NE = "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geoj
 UA = {"User-Agent": "videomaps-geo/1.0 (https://github.com/vidlgtm/videomaps)"}
 os.makedirs("cache", exist_ok=True)
 ERR = []
+WORLDVIEW = "usa"                        # Natural Earth point-of-view file ne_10m_admin_0_countries_<WORLDVIEW>
+WORLDVIEW_FCLASS = "fclass_us"           # the same view in the boundary-line data
+HIDDEN_LINES = ("Unrecognized", "Admin-1 boundary", "Claim boundary")   # lines that view does not draw as borders
 
 
 def fetch(name):
@@ -43,6 +49,15 @@ def fetch(name):
                 if i == 5: raise
                 time.sleep(3 + 4 * i)
     return json.load(open(p, encoding="utf-8"))["features"]
+
+
+def big_parts(g, min_area=2e-4):
+    """the polygons of g larger than min_area square degrees (about 2 km2): drops slivers where two files digitise the
+    same border slightly differently; None when nothing is left"""
+    if g is None or g.is_empty: return None
+    polys = [g] if g.geom_type == "Polygon" else [q for q in getattr(g, "geoms", []) if q.geom_type == "Polygon"]
+    keep = [q for q in polys if q.area >= min_area]
+    return unary_union(keep) if keep else None
 
 
 def props(f):
@@ -63,9 +78,19 @@ class Geo:
         lb = md.lonlat_box()
         self.llbox = box(max(-180, lb[0] - 3), max(-89.5, lb[1] - 3), min(180, lb[2] + 3), min(89.5, lb[3] + 3))
         self.frame = box(-300, -300, md.W + 300, md.H + 300)
-        self.adm0 = fetch("ne_10m_admin_0_countries_lakes.geojson")
+        self.init_countries()
         self._adm1 = None; self._brk = None
         self.cache = {}
+
+    def init_countries(self):
+        """admin-0 sources: countries with boundary lakes (the drawing), the worldview file and the default file (their
+        difference is the land the worldview gives to another country than the de facto data)"""
+        self.adm0 = fetch("ne_10m_admin_0_countries_lakes.geojson")
+        self.pov = fetch(f"ne_10m_admin_0_countries_{WORLDVIEW}.geojson")
+        self.dflt = fetch("ne_10m_admin_0_countries.geojson")
+        index = lambda fs: [({props(f).get("adm0_a3"), props(f).get("iso_a3"), props(f).get("iso_a3_eh")}, f) for f in fs]
+        self.ix = {"lakes": index(self.adm0), "pov": index(self.pov), "dflt": index(self.dflt)}
+        self.delta, self.gcache = {}, {}
 
     # ---------------------------------------------------------------- projection helpers (as the v5 geodata)
     def to_px(self, g):
@@ -120,17 +145,60 @@ class Geo:
         return f
 
     # ---------------------------------------------------------------- sources
+    def hits(self, which, iso):
+        """features of one admin-0 file that belong to country iso (its own code, ISO code or 'equivalent' code)"""
+        return [f for cs, f in self.ix[which] if iso in cs]
+
+    def _others(self, which, iso, area):
+        """union of the features of one admin-0 file that belong to another country than iso and touch area"""
+        gs = []
+        for cs, f in self.ix[which]:
+            if iso in cs: continue
+            k = (which, id(f))
+            if k not in self.gcache: self.gcache[k] = geom(f)
+            g = self.gcache[k]
+            if g is not None and g.intersects(area): gs.append(g)
+        return unary_union(gs) if gs else None
+
+    def _delta(self, iso):
+        """(gained, lost): land the worldview gives to iso / gives to another country, compared with the de facto data.
+        Only a change of owner counts: land missing from one file (the 'usa' file has no Adjara) is a hole, not a change."""
+        if iso not in self.delta:
+            hp, hd = self.hits("pov", iso), self.hits("dflt", iso)
+            gained = lost = None
+            if [f["geometry"] for f in hp] != [f["geometry"] for f in hd]:
+                gp = unary_union([g for g in map(geom, hp) if g is not None]) if hp else None
+                gd = unary_union([g for g in map(geom, hd) if g is not None]) if hd else None
+                gained = big_parts(gp.difference(gd) if gp is not None and gd is not None else gp)
+                lost = big_parts(gd.difference(gp) if gp is not None and gd is not None else gd)
+                if gained is not None:                    # held by another country in the de facto data
+                    o = self._others("dflt", iso, gained); gained = big_parts(gained.intersection(o)) if o is not None else None
+                if lost is not None:                      # given to another country by the worldview
+                    o = self._others("pov", iso, lost); lost = big_parts(lost.intersection(o)) if o is not None else None
+            self.delta[iso] = (gained, lost)
+        return self.delta[iso]
+
+    def land(self, iso):
+        """country iso as the worldview draws it, boundary lakes cut out; None when Natural Earth has no land for it"""
+        key = "l:" + iso
+        if key not in self.cache:
+            hl = self.hits("lakes", iso)
+            g = unary_union([x for x in map(geom, hl) if x is not None]) if hl else None
+            gained, lost = self._delta(iso)
+            if gained is not None: g = gained if g is None else g.union(gained)
+            if lost is not None and g is not None: g = g.difference(lost)
+            if g is not None and not g.is_empty and not g.is_valid: g = g.buffer(0)
+            self.cache[key] = g if g is not None and not g.is_empty else None
+        return self.cache[key]
+
     def country(self, iso):
         key = "c:" + iso
         if key in self.cache: return self.cache[key]
-        hits = []
-        for f in self.adm0:
-            p = props(f)
-            if iso in (p.get("adm0_a3"), p.get("iso_a3"), p.get("iso_a3_eh")): hits.append(f)
-        if not hits:
+        g = self.land(iso)
+        hits = self.hits("pov", iso) or self.hits("lakes", iso)
+        if g is None or not hits:
             ERR.append(f'country "{iso}" is not in Natural Earth (use its ADM0_A3 code)'); self.cache[key] = None; return None
-        g = unary_union([geom(f) for f in hits if geom(f) is not None])
-        p = props(hits[0])
+        p = props(next((f for f in hits if props(f).get("adm0_a3") == iso), hits[0]))
         self.cache[key] = g
         self.cache["n:" + iso] = p.get("name_en") or p.get("name") or iso
         iso2 = str(p.get("iso_a2_eh") or p.get("iso_a2") or "").lower()
@@ -142,9 +210,24 @@ class Geo:
         return self._adm1
 
     def admin1(self, iso, pattern):
-        sel = [geom(f) for f in self.adm1() if props(f).get("adm0_a3") == iso and re.search(pattern, str(props(f).get("name") or ""), re.I)]
-        sel = [g for g in sel if g is not None]
-        if not sel: ERR.append(f'admin-1 region "{pattern}" not found in {iso}'); return None
+        """admin-1 regions of iso whose name matches pattern, in the worldview: Natural Earth files them under the country that
+        holds them (Crimea under RUS), so a region inside land the worldview gives to iso counts for iso, and one inside land
+        it gives away does not"""
+        gained, lost = self._delta(iso)
+        sel, away = [], []
+        for f in self.adm1():
+            p = props(f)
+            if not re.search(pattern, str(p.get("name") or ""), re.I): continue
+            mine = p.get("adm0_a3") == iso
+            if not mine and gained is None: continue
+            g = geom(f)
+            if g is None: continue
+            pt = g.representative_point()
+            if mine and lost is not None and lost.contains(pt): away.append(str(p.get("name"))); continue
+            if mine or gained.contains(pt): sel.append(g)
+        if not sel:
+            ERR.append(f'admin-1 region "{pattern}" not found in {iso}' +
+                       (f' ({", ".join(away)}: not part of {iso} in the worldview "{WORLDVIEW}")' if away else '')); return None
         return unary_union(sel)
 
     def disputed(self, pattern):
@@ -237,13 +320,19 @@ def main(a):
         U = unary_union(U).buffer(0.35).buffer(-0.35)
         polys = [U] if isinstance(U, Polygon) else sorted([p for p in U.geoms if isinstance(p, Polygon)], key=lambda p: -p.area)
         geo["shapes"]["frontier"] = {"id": "frontier", "d": G.line_d(MultiLineString([p.exterior for p in polys if p.area > 400]), 1.0)}
-    # every other country on the canvas
+    # every other country on the canvas, as the worldview draws it (a piece of another country is not a neighbour of its
+    # own: Baikonur is Kazakhstan, Abkhazia and South Ossetia are Georgia)
     seen = set(film)
-    for f in G.adm0:
+    adm = {props(f).get("adm0_a3") for f in G.pov}
+    for f in G.pov:
         p = props(f); iso = p.get("adm0_a3")
         if not iso or iso in seen: continue
-        g = geom(f)
-        if g is None or not g.intersects(G.llbox): continue
+        eh = p.get("iso_a3_eh")
+        if eh and eh != iso and (eh in adm or eh in film): continue
+        g0 = geom(f)
+        if g0 is None or not g0.intersects(G.llbox): continue
+        g = G.land(iso)
+        if g is None: continue
         try: gp = G.to_px(g)
         except Exception: continue
         if gp.is_empty or gp.area < 30: continue
@@ -288,7 +377,7 @@ def main(a):
     json.dump(geo, open(out, "w"), separators=(",", ":"))
     print(f"geo.json {os.path.getsize(out) / 1e6:.2f} MB: {len(geo['republics'])} countries, {len(geo['context'])} neighbours, "
           f"{len(geo['shapes'])} shapes, {len(geo['rus_republics'])} regions, {len(geo['breakaway'])} disputed, {len(geo['rivers'])} rivers, "
-          f"{len(geo['cities'])} cities | map {md.kind} {md.W}x{md.H} {md.res / 1000:.3f} km/px")
+          f"{len(geo['cities'])} cities | map {md.kind} {md.W}x{md.H} {md.res / 1000:.3f} km/px | worldview {WORLDVIEW}")
 
 
 if __name__ == "__main__":

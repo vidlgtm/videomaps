@@ -171,6 +171,30 @@
    "rep:UZB",
    "rep:KGZ",
    "rep:TKM"
+  ],
+  "Grozny": [
+   45.69,
+   43.32
+  ],
+  "Kharkiv": [
+   36.23,
+   49.99
+  ],
+  "Viskuli": [
+   23.84,
+   52.63
+  ],
+  "Sukhumi": [
+   41.02,
+   43.0
+  ],
+  "Tskhinvali": [
+   43.96,
+   42.23
+  ],
+  "Stepanakert": [
+   46.75,
+   39.82
   ]
  },
  "capitals": {
@@ -234,6 +258,98 @@
    76.95,
    43.24
   ]
+ },
+ "regions": {
+  "Tatarstan": [
+   "RUS",
+   "^Tatarstan"
+  ],
+  "Bashkortostan": [
+   "RUS",
+   "^Bashkortostan"
+  ],
+  "Chuvashia": [
+   "RUS",
+   "^Chuvash"
+  ],
+  "Mari El": [
+   "RUS",
+   "^Mariy|^Mari"
+  ],
+  "Udmurtia": [
+   "RUS",
+   "^Udmurt"
+  ],
+  "Mordovia": [
+   "RUS",
+   "^Mordov"
+  ],
+  "Chechnya": [
+   "RUS",
+   "^Chechnya|^Chechen"
+  ],
+  "Ingushetia": [
+   "RUS",
+   "^Ingush"
+  ],
+  "Dagestan": [
+   "RUS",
+   "^Dagestan"
+  ],
+  "North Ossetia": [
+   "RUS",
+   "North Ossetia"
+  ],
+  "Kabardino-Balkaria": [
+   "RUS",
+   "^Kabardin"
+  ],
+  "Karachay-Cherkessia": [
+   "RUS",
+   "^Karachay"
+  ],
+  "Adygea": [
+   "RUS",
+   "^Adyge"
+  ],
+  "Kalmykia": [
+   "RUS",
+   "^Kalmyk"
+  ],
+  "Karelia": [
+   "RUS",
+   "^Karel"
+  ],
+  "Komi": [
+   "RUS",
+   "^Komi$"
+  ],
+  "Sakha (Yakutia)": [
+   "RUS",
+   "^Sakha \\(Yakutia\\)$"
+  ],
+  "Buryatia": [
+   "RUS",
+   "^Buryat"
+  ],
+  "Tuva": [
+   "RUS",
+   "^Tuva"
+  ],
+  "Khakassia": [
+   "RUS",
+   "^Khakas"
+  ],
+  "Altai Republic": [
+   "RUS",
+   "^Gorno-Altay$"
+  ]
+ },
+ "disputed": {
+  "Abkhazia": "Abkhaz",
+  "South Ossetia": "South Ossetia",
+  "Transnistria": "Transnist|Pridnestrov",
+  "Nagorno-Karabakh": "Karabakh|Artsakh"
  },
  "datasets": {
   "homelands": [

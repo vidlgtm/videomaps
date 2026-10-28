@@ -3,7 +3,7 @@
 // Reads: <order>/order.json, narration.json, storyboard.json, assets.json (+ the line's 3D pieces), out/pack.json (processing station),
 //        data/timeline.json (voice job) + the rules. Also writes <order>/out/CREDITS.txt (YouTube description).
 // Writes: film.json (every element of the film) + <order>/out/director_report.txt. Fails with a clear message on any
-// mistake in the order (cue not in the narration, unknown place, missing asset).
+// mistake in the order (cue not in the narration, unknown place, missing asset); unknown places are all listed in one run.
 import * as fs from 'fs';
 import * as path from 'path';
 import {readJSON, exists, r3, DirectorError} from './lib/util';
@@ -12,6 +12,7 @@ import {Director} from './lib/plan';
 import {visibility, placement, rhythm, flagCuts} from './lib/fit';
 import {sound} from './lib/sound';
 import {feedbackToPatches} from './lib/feedback';
+import {UNKNOWN_PLACES, unknownPlaces} from './lib/geo';
 
 const args = process.argv.slice(2);
 const orderDir = args[0];
@@ -42,6 +43,7 @@ try {
   const fb = opt('--feedback');
   const D0 = () => { const d = new Director(o, sb, assets, K, cues, patches); d.structure(); d.parse(); d.planCamera(); d.elements(); visibility(d); placement(d); return d; };
   let d = D0();
+  if (UNKNOWN_PLACES.size) throw new DirectorError(unknownPlaces());
   if (fb && exists(fb)) {
     const prev = exists(out) ? readJSON(out) : null;
     patches = feedbackToPatches(readJSON(fb), d, prev, patches);
@@ -122,6 +124,11 @@ try {
   console.log(rep.slice(0, 8).join('\n'));
   console.log('film.json ->', out);
 } catch (e: any) {
-  if (e instanceof DirectorError) { console.error('ORDER ERROR: ' + e.message); process.exit(2); }
+  if (e instanceof DirectorError) {
+    const u = UNKNOWN_PLACES.size ? unknownPlaces() : '';          // every unknown place found before the stop, then the stop itself
+    if (u) console.error('ORDER ERROR: ' + u);
+    if (e.message !== u) console.error('ORDER ERROR: ' + e.message);
+    process.exit(2);
+  }
   throw e;
 }

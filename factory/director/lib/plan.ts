@@ -150,6 +150,7 @@ export class Director {
     const sh: Shot[] = [];
     const goBeats = this.beats.filter((b) => b.b.go !== undefined);
     goBeats.forEach((rb) => {
+      this.gaz.ctx = rb.key;
       const g = rb.b.go;
       const pl = g === 'overview' || g === 'wide' ? null : this.place(g);
       sh.push({t: rb.t, place: pl, kind: rb.b.shot ?? (pl ? 'auto' : 'wide'), key: 'cam:' + rb.key, explicit: true, box: pl?.box ?? null, pt: pl?.pt ?? null,
@@ -292,11 +293,13 @@ export class Director {
   elements() {
     for (const rb of this.beats) {
       const b = rb.b;
+      this.gaz.ctx = rb.key;
       for (const act of actionsOf(b)) {
         const fn = (this as any)['a_' + act];
         if (fn) fn.call(this, rb, b[act]);
       }
     }
+    this.gaz.ctx = '';
     this.chapterCards();
     this.fixFillOverlaps();
     this.afterWindows();
@@ -411,6 +414,7 @@ export class Director {
   }
   a_marker(rb: RB, v: any) {
     const pl = this.place(v);
+    if (pl.unknown) return;                                // already in the list of unknown places
     if (!pl.city) fail(`beat ${rb.key}: marker "${v}" must be a city of geo.json or a [lon, lat] place in order.json "places"`);
     const from = rb.t - 0.1, to = this.until(rb, rb.b.until, () => this.endDefault(rb, 2.5, 12));
     const el: any = {city: pl.city, from: r3(from), to: r3(to)};

@@ -8,7 +8,7 @@ stage render : only scenes whose current preview passed -> Kaggle GPU within eac
               <rkey>_sheet.jpg, <rkey>.json -> <orderDir>/out/workshop.json (clip assets for the director)
 stage clips  : the film line - <orderDir>/out/workshop.json from pieces already rendered (no GPU; fails when a piece
               of the current version is not rendered yet)
-keys: dkey = data (store files + prep code); vkey = look (scene + kit code + dkey);
+keys: dkey = data (store files + prep code + map code when the scene uses map data); vkey = look (scene + kit code + dkey);
       lkey = preview (vkey + preview code); rkey = clip (vkey + exposure + kernel code)
 usage: python3 factory/workshop/run.py <orderDir> --stage preview|render|clips [--blender PATH] [--release TAG] [--sha SHA] [--repo o/n] [--dry]
 env  : GH_TOKEN; KAGGLE_API_TOKEN + KAGGLE_USERNAME when the render stage has pieces to render"""
@@ -66,7 +66,9 @@ if meta_o.get("preview_only") and STAGE in ("render", "clips"): fail("this order
 store = json.load(open(ORDER / "store.json", encoding="utf-8")).get("items", {}) if (ORDER / "store.json").exists() else {}
 KITCODE = b"".join((KIT / f).read_bytes() for f in sorted(os.listdir(KIT)) if f.endswith(".py"))
 PREP, PREV, KERNEL = (HERE / "prep.py").read_bytes(), (HERE / "preview.py").read_bytes(), (HERE / "kaggle_kernel.py").read_bytes()
-GEOCODE = (HERE / "geodata.py").read_bytes() + b"".join((ROOT / "factory" / "maps" / f).read_bytes() for f in ("mapdef.py", "terrain.py", "geo_build.py"))
+GEOCODE = (HERE / "geodata.py").read_bytes()                     # builds the data of every scene (cut-outs, pieces, models, maps)
+MAPCODE = b"".join((ROOT / "factory" / "maps" / f).read_bytes() for f in ("mapdef.py", "terrain.py", "geo_build.py"))
+uses_map = lambda nd: bool(nd["tiles"] or nd["terrains"] or nd["place"] or nd["globe"] or nd["routes"] or nd["fly"] or nd["at"])
 GPU_S_PER_FRAME = 9.0                # T4 OptiX, 1920x1080, 160 samples + denoise (measured once, raised when a scene needs it)
 COST = {"terrain": 1.5, "sea": 1.5, "haze_in": 1.6, "rain": 1.3, "snow": 1.3}   # heavier scenes get a longer budget
 if any(str(c.get("from", "")).startswith("obj:") for sc in S.values() for c in (sc.get("cast") or {}).values()) \
@@ -80,7 +82,8 @@ for sid, sc in S.items():
     files = {k: store[k]["sha256"] for k in prep.used(sc) + prep.models(sc)}
     objs = {n: OBJ.get(str(c["from"])[4:], {}).get("rkey") for n, c in (sc.get("cast") or {}).items() if str(c.get("from", "")).startswith("obj:")}
     look = {k: v for k, v in sc.items() if k not in ("note", "idea")}
-    dkey = sha(files, prep.key_parts(sc), objs, PREP, GEOCODE)
+    nd = prep.key_parts(sc)                                     # the map code is a key part only of scenes drawn from map data
+    dkey = sha(files, nd, objs, PREP, GEOCODE + (MAPCODE if uses_map(nd) else b""))
     vkey = sha(look, KITCODE, dkey)
     lkey = sha(vkey, PREV)
     frames = int(round(float(sc["seconds"]) * 30))

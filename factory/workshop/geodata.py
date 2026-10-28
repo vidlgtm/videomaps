@@ -200,7 +200,7 @@ def geo_resolver(order, store_dir):
     o = json.load(open(op, encoding="utf-8")) if os.path.exists(op) else {}
     o["_dir"] = order
     G = gb.Geo.__new__(gb.Geo); G.o = o; G.store_dir = store_dir; G.md = None
-    G.adm0 = gb.fetch("ne_10m_admin_0_countries_lakes.geojson"); G._adm1 = None; G._brk = None; G.cache = {}
+    G.init_countries(); G._adm1 = None; G._brk = None; G.cache = {}
     shapes, regions = o.get("shapes") or {}, o.get("regions") or {}
 
     def ref(r):
@@ -375,6 +375,7 @@ def terrain_place(region, kind, nd, out):
 
 # ------------------------------------------------------------------ globe, models, cut-outs
 def earth(out):
+    """globe texture: Blue Marble with the land borders of the films' worldview (geo_build.WORLDVIEW)"""
     from PIL import Image, ImageDraw
     mapdef, terrain, gb = _maps()
     Image.MAX_IMAGE_PIXELS = None
@@ -383,6 +384,7 @@ def earth(out):
     im = im.convert("RGB").resize((8192, 4096), Image.LANCZOS)
     ov = Image.new("L", im.size, 0); dr = ImageDraw.Draw(ov)
     for f in gb.fetch("ne_10m_admin_0_boundary_lines_land.geojson"):
+        if str(gb.props(f).get(gb.WORLDVIEW_FCLASS) or "").startswith(gb.HIDDEN_LINES): continue   # not a border in that view
         g = f.get("geometry") or {}
         lines = g.get("coordinates", []) if g.get("type") == "MultiLineString" else [g.get("coordinates", [])]
         for ln in lines:

@@ -1,0 +1,878 @@
+{
+ "title": "Why the Soviet Union Broke Into Exactly 15 Countries",
+ "slug": "newpath_check",
+ "note": "check of the new-film path without 3D pieces: map, geography, director, map tiles, stills",
+ "countries": [
+  "RUS",
+  "UKR",
+  "BLR",
+  "KAZ",
+  "UZB",
+  "TKM",
+  "KGZ",
+  "TJK",
+  "GEO",
+  "ARM",
+  "AZE",
+  "MDA",
+  "EST",
+  "LVA",
+  "LTU"
+ ],
+ "places": {
+  "Arctic Ocean": [
+   80,
+   77.5
+  ],
+  "Black Sea": [
+   34.2,
+   43.1
+  ],
+  "Caspian Sea": [
+   50.6,
+   41.6
+  ],
+  "Baltic Sea": [
+   19.4,
+   57.4
+  ],
+  "White Sea Canal": [
+   34.8,
+   63.6
+  ],
+  "Karelian Isthmus": [
+   29.5,
+   60.6
+  ],
+  "Bender": [
+   29.6,
+   46.6
+  ],
+  "Lithuania west": [
+   22.21,
+   55.54
+  ],
+  "Saaremaa road": [
+   24.6,
+   58.4
+  ],
+  "Panevezys road": [
+   24.6,
+   55.9
+  ],
+  "Russian republics": [
+   "rr:Tatarstan",
+   "rr:Bashkortostan",
+   "rr:Chuvashia",
+   "rr:Mari El",
+   "rr:Udmurtia",
+   "rr:Mordovia",
+   "rr:Chechnya",
+   "rr:Ingushetia",
+   "rr:Dagestan",
+   "rr:North Ossetia",
+   "rr:Kabardino-Balkaria",
+   "rr:Karachay-Cherkessia",
+   "rr:Adygea",
+   "rr:Kalmykia",
+   "rr:Karelia",
+   "rr:Komi",
+   "rr:Sakha (Yakutia)",
+   "rr:Buryatia",
+   "rr:Tuva",
+   "rr:Khakassia",
+   "rr:Altai Republic"
+  ],
+  "homeland regions": [
+   "rr:Tatarstan",
+   "rr:Bashkortostan",
+   "rr:Chuvashia",
+   "rr:Mari El",
+   "rr:Udmurtia",
+   "rr:Mordovia",
+   "rr:Chechnya",
+   "rr:Ingushetia",
+   "rr:Dagestan",
+   "rr:North Ossetia",
+   "rr:Kabardino-Balkaria",
+   "rr:Karachay-Cherkessia",
+   "rr:Adygea",
+   "rr:Kalmykia",
+   "rr:Karelia",
+   "rr:Komi",
+   "rr:Sakha (Yakutia)",
+   "rr:Buryatia",
+   "rr:Tuva",
+   "rr:Khakassia",
+   "rr:Altai Republic",
+   "brk:Abkhazia",
+   "brk:South Ossetia",
+   "brk:Transnistria",
+   "brk:Nagorno-Karabakh"
+  ],
+  "Caucasus": [
+   "rep:GEO",
+   "rep:ARM",
+   "rep:AZE"
+  ],
+  "Baltic": [
+   "rep:EST",
+   "rep:LVA",
+   "rep:LTU"
+  ],
+  "Central Asia": [
+   "rep:UZB",
+   "rep:TKM",
+   "rep:TJK",
+   "rep:KGZ"
+  ],
+  "Volga republics": [
+   "rr:Tatarstan",
+   "rr:Bashkortostan",
+   "rr:Chuvashia",
+   "rr:Mari El",
+   "rr:Udmurtia",
+   "rr:Mordovia"
+  ],
+  "Western USSR": [
+   "rep:BLR",
+   "rep:UKR",
+   "rep:GEO",
+   "rep:AZE",
+   "rep:KAZ"
+  ],
+  "European USSR and Central Asia": [
+   "rep:UKR",
+   "rep:BLR",
+   "rep:KAZ",
+   "rep:TKM"
+  ],
+  "the West in 1940": [
+   "rep:EST",
+   "rep:LVA",
+   "rep:LTU",
+   "rep:BLR",
+   "rep:MDA"
+  ],
+  "Ukraine and the Caucasus": [
+   "Kyiv",
+   "Tbilisi",
+   "Yerevan",
+   "Baku"
+  ],
+  "breakaway regions": [
+   "brk:Abkhazia",
+   "brk:South Ossetia",
+   "brk:Transnistria",
+   "brk:Nagorno-Karabakh"
+  ],
+  "Kazakhstan and Central Asia": [
+   "rep:KAZ",
+   "rep:UZB",
+   "rep:KGZ",
+   "rep:TKM"
+  ],
+  "Grozny": [
+   45.69,
+   43.32
+  ],
+  "Kharkiv": [
+   36.23,
+   49.99
+  ],
+  "Viskuli": [
+   23.84,
+   52.63
+  ],
+  "Sukhumi": [
+   41.02,
+   43.0
+  ],
+  "Tskhinvali": [
+   43.96,
+   42.23
+  ],
+  "Stepanakert": [
+   46.75,
+   39.82
+  ]
+ },
+ "capitals": {
+  "EST": [
+   24.75,
+   59.44
+  ],
+  "LVA": [
+   24.11,
+   56.95
+  ],
+  "RUS": [
+   37.62,
+   55.75
+  ],
+  "LTU": [
+   25.28,
+   54.69
+  ],
+  "BLR": [
+   27.56,
+   53.9
+  ],
+  "UKR": [
+   30.52,
+   50.45
+  ],
+  "MDA": [
+   28.86,
+   47.01
+  ],
+  "GEO": [
+   44.79,
+   41.72
+  ],
+  "ARM": [
+   44.51,
+   40.18
+  ],
+  "AZE": [
+   49.87,
+   40.41
+  ],
+  "TKM": [
+   58.38,
+   37.95
+  ],
+  "UZB": [
+   69.24,
+   41.3
+  ],
+  "TJK": [
+   68.79,
+   38.56
+  ],
+  "KGZ": [
+   74.59,
+   42.87
+  ],
+  "KAZ": [
+   76.95,
+   43.24
+  ]
+ },
+ "regions": {
+  "Tatarstan": [
+   "RUS",
+   "^Tatarstan"
+  ],
+  "Bashkortostan": [
+   "RUS",
+   "^Bashkortostan"
+  ],
+  "Chuvashia": [
+   "RUS",
+   "^Chuvash"
+  ],
+  "Mari El": [
+   "RUS",
+   "^Mariy|^Mari"
+  ],
+  "Udmurtia": [
+   "RUS",
+   "^Udmurt"
+  ],
+  "Mordovia": [
+   "RUS",
+   "^Mordov"
+  ],
+  "Chechnya": [
+   "RUS",
+   "^Chechnya|^Chechen"
+  ],
+  "Ingushetia": [
+   "RUS",
+   "^Ingush"
+  ],
+  "Dagestan": [
+   "RUS",
+   "^Dagestan"
+  ],
+  "North Ossetia": [
+   "RUS",
+   "North Ossetia"
+  ],
+  "Kabardino-Balkaria": [
+   "RUS",
+   "^Kabardin"
+  ],
+  "Karachay-Cherkessia": [
+   "RUS",
+   "^Karachay"
+  ],
+  "Adygea": [
+   "RUS",
+   "^Adyge"
+  ],
+  "Kalmykia": [
+   "RUS",
+   "^Kalmyk"
+  ],
+  "Karelia": [
+   "RUS",
+   "^Karel"
+  ],
+  "Komi": [
+   "RUS",
+   "^Komi$"
+  ],
+  "Sakha (Yakutia)": [
+   "RUS",
+   "^Sakha \\(Yakutia\\)$"
+  ],
+  "Buryatia": [
+   "RUS",
+   "^Buryat"
+  ],
+  "Tuva": [
+   "RUS",
+   "^Tuva"
+  ],
+  "Khakassia": [
+   "RUS",
+   "^Khakas"
+  ],
+  "Altai Republic": [
+   "RUS",
+   "^Gorno-Altay$"
+  ]
+ },
+ "disputed": {
+  "Abkhazia": "Abkhaz",
+  "South Ossetia": "South Ossetia",
+  "Transnistria": "Transnist|Pridnestrov",
+  "Nagorno-Karabakh": "Karabakh|Artsakh"
+ },
+ "datasets": {
+  "homelands": [
+   [
+    "Moscow",
+    37.62,
+    55.76,
+    0
+   ],
+   [
+    "Kyiv",
+    30.52,
+    50.45,
+    0
+   ],
+   [
+    "Minsk",
+    27.56,
+    53.9,
+    0
+   ],
+   [
+    "Tashkent",
+    69.28,
+    41.31,
+    0
+   ],
+   [
+    "Alma-Ata",
+    76.89,
+    43.24,
+    0
+   ],
+   [
+    "Tbilisi",
+    44.79,
+    41.72,
+    0
+   ],
+   [
+    "Baku",
+    49.87,
+    40.41,
+    0
+   ],
+   [
+    "Vilnius",
+    25.28,
+    54.69,
+    0
+   ],
+   [
+    "Kishinev",
+    28.86,
+    47.01,
+    0
+   ],
+   [
+    "Riga",
+    24.11,
+    56.95,
+    0
+   ],
+   [
+    "Frunze",
+    74.59,
+    42.87,
+    0
+   ],
+   [
+    "Dushanbe",
+    68.79,
+    38.56,
+    0
+   ],
+   [
+    "Yerevan",
+    44.51,
+    40.18,
+    0
+   ],
+   [
+    "Ashkhabad",
+    58.33,
+    37.96,
+    0
+   ],
+   [
+    "Tallinn",
+    24.75,
+    59.44,
+    0
+   ],
+   [
+    "Ufa",
+    55.97,
+    54.74,
+    1
+   ],
+   [
+    "Ulan-Ude",
+    107.58,
+    51.83,
+    1
+   ],
+   [
+    "Grozny",
+    45.69,
+    43.32,
+    1
+   ],
+   [
+    "Cheboksary",
+    47.25,
+    56.13,
+    1
+   ],
+   [
+    "Makhachkala",
+    47.5,
+    42.98,
+    1
+   ],
+   [
+    "Nalchik",
+    43.62,
+    43.49,
+    1
+   ],
+   [
+    "Elista",
+    44.26,
+    46.31,
+    1
+   ],
+   [
+    "Petrozavodsk",
+    34.35,
+    61.79,
+    1
+   ],
+   [
+    "Syktyvkar",
+    50.84,
+    61.67,
+    1
+   ],
+   [
+    "Yoshkar-Ola",
+    47.89,
+    56.63,
+    1
+   ],
+   [
+    "Saransk",
+    45.18,
+    54.19,
+    1
+   ],
+   [
+    "Ordzhonikidze",
+    44.68,
+    43.02,
+    1
+   ],
+   [
+    "Kazan",
+    49.12,
+    55.79,
+    1
+   ],
+   [
+    "Kyzyl",
+    94.45,
+    51.72,
+    1
+   ],
+   [
+    "Izhevsk",
+    53.21,
+    56.85,
+    1
+   ],
+   [
+    "Yakutsk",
+    129.73,
+    62.03,
+    1
+   ],
+   [
+    "Sukhumi",
+    41.02,
+    43.0,
+    1
+   ],
+   [
+    "Batumi",
+    41.64,
+    41.64,
+    1
+   ],
+   [
+    "Nakhichevan",
+    45.41,
+    39.21,
+    1
+   ],
+   [
+    "Nukus",
+    59.6,
+    42.46,
+    1
+   ],
+   [
+    "Maykop",
+    40.1,
+    44.61,
+    2
+   ],
+   [
+    "Gorno-Altaysk",
+    85.96,
+    51.96,
+    2
+   ],
+   [
+    "Birobidzhan",
+    132.92,
+    48.79,
+    2
+   ],
+   [
+    "Cherkessk",
+    42.06,
+    44.23,
+    2
+   ],
+   [
+    "Abakan",
+    91.44,
+    53.72,
+    2
+   ],
+   [
+    "Tskhinvali",
+    43.97,
+    42.23,
+    2
+   ],
+   [
+    "Stepanakert",
+    46.75,
+    39.82,
+    2
+   ],
+   [
+    "Khorog",
+    71.55,
+    37.49,
+    2
+   ],
+   [
+    "Aginskoye",
+    114.53,
+    51.1,
+    3
+   ],
+   [
+    "Anadyr",
+    177.51,
+    64.73,
+    3
+   ],
+   [
+    "Tura",
+    100.22,
+    64.27,
+    3
+   ],
+   [
+    "Khanty-Mansiysk",
+    69.02,
+    61.0,
+    3
+   ],
+   [
+    "Kudymkar",
+    54.66,
+    59.01,
+    3
+   ],
+   [
+    "Palana",
+    159.95,
+    59.08,
+    3
+   ],
+   [
+    "Naryan-Mar",
+    53.01,
+    67.64,
+    3
+   ],
+   [
+    "Dudinka",
+    86.18,
+    69.4,
+    3
+   ],
+   [
+    "Ust-Ordynsky",
+    104.76,
+    52.81,
+    3
+   ],
+   [
+    "Salekhard",
+    66.6,
+    66.53,
+    3
+   ]
+  ]
+ },
+ "hook": {
+  "paragraphs": [
+   "01"
+  ],
+  "music": "m_hook"
+ },
+ "chapters": [
+  {
+   "n": "I",
+   "title": "The Nesting Doll",
+   "paragraphs": [
+    "02"
+   ],
+   "music": "m_origins"
+  },
+  {
+   "n": "II",
+   "title": "Stalin's Three Rules",
+   "paragraphs": [
+    "03",
+    "04"
+   ],
+   "music": "m_origins"
+  },
+  {
+   "n": "III",
+   "title": "Sixteen Becomes Fifteen",
+   "paragraphs": [
+    "05"
+   ],
+   "music": "m_annex"
+  },
+  {
+   "n": "IV",
+   "title": "The Collapse",
+   "paragraphs": [
+    "06"
+   ],
+   "music": "m_collapse"
+  },
+  {
+   "n": "V",
+   "title": "The Dolls Inside",
+   "paragraphs": [
+    "07"
+   ],
+   "music": "m_resolution"
+  },
+  {
+   "n": null,
+   "title": "Conclusion",
+   "paragraphs": [
+    "08"
+   ],
+   "music": "m_resolution",
+   "card": false
+  }
+ ],
+ "opening": {
+  "map_in": "On",
+  "text_out": "the red flag",
+  "lines": [
+   {
+    "text": "25 DECEMBER",
+    "cue": "December",
+    "kind": "kicker"
+   },
+   {
+    "text": "1991",
+    "cue": "1991",
+    "kind": "year"
+   },
+   {
+    "text": "Moscow · the Kremlin · 7:32 pm",
+    "kind": "place"
+   }
+  ]
+ },
+ "names": {
+  "sets": {
+   "modern": {
+    "rep:RUS": "RUSSIA",
+    "rep:UKR": "UKRAINE",
+    "rep:BLR": "BELARUS",
+    "rep:KAZ": "KAZAKHSTAN",
+    "rep:UZB": "UZBEKISTAN",
+    "rep:TKM": "TURKMENISTAN",
+    "rep:KGZ": "KYRGYZSTAN",
+    "rep:TJK": "TAJIKISTAN",
+    "rep:GEO": "GEORGIA",
+    "rep:ARM": "ARMENIA",
+    "rep:AZE": "AZERBAIJAN",
+    "rep:MDA": "MOLDOVA",
+    "rep:EST": "ESTONIA",
+    "rep:LVA": "LATVIA",
+    "rep:LTU": "LITHUANIA"
+   },
+   "soviet": {
+    "rep:RUS": "RUSSIAN SFSR",
+    "rep:UKR": "UKRAINIAN SSR",
+    "rep:BLR": "BYELORUSSIAN SSR",
+    "rep:KAZ": "KAZAKH SSR",
+    "rep:UZB": "UZBEK SSR",
+    "rep:TKM": "TURKMEN SSR",
+    "rep:KGZ": "KIRGHIZ SSR",
+    "rep:TJK": "TAJIK SSR",
+    "rep:GEO": "GEORGIAN SSR",
+    "rep:ARM": "ARMENIAN SSR",
+    "rep:AZE": "AZERBAIJAN SSR",
+    "rep:MDA": "MOLDAVIAN SSR",
+    "rep:EST": "ESTONIAN SSR",
+    "rep:LVA": "LATVIAN SSR",
+    "rep:LTU": "LITHUANIAN SSR"
+   }
+  },
+  "eras": [
+   {
+    "from": "start",
+    "set": "modern",
+    "neighbours": true
+   },
+   {
+    "from": "02:start",
+    "set": "soviet",
+    "neighbours": false
+   },
+   {
+    "from": "06:start",
+    "set": null,
+    "neighbours": false
+   },
+   {
+    "from": "06:fifteen independent states",
+    "set": "modern",
+    "neighbours": true
+   }
+  ],
+  "neighbours": {
+   "CHN": "CHINA",
+   "MNG": "MONGOLIA",
+   "IRN": "IRAN",
+   "AFG": "AFGHANISTAN",
+   "TUR": "TURKEY",
+   "FIN": "FINLAND",
+   "POL": "POLAND",
+   "ROU": "ROMANIA",
+   "NOR": "NORWAY",
+   "SWE": "SWEDEN",
+   "IRQ": "IRAQ",
+   "SYR": "SYRIA",
+   "PAK": "PAKISTAN",
+   "IND": "INDIA",
+   "JPN": "JAPAN",
+   "HUN": "HUNGARY",
+   "GRC": "GREECE",
+   "BGR": "BULGARIA"
+  }
+ },
+ "end": {
+  "text": "WHY THE SOVIET UNION BROKE INTO EXACTLY 15 COUNTRIES",
+  "sub": "Sources: Constitution of the USSR (1936, 1977) · 1939 & 1989 Soviet censuses · Alma-Ata Declaration (1991) · Natural Earth · historical-basemaps"
+ },
+ "music": {
+  "use": "score",
+  "cues": {
+   "m_hook": {
+    "caption": "cinematic documentary underscore, slow and solemn, low strings, soft felt piano, distant choir pad, quiet tension, no drums, instrumental",
+    "bpm": 64,
+    "key": "D minor",
+    "timesig": 4,
+    "seed": 11
+   },
+   "m_origins": {
+    "caption": "calm documentary underscore, warm strings, solo cello melody, light piano, steady and thoughtful, subtle pulse, instrumental",
+    "bpm": 76,
+    "key": "A minor",
+    "timesig": 4,
+    "seed": 12
+   },
+   "m_annex": {
+    "caption": "dark cinematic documentary underscore, low brass swells, pulsing strings, soft timpani, restrained tension, instrumental",
+    "bpm": 84,
+    "key": "C minor",
+    "timesig": 4,
+    "seed": 13
+   },
+   "m_collapse": {
+    "caption": "cinematic documentary underscore, rising tension, string ostinato, light percussion, piano motif, building momentum, instrumental",
+    "bpm": 92,
+    "key": "E minor",
+    "timesig": 4,
+    "seed": 14
+   },
+   "m_resolution": {
+    "caption": "reflective documentary underscore, gentle strings, solo piano, warm and hopeful resolution, slow, instrumental",
+    "bpm": 70,
+    "key": "F major",
+    "timesig": 4,
+    "seed": 15
+   }
+  }
+ }
+}

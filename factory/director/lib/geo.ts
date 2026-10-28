@@ -33,7 +33,16 @@ export function lonlat(wx: number, wy: number): [number, number] {
   return [Math.round(lon * 1000) / 1000, Math.round(lat * 1000) / 1000];
 }
 export type Box = [number, number, number, number];
-export type Place = {name: string; pt: [number, number]; box: Box | null; lonlat: [number, number]; ids: string[]; city?: string; shape: [number, number][]};
+export type Place = {name: string; pt: [number, number]; box: Box | null; lonlat: [number, number]; ids: string[]; city?: string; shape: [number, number][];
+  unknown?: boolean};
+/** places the order names that the map does not know, with the beats that name them: collected over the whole run so that
+ *  one run lists every one of them (a stand-in point keeps the run going; main.ts fails at the end when the list is not empty) */
+export const UNKNOWN_PLACES = new Map<string, Set<string>>();
+export function unknownPlaces(): string {
+  const xs = [...UNKNOWN_PLACES.entries()].map(([s, k]) => `"${s}"` + (k.size ? ` (beat ${[...k].sort().join(', ')})` : ''));
+  return `${xs.length} unknown place(s): ${xs.join('; ')} - use a geo.json id (rep:EST, rr:Tatarstan, ctx:FIN, shape:crimea), a city of ` +
+    `geo.json (${Object.keys(CITIES).slice(0, 8).join(', ')}, ...), or add them to order.json "places" as [lon, lat]`;
+}
 /** world-px points of an SVG path string (M/L absolute coordinates as written by geodata.py) */
 const ptsOf = (d?: string): [number, number][] => {
   if (!d) return [];
@@ -93,9 +102,15 @@ export const unionBox = (bs: (Box | null)[], pts: [number, number][] = []): Box 
   return xs.length ? [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)] : null;
 };
 
+/** letters NFD does not split into base + accent (Łódź, Tromsø, Đakovo ...) */
+const PLAIN: Record<string, string> = {'ł': 'l', 'Ł': 'L', 'ø': 'o', 'Ø': 'O', 'ß': 'ss', 'æ': 'ae', 'Æ': 'AE', 'œ': 'oe', 'Œ': 'OE', 'đ': 'd', 'Đ': 'D', 'ı': 'i', 'ħ': 'h', 'Ħ': 'H'};
+/** a name without accents and case, to match the order's spelling to the map's (Chisinau = Chișinău, Lodz = Łódź) */
+export const fold = (s: string) => s.replace(/[łŁøØßæÆœŒđĐıħĦ]/g, (c) => PLAIN[c]).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
 export class Gazetteer {
   extra: Record<string, any>;                 // order.json "places": {"Name": [lon, lat] | "id" | ["id", "Name", ...]}
   extraCities: Record<string, [number, number]> = {};
+  ctx = '';                                   // key of the beat being read (for the list of unknown places)
   constructor(extra: Record<string, any> = {}) { this.extra = extra; }
   hasPath(id: string) { return !!PATHS[id]; }
   path(id: string): PathRec { const p = PATHS[id]; if (!p) fail(`unknown map region id "${id}" (not in geo.json)`); return p; }
@@ -125,12 +140,20 @@ export class Gazetteer {
     const low = s.toLowerCase();
     const city = Object.keys(CITIES).find((c) => c.toLowerCase() === low);
     if (city) return {name: city, pt: CITIES[city].px, box: null, lonlat: CITIES[city].lonlat, ids: [], city, shape: [CITIES[city].px]};
+    const fs = fold(s), near = Object.keys(CITIES).find((c) => fold(c) === fs);
+    if (near) {                                // the same city written without its accents: the order's spelling stays on screen
+      const c = CITIES[near]; this.extraCities[s] = c.lonlat;
+      return {name: s, pt: c.px, box: null, lonlat: c.lonlat, ids: [], city: s, shape: [c.px]};
+    }
     for (const pre of ['rep:', 'rr:', 'brk:', 'shape:', 'ctx:', 'river:']) {
       const id = Object.keys(PATHS).find((k) => k.startsWith(pre) && (k.slice(pre.length).toLowerCase() === low || (PATHS[k].name ?? '').toLowerCase() === low));
       if (id) return this.resolve(id, depth + 1);
     }
-    return fail(`unknown place "${s}" - use a geo.json id (rep:EST, rr:Tatarstan, ctx:FIN, shape:crimea), a city of geo.json ` +
-      `(${Object.keys(CITIES).slice(0, 8).join(', ')}, ...), or add it to order.json "places" as [lon, lat]`);
+    const seen = UNKNOWN_PLACES.get(s) ?? new Set<string>();
+    if (this.ctx) seen.add(this.ctx);
+    UNKNOWN_PLACES.set(s, seen);
+    const pt: [number, number] = [WORLD_W / 2, WORLD_H / 2];
+    return {name: s, pt, box: null, lonlat: lonlat(pt[0], pt[1]), ids: [], shape: [pt], unknown: true};
   }
   /** expand "film" / "film-except" helpers into republic ids */
   ids(q: any, film: string[]): string[] {
@@ -139,7 +162,7 @@ export class Gazetteer {
       if (x === 'film') out.push(...film.map((i) => 'rep:' + i));
       else if (typeof x === 'string' && /^[A-Z]{3}$/.test(x) && PATHS['rep:' + x]) out.push('rep:' + x);
       else if (typeof x === 'string' && (PATHS[x] || x === 'borders' || x === 'frontier')) out.push(x);
-      else if (typeof x === 'string') { const p = this.resolve(x); if (!p.ids.length) fail(`"${x}" is a point, not a region (fill/border need a region)`); out.push(...p.ids); }
+      else if (typeof x === 'string') { const p = this.resolve(x); if (p.unknown) return; if (!p.ids.length) fail(`"${x}" is a point, not a region (fill/border need a region)`); out.push(...p.ids); }
       else fail(`bad region: ${JSON.stringify(x)}`);
     });
     return out;

@@ -1,0 +1,13 @@
+{
+ "icons": {
+  "helmet": {
+   "from": "helmet",
+   "az": 270,
+   "size": 1.0
+  }
+ },
+ "approved": {
+  "helmet": "0bba91ce69519b"
+ },
+ "note": "the helmet icon made for tools_test (same picture, same settings: the made icon is reused)"
+}

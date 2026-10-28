@@ -151,7 +151,10 @@ export function feedbackToPatches(audit: any, d: Director, film: any, patches: R
       if (wa && wb) {
         const qa = scr(c, wa as [number, number]), qb = scr(c, wb as [number, number]);
         const ang = Math.atan2(qb.y - qa.y, qb.x - qa.x), dist = Math.sqrt(v.worst) + 40;
-        if (moveAt(lo, v.t0 + 0.1, Math.cos(ang) * dist, Math.sin(ang) * dist)) continue;
+        const dx = Math.cos(ang) * dist, dy = Math.sin(ang) * dist, B0 = v.boxB ? bb(v.boxB) : null;
+        // the step away must keep the element inside the title-safe frame, or the fitting pulls it back on the next pass
+        const fits = !B0 || (B0.x0 + dx >= SF.x0 && B0.x1 + dx <= SF.x1 && B0.y0 + dy >= SF.y0 && B0.y1 + dy <= SF.y1);
+        if (fits && moveAt(lo, v.t0 + 0.1, dx, dy)) continue;
       }
     }
     // a date card above a map element takes the other top corner; a free element steps aside (boxes from the audit)

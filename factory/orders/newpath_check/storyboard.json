@@ -1,0 +1,1851 @@
+{
+ "paragraphs": [
+  {
+   "id": "01",
+   "beats": [
+    {
+     "cue": "the red flag",
+     "go": "Moscow",
+     "shot": "region"
+    },
+    {
+     "cue": "Within a day",
+     "go": "overview"
+    },
+    {
+     "cue": "on Earth",
+     "label": "Arctic Ocean",
+     "at": "Arctic Ocean",
+     "style": "water",
+     "until": "Tatarstan had"
+    },
+    {
+     "cue": "on Earth",
+     "label": "Black Sea",
+     "at": "Black Sea",
+     "style": "water",
+     "until": "Tatarstan had"
+    },
+    {
+     "cue": "was gone",
+     "label": "Caspian Sea",
+     "at": "Caspian Sea",
+     "style": "water",
+     "until": "Tatarstan had"
+    },
+    {
+     "cue": "was gone",
+     "label": "Baltic Sea",
+     "at": "Baltic Sea",
+     "style": "water",
+     "until": "Tatarstan had"
+    },
+    {
+     "cue": "was gone",
+     "border": "film",
+     "style": "light",
+     "until": "a patchwork"
+    },
+    {
+     "cue": "stood fifteen",
+     "go": "overview"
+    },
+    {
+     "cue": "fifteen new nations",
+     "fill": "film",
+     "look": "tint",
+     "until": "a patchwork"
+    },
+    {
+     "cue": "fifteen new nations",
+     "flag": "film",
+     "until": "the strange part"
+    },
+    {
+     "cue": "But here is",
+     "label": "RUSSIA",
+     "at": "rep:RUS",
+     "until": "a patchwork"
+    },
+    {
+     "cue": "But here is",
+     "label": "KAZAKHSTAN",
+     "at": "rep:KAZ",
+     "until": "a patchwork"
+    },
+    {
+     "cue": "But here is",
+     "label": "UKRAINE",
+     "at": "rep:UKR",
+     "until": "a patchwork"
+    },
+    {
+     "cue": "the strange part",
+     "label": "UZBEKISTAN",
+     "at": "rep:UZB",
+     "until": "a patchwork"
+    },
+    {
+     "cue": "the strange part",
+     "label": "TURKMENISTAN",
+     "at": "rep:TKM",
+     "until": "a patchwork"
+    },
+    {
+     "cue": "the strange part",
+     "label": "BELARUS",
+     "at": "rep:BLR",
+     "until": "a patchwork"
+    },
+    {
+     "cue": "fifteen peoples",
+     "go": "European USSR and Central Asia"
+    },
+    {
+     "cue": "a patchwork",
+     "fill": [
+      "film",
+      "homeland regions"
+     ],
+     "look": "quilt",
+     "until": "Tatarstan had",
+     "accent": "shimmer"
+    },
+    {
+     "cue": "organized into",
+     "go": "overview"
+    },
+    {
+     "cue": "organized into",
+     "dots": "homelands",
+     "tempo": "slow",
+     "until": "Tatarstan had"
+    },
+    {
+     "cue": "fifty-three",
+     "numeral": "53",
+     "until": "Tatarstan had"
+    },
+    {
+     "cue": "Tatarstan had",
+     "go": "Tatarstan",
+     "shot": "context"
+    },
+    {
+     "cue": "Tatarstan had",
+     "fill": "rep:RUS",
+     "look": "faint",
+     "until": "and not twenty"
+    },
+    {
+     "cue": "Tatarstan had",
+     "fill": "rr:Tatarstan",
+     "look": "focus",
+     "until": "and Tatarstan did not"
+    },
+    {
+     "cue": "Tatarstan had",
+     "banner": "kazan",
+     "title": "TATARSTAN",
+     "sub": "3.6 million people",
+     "near": "Kazan",
+     "until": "Chechnya would"
+    },
+    {
+     "cue": "Estonia",
+     "go": "Estonia",
+     "shot": "context"
+    },
+    {
+     "cue": "Estonia",
+     "fill": "rep:EST",
+     "look": "tint",
+     "op": 0.82,
+     "until": "Chechnya would"
+    },
+    {
+     "cue": "Estonia",
+     "banner": "tallinn",
+     "title": "ESTONIA",
+     "sub": "1.6 million people",
+     "near": "Tallinn",
+     "until": "became a country"
+    },
+    {
+     "cue": "became a country",
+     "go": [
+      "Tatarstan",
+      "Estonia"
+     ]
+    },
+    {
+     "cue": "became a country",
+     "border": "rep:EST",
+     "style": "trace"
+    },
+    {
+     "cue": "became a country",
+     "flag": "EST",
+     "until": "Chechnya would"
+    },
+    {
+     "cue": "and Tatarstan did not",
+     "fill": "rr:Tatarstan",
+     "look": "muted",
+     "until": "Chechnya would",
+     "accent": "seal"
+    },
+    {
+     "cue": "Chechnya would",
+     "go": "Chechnya",
+     "shot": "context"
+    },
+    {
+     "cue": "Chechnya would",
+     "fill": "rr:Chechnya",
+     "look": "war",
+     "until": "control"
+    },
+    {
+     "cue": "Chechnya would",
+     "banner": "grozny",
+     "title": "CHECHNYA",
+     "sub": "wars 1994–96 · 1999–2009",
+     "near": "Grozny",
+     "until": "So why fifteen"
+    },
+    {
+     "cue": "two brutal",
+     "accent": "war"
+    },
+    {
+     "cue": "wars over",
+     "icon": "helmet",
+     "near": "rr:Dagestan",
+     "until": "So why fifteen"
+    },
+    {
+     "cue": "and end up",
+     "go": [
+      "Moscow",
+      "Grozny"
+     ]
+    },
+    {
+     "cue": "and end up",
+     "marker": "Moscow",
+     "label": "Moscow",
+     "side": "b",
+     "until": "So why fifteen"
+    },
+    {
+     "cue": "and end up",
+     "arrow": [
+      "Moscow",
+      "Grozny"
+     ],
+     "kind": "link",
+     "until": "So why fifteen"
+    },
+    {
+     "cue": "control",
+     "fill": "rr:Chechnya",
+     "look": "state",
+     "op": 0.9,
+     "until": "and not twenty"
+    },
+    {
+     "cue": "So why fifteen",
+     "go": "overview"
+    },
+    {
+     "cue": "fifteen#3",
+     "numeral": "15?"
+    },
+    {
+     "cue": "fifteen#3",
+     "fill": "film",
+     "op": 0.6,
+     "until": "02:the Russian Civil War"
+    },
+    {
+     "cue": "fifteen#3",
+     "border": "film",
+     "style": "light",
+     "until": "02:the Russian Civil War"
+    },
+    {
+     "cue": "twenty",
+     "numeral": "20?"
+    },
+    {
+     "cue": "twenty",
+     "fill": "Russian republics",
+     "look": "highlight",
+     "until": "had been written"
+    },
+    {
+     "cue": "or fifty",
+     "numeral": "50?"
+    },
+    {
+     "cue": "or fifty",
+     "dots": "homelands",
+     "tempo": "fast",
+     "until": "had been written"
+    },
+    {
+     "cue": "The answer",
+     "go": "overview"
+    },
+    {
+     "cue": "written",
+     "document": "const1936",
+     "caption": "THE 1936 CONSTITUTION",
+     "until": "by Lenin and Stalin"
+    },
+    {
+     "cue": "by Lenin and Stalin",
+     "portrait": "lenin",
+     "name": "VLADIMIR LENIN",
+     "sub": "Soviet leader · 1917–1924",
+     "until": "This is why"
+    },
+    {
+     "cue": "Stalin themselves",
+     "portrait": "stalin",
+     "name": "JOSEPH STALIN",
+     "sub": "General Secretary · 1922–1952",
+     "until": "This is why"
+    },
+    {
+     "cue": "This is why",
+     "go": "overview"
+    },
+    {
+     "cue": "This is why",
+     "titles": [
+      {
+       "text": "WHY THE SOVIET UNION",
+       "cue": "This is why"
+      },
+      {
+       "text": "BROKE INTO",
+       "cue": "broke into"
+      },
+      {
+       "text": "EXACTLY 15 COUNTRIES",
+       "cue": "exactly",
+       "hi": "15",
+       "hi_cue": "fifteen countries"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "02",
+   "beats": [
+    {
+     "cue": "When the Bolsheviks",
+     "go": "Moscow",
+     "shot": "region"
+    },
+    {
+     "cue": "they inherited a problem",
+     "banner": "redarmy",
+     "title": "THE RED ARMY",
+     "sub": "Moscow",
+     "near": "Moscow"
+    },
+    {
+     "cue": "briefly broken free",
+     "go": "Ukraine and the Caucasus",
+     "shot": "context"
+    },
+    {
+     "cue": "briefly broken free",
+     "marker": "Kyiv",
+     "label": "Ukraine",
+     "sub": "1917–1921",
+     "until": "a clever compromise"
+    },
+    {
+     "cue": "briefly broken free",
+     "marker": "Tbilisi",
+     "label": "Georgia",
+     "sub": "1918–1921",
+     "until": "a clever compromise"
+    },
+    {
+     "cue": "broken free",
+     "marker": "Yerevan",
+     "label": "Armenia",
+     "sub": "1918–1920",
+     "side": "l",
+     "until": "a clever compromise"
+    },
+    {
+     "cue": "free",
+     "marker": "Baku",
+     "label": "Azerbaijan",
+     "sub": "1918–1920",
+     "until": "a clever compromise"
+    },
+    {
+     "cue": "Lenin's solution",
+     "go": "Western USSR",
+     "shot": "context"
+    },
+    {
+     "cue": "Lenin's solution",
+     "portrait": "lenin",
+     "name": "VLADIMIR LENIN",
+     "sub": "a union of “equal” republics",
+     "until": "On December 30th"
+    },
+    {
+     "cue": "Ironically, Stalin",
+     "portrait": "stalin",
+     "name": "JOSEPH STALIN",
+     "sub": "Commissar for Nationalities · 1917–23",
+     "until": "of supposedly equal partners"
+    },
+    {
+     "cue": "On December 30th",
+     "go": "Western USSR"
+    },
+    {
+     "cue": "On December 30th",
+     "date": "30 DECEMBER 1922",
+     "sub": "TREATY ON THE CREATION OF THE USSR",
+     "until": "On paper, it was"
+    },
+    {
+     "cue": "Russia, Ukraine",
+     "marker": "Moscow",
+     "label": "Russian SFSR",
+     "side": "l",
+     "until": "In reality"
+    },
+    {
+     "cue": "Ukraine, Belarus",
+     "marker": "Kharkiv",
+     "label": "Ukrainian SSR",
+     "sub": "capital Kharkiv",
+     "until": "In reality"
+    },
+    {
+     "cue": "Belarus and Transcaucasia",
+     "marker": "Minsk",
+     "label": "Byelorussian SSR",
+     "side": "l",
+     "until": "In reality"
+    },
+    {
+     "cue": "Transcaucasia, approved",
+     "marker": "Tbilisi",
+     "label": "Transcaucasian SFSR",
+     "until": "In reality"
+    },
+    {
+     "cue": "approved a treaty",
+     "document": "treaty1922",
+     "caption": "TREATY ON THE CREATION OF THE USSR · 1922",
+     "until": "In reality"
+    },
+    {
+     "cue": "By 1989",
+     "go": "overview"
+    },
+    {
+     "cue": "fifteen union republics",
+     "dots": "homelands",
+     "layers": [
+      0
+     ],
+     "tempo": "all",
+     "until": "Every layer"
+    },
+    {
+     "cue": "fifteen union republics",
+     "numeral": "15",
+     "sub": "union republics"
+    },
+    {
+     "cue": "twenty autonomous republics",
+     "dots": "homelands",
+     "layers": [
+      1
+     ],
+     "tempo": "all",
+     "until": "Every layer"
+    },
+    {
+     "cue": "twenty autonomous republics",
+     "numeral": "20",
+     "sub": "autonomous republics"
+    },
+    {
+     "cue": "eight autonomous regions",
+     "dots": "homelands",
+     "layers": [
+      2
+     ],
+     "tempo": "all",
+     "until": "Every layer"
+    },
+    {
+     "cue": "eight autonomous regions",
+     "numeral": "8",
+     "sub": "autonomous regions"
+    },
+    {
+     "cue": "ten autonomous districts",
+     "dots": "homelands",
+     "layers": [
+      3
+     ],
+     "tempo": "all",
+     "until": "Every layer"
+    },
+    {
+     "cue": "ten autonomous districts",
+     "numeral": "10",
+     "sub": "autonomous districts",
+     "until": "Every layer"
+    },
+    {
+     "cue": "Every layer",
+     "go": "Caucasus",
+     "shot": "region"
+    },
+    {
+     "cue": "Every layer",
+     "fill": [
+      "GEO",
+      "ARM",
+      "AZE"
+     ],
+     "op": 0.55,
+     "until": "the union republics, held"
+    },
+    {
+     "cue": "Every layer",
+     "label": "GEORGIA",
+     "at": "rep:GEO",
+     "until": "the union republics, held"
+    },
+    {
+     "cue": "Every layer",
+     "label": "ARMENIA",
+     "at": "rep:ARM",
+     "until": "the union republics, held"
+    },
+    {
+     "cue": "Every layer",
+     "label": "AZERBAIJAN",
+     "at": "rep:AZE",
+     "until": "the union republics, held"
+    },
+    {
+     "cue": "its own borders",
+     "fill": [
+      "brk:Abkhazia",
+      "brk:South Ossetia",
+      "brk:Nagorno-Karabakh"
+     ],
+     "look": "new",
+     "until": "the union republics, held"
+    },
+    {
+     "cue": "its own borders",
+     "border": [
+      "brk:Abkhazia",
+      "brk:South Ossetia",
+      "brk:Nagorno-Karabakh"
+     ],
+     "style": "dashed",
+     "until": "the union republics, held"
+    },
+    {
+     "cue": "its own borders",
+     "label": "Abkhaz ASSR",
+     "at": "brk:Abkhazia",
+     "style": "italic",
+     "until": "the union republics, held"
+    },
+    {
+     "cue": "its own capital",
+     "label": "South Ossetian AO",
+     "at": "brk:South Ossetia",
+     "style": "italic",
+     "until": "the union republics, held"
+    },
+    {
+     "cue": "its own capital",
+     "label": "Nagorno-Karabakh AO",
+     "at": "brk:Nagorno-Karabakh",
+     "style": "italic",
+     "until": "the union republics, held"
+    },
+    {
+     "cue": "its own capital",
+     "marker": "Sukhumi",
+     "dot": true,
+     "until": "the union republics, held"
+    },
+    {
+     "cue": "its own capital",
+     "marker": "Tskhinvali",
+     "dot": true,
+     "until": "the union republics, held"
+    },
+    {
+     "cue": "its own official nationality",
+     "marker": "Stepanakert",
+     "until": "the union republics, held"
+    },
+    {
+     "cue": "But only the outer shell",
+     "go": "overview"
+    },
+    {
+     "cue": "But only the outer shell",
+     "fill": "film",
+     "op": 0.5,
+     "until": "paragraph"
+    },
+    {
+     "cue": "But only the outer shell",
+     "border": "film",
+     "style": "plain",
+     "until": "paragraph"
+    },
+    {
+     "cue": "the union republics, held",
+     "border": "frontier",
+     "style": "gold",
+     "until": "Any real attempt"
+    },
+    {
+     "cue": "The Soviet constitution guaranteed",
+     "document": "const1936_a17",
+     "caption": "ARTICLE 17 · “THE RIGHT FREELY TO SECEDE”",
+     "until": "Any real attempt"
+    },
+    {
+     "cue": "Any real attempt",
+     "go": "White Sea Canal",
+     "shot": "context"
+    },
+    {
+     "cue": "Any real attempt",
+     "banner": "gulag",
+     "title": "THE GULAG",
+     "sub": "White Sea Canal · 1930s",
+     "near": "White Sea Canal",
+     "until": "written in black and white"
+    },
+    {
+     "cue": "But the words were there",
+     "go": "overview"
+    }
+   ]
+  },
+  {
+   "id": "03",
+   "beats": [
+    {
+     "cue": "Uzbekistan and Turkmenistan",
+     "go": "Central Asia"
+    },
+    {
+     "cue": "and Turkmenistan",
+     "fill": "TKM",
+     "look": "born",
+     "until": "05:end"
+    },
+    {
+     "cue": "and Turkmenistan",
+     "label": "TURKMEN SSR",
+     "at": "rep:TKM",
+     "sub": "created 1924 · joined 1925",
+     "until": "Kazakhstan and Kyrgyzstan"
+    },
+    {
+     "cue": "Tajikistan in 1929",
+     "fill": "TJK",
+     "look": "born",
+     "until": "05:end"
+    },
+    {
+     "cue": "Tajikistan in 1929",
+     "label": "TAJIK SSR",
+     "at": "rep:TJK",
+     "sub": "1929",
+     "until": "Kazakhstan and Kyrgyzstan"
+    },
+    {
+     "cue": "Then, in 1936",
+     "go": "Kazakhstan and Central Asia"
+    },
+    {
+     "cue": "Then, in 1936",
+     "date": "5 DECEMBER 1936",
+     "sub": "THE “STALIN CONSTITUTION”",
+     "until": "That made eleven"
+    },
+    {
+     "cue": "Then, in 1936",
+     "document": "const1936",
+     "caption": "THE 1936 CONSTITUTION",
+     "until": "That made eleven"
+    },
+    {
+     "cue": "Kazakhstan and Kyrgyzstan",
+     "fill": "KAZ",
+     "look": "born",
+     "until": "05:end"
+    },
+    {
+     "cue": "Kazakhstan and Kyrgyzstan",
+     "label": "KAZAKH SSR",
+     "at": "rep:KAZ",
+     "sub": "1936",
+     "until": "When the draft constitution"
+    },
+    {
+     "cue": "and Kyrgyzstan",
+     "fill": [
+      "KGZ",
+      "UZB"
+     ],
+     "look": "born",
+     "until": "05:end"
+    },
+    {
+     "cue": "and Kyrgyzstan",
+     "label": "KIRGHIZ SSR",
+     "at": "rep:KGZ",
+     "sub": "1936",
+     "until": "When the draft constitution"
+    },
+    {
+     "cue": "the Transcaucasian republic",
+     "go": "Caucasus",
+     "shot": "context"
+    },
+    {
+     "cue": "into Georgia, Armenia",
+     "fill": [
+      "GEO",
+      "ARM",
+      "AZE"
+     ],
+     "look": "born",
+     "until": "05:end"
+    },
+    {
+     "cue": "That made eleven",
+     "go": "overview"
+    },
+    {
+     "cue": "That made eleven",
+     "numeral": "11",
+     "sub": "union republics",
+     "until": "When the draft constitution"
+    },
+    {
+     "cue": "That made eleven",
+     "document": "const1936_a13",
+     "caption": "ARTICLE 13 · ELEVEN UNION REPUBLICS",
+     "until": "04:a nation needed three things"
+    },
+    {
+     "cue": "When the draft constitution",
+     "portrait": "stalin",
+     "name": "JOSEPH STALIN",
+     "sub": "speech of 25 November 1936",
+     "until": "04:First, it had"
+    }
+   ]
+  },
+  {
+   "id": "04",
+   "beats": [
+    {
+     "cue": "First, it had",
+     "go": "overview"
+    },
+    {
+     "cue": "First, it had",
+     "tag": "ON THE OUTER BORDER",
+     "num": "I",
+     "until": "Second, its namesake"
+    },
+    {
+     "cue": "First, it had",
+     "border": "frontier",
+     "style": "gold",
+     "until": "Second, its namesake"
+    },
+    {
+     "cue": "After all, Stalin argued",
+     "go": "Volga republics",
+     "shot": "context"
+    },
+    {
+     "cue": "Second, its namesake",
+     "go": "Western USSR"
+    },
+    {
+     "cue": "Second, its namesake",
+     "tag": "A COMPACT MAJORITY",
+     "num": "II",
+     "until": "And third"
+    },
+    {
+     "cue": "And third",
+     "tag": "MORE THAN 1 MILLION PEOPLE",
+     "num": "III",
+     "until": "Now look at Tatarstan"
+    },
+    {
+     "cue": "Now look at Tatarstan",
+     "go": "Tatarstan",
+     "shot": "context"
+    },
+    {
+     "cue": "Now look at Tatarstan",
+     "fill": "rr:Tatarstan",
+     "look": "focus",
+     "until": "In practice"
+    },
+    {
+     "cue": "Now look at Tatarstan",
+     "label": "TATARSTAN",
+     "at": "rr:Tatarstan",
+     "until": "In practice"
+    },
+    {
+     "cue": "Now look at Tatarstan",
+     "marker": "Kazan",
+     "until": "In practice"
+    },
+    {
+     "cue": "Now look at Tatarstan",
+     "banner": "kazan",
+     "title": "TATARSTAN",
+     "sub": "3.6 million people (1989)",
+     "near": "Kazan",
+     "until": "Stalin himself used"
+    },
+    {
+     "cue": "one point six million",
+     "go": [
+      "Tatarstan",
+      "Estonia"
+     ]
+    },
+    {
+     "cue": "one point six million",
+     "banner": "tallinn",
+     "title": "ESTONIA",
+     "sub": "1.6 million people (1989)",
+     "near": "Tallinn",
+     "until": "deep inside Russia"
+    },
+    {
+     "cue": "deep inside Russia",
+     "go": "Tatarstan",
+     "shot": "context"
+    },
+    {
+     "cue": "deep inside Russia",
+     "rings": "rr:Tatarstan",
+     "until": "it could never qualify"
+    },
+    {
+     "cue": "it could never qualify",
+     "accent": "seal"
+    },
+    {
+     "cue": "Stalin himself used",
+     "go": "Volga republics",
+     "shot": "region"
+    },
+    {
+     "cue": "Bashkir republics",
+     "fill": "rr:Bashkortostan",
+     "look": "highlight",
+     "until": "In practice"
+    },
+    {
+     "cue": "Bashkir republics",
+     "label": "BASHKORTOSTAN",
+     "at": "rr:Bashkortostan",
+     "until": "In practice"
+    },
+    {
+     "cue": "to Chuvashia",
+     "fill": "rr:Chuvashia",
+     "look": "highlight",
+     "until": "In practice"
+    },
+    {
+     "cue": "to Chuvashia",
+     "label": "CHUVASHIA",
+     "at": "rr:Chuvashia",
+     "until": "In practice"
+    },
+    {
+     "cue": "of the Volga and Ural",
+     "fill": [
+      "rr:Mari El",
+      "rr:Udmurtia",
+      "rr:Mordovia"
+     ],
+     "look": "highlight",
+     "until": "In practice"
+    },
+    {
+     "cue": "of the Volga and Ural",
+     "border": [
+      "river:Volga",
+      "river:Kama"
+     ],
+     "style": "river",
+     "until": "In practice"
+    },
+    {
+     "cue": "of the Volga and Ural",
+     "label": "Volga",
+     "at": "river:Volga",
+     "style": "water",
+     "until": "In practice"
+    },
+    {
+     "cue": "In practice",
+     "go": [
+      "Moscow",
+      "Kazan"
+     ]
+    },
+    {
+     "cue": "Kazakhstan was promoted",
+     "go": "Kazakhstan"
+    },
+    {
+     "cue": "Kazakhstan was promoted",
+     "fill": "KAZ",
+     "look": "gain",
+     "until": "paragraph"
+    },
+    {
+     "cue": "Kazakhstan was promoted",
+     "label": "KAZAKH SSR",
+     "at": "rep:KAZ",
+     "sub": "1939 census: Kazakhs 38%",
+     "until": "paragraph"
+    },
+    {
+     "cue": "But the principle was set",
+     "go": "overview"
+    }
+   ]
+  },
+  {
+   "id": "05",
+   "beats": [
+    {
+     "cue": "In 1940",
+     "go": "the West in 1940"
+    },
+    {
+     "cue": "In 1940",
+     "date": "1940",
+     "sub": "ANNEXATIONS IN THE WEST",
+     "until": "Karelo-Finnish"
+    },
+    {
+     "cue": "In 1940",
+     "fill": "BLR",
+     "op": 0.55,
+     "until": "paragraph"
+    },
+    {
+     "cue": "annexed Estonia",
+     "fill": "EST",
+     "look": "born",
+     "until": "paragraph"
+    },
+    {
+     "cue": "annexed Estonia",
+     "label": "ESTONIA",
+     "at": "rep:EST",
+     "sub": "1940",
+     "until": "Karelo-Finnish"
+    },
+    {
+     "cue": "annexed Estonia",
+     "arrow": [
+      "Moscow",
+      "Tallinn"
+     ],
+     "kind": "force",
+     "until": "Karelo-Finnish"
+    },
+    {
+     "cue": "Latvia and Lithuania",
+     "fill": "LVA",
+     "look": "born",
+     "until": "paragraph"
+    },
+    {
+     "cue": "Latvia and Lithuania",
+     "label": "LATVIA",
+     "at": "rep:LVA",
+     "sub": "1940",
+     "until": "Karelo-Finnish"
+    },
+    {
+     "cue": "Latvia and Lithuania",
+     "arrow": [
+      [
+       "Moscow",
+       "Riga"
+      ],
+      [
+       "Moscow",
+       "Vilnius"
+      ]
+     ],
+     "kind": "force",
+     "until": "Karelo-Finnish"
+    },
+    {
+     "cue": "and Lithuania",
+     "fill": "LTU",
+     "look": "born",
+     "until": "paragraph"
+    },
+    {
+     "cue": "and Lithuania",
+     "label": "LITHUANIA",
+     "at": "rep:LTU",
+     "sub": "1940",
+     "until": "Karelo-Finnish"
+    },
+    {
+     "cue": "the Moldavian republic",
+     "go": "Moldova",
+     "shot": "context"
+    },
+    {
+     "cue": "the Moldavian republic",
+     "fill": "MDA",
+     "look": "born",
+     "until": "paragraph"
+    },
+    {
+     "cue": "the Moldavian republic",
+     "label": "MOLDAVIAN SSR",
+     "at": "rep:MDA",
+     "sub": "1940",
+     "until": "Karelo-Finnish"
+    },
+    {
+     "cue": "the Moldavian republic",
+     "arrow": [
+      "Moscow",
+      "Chisinau"
+     ],
+     "kind": "force",
+     "until": "Karelo-Finnish"
+    },
+    {
+     "cue": "joined with a strip",
+     "fill": "brk:Transnistria",
+     "like": "UKR",
+     "until": "east of the Dniester"
+    },
+    {
+     "cue": "joined with a strip",
+     "label": "LEFT BANK OF THE DNIESTER",
+     "at": "brk:Transnistria",
+     "sub": "from the Ukrainian SSR",
+     "until": "Karelo-Finnish"
+    },
+    {
+     "cue": "east of the Dniester",
+     "fill": "brk:Transnistria",
+     "like": "MDA",
+     "look": "born",
+     "until": "Karelo-Finnish"
+    },
+    {
+     "cue": "on the border with Finland",
+     "label": "FINLAND",
+     "at": "ctx:FIN",
+     "color": "#E8E2D4",
+     "until": "So in 1956"
+    },
+    {
+     "cue": "on the border with Finland",
+     "banner": "winterwar",
+     "title": "THE WINTER WAR",
+     "sub": "Soviet-Finnish war · 1939–40",
+     "near": "Karelian Isthmus",
+     "until": "That brought the total"
+    },
+    {
+     "cue": "That brought the total",
+     "go": "Western USSR"
+    },
+    {
+     "cue": "to sixteen",
+     "numeral": "16",
+     "sub": "union republics",
+     "until": "But Finland never fell"
+    },
+    {
+     "cue": "So in 1956",
+     "go": [
+      "ctx:FIN"
+     ]
+    },
+    {
+     "cue": "So in 1956",
+     "date": "16 JULY 1956",
+     "sub": "KARELO-FINNISH SSR DOWNGRADED",
+     "until": "Two years earlier"
+    },
+    {
+     "cue": "Sixteen became fifteen",
+     "go": "overview"
+    },
+    {
+     "cue": "Sixteen became fifteen",
+     "numeral": "15",
+     "sub": "and the number never changed again",
+     "until": "Two years earlier"
+    },
+    {
+     "cue": "Two years earlier",
+     "date": "19 FEBRUARY 1954",
+     "sub": "CRIMEA TRANSFERRED TO THE UKRAINIAN SSR",
+     "until": "At the time"
+    },
+    {
+     "cue": "was transferred",
+     "fill": [
+      "RUS",
+      "UKR"
+     ],
+     "op": 0.55,
+     "until": "paragraph"
+    },
+    {
+     "cue": "was transferred",
+     "document": "crimea1954",
+     "caption": "1954 · CRIMEA TRANSFERRED TO THE UKRAINIAN SSR",
+     "until": "Nobody imagined"
+    },
+    {
+     "cue": "At the time",
+     "go": [
+      "Kharkiv"
+     ]
+    },
+    {
+     "cue": "Nobody imagined",
+     "go": "overview"
+    },
+    {
+     "cue": "Nobody imagined",
+     "border": "film",
+     "style": "gold",
+     "until": "paragraph"
+    }
+   ]
+  },
+  {
+   "id": "06",
+   "beats": [
+    {
+     "cue": "start",
+     "fill": "film",
+     "op": 0.58,
+     "until": "end"
+    },
+    {
+     "cue": "start",
+     "border": "film",
+     "style": "plain",
+     "until": "07:So the lines drawn"
+    },
+    {
+     "cue": "Mikhail Gorbachev",
+     "go": "Moscow",
+     "shot": "context"
+    },
+    {
+     "cue": "Mikhail Gorbachev",
+     "portrait": "gorbachev",
+     "name": "MIKHAIL GORBACHEV",
+     "sub": "General Secretary · 1985–91",
+     "until": "Suddenly"
+    },
+    {
+     "cue": "Suddenly",
+     "document": "article72",
+     "until": "In August 1989"
+    },
+    {
+     "cue": "In August 1989",
+     "go": "Baltic",
+     "shot": "region"
+    },
+    {
+     "cue": "In August 1989",
+     "date": "23 AUGUST 1989",
+     "sub": "THE BALTIC WAY · ~2 MILLION PEOPLE · 675 KM",
+     "until": "On March 11th, 1990"
+    },
+    {
+     "cue": "In August 1989",
+     "banner": "balticway",
+     "title": "THE BALTIC WAY",
+     "sub": "23 August 1989",
+     "near": "Riga",
+     "until": "On March 11th, 1990"
+    },
+    {
+     "cue": "joined hands",
+     "route": [
+      "Tallinn",
+      "Saaremaa road",
+      "Riga",
+      "Panevezys road",
+      "Vilnius"
+     ],
+     "style": "chain",
+     "until": "Moscow responded",
+     "accent": "crowd"
+    },
+    {
+     "cue": "On March 11th, 1990",
+     "go": "Lithuania",
+     "shot": "close"
+    },
+    {
+     "cue": "On March 11th, 1990",
+     "date": "11 MARCH 1990",
+     "sub": "LITHUANIA RESTORES INDEPENDENCE",
+     "until": "Moscow responded"
+    },
+    {
+     "cue": "On March 11th, 1990",
+     "banner": "lithuania90",
+     "title": "LITHUANIA",
+     "sub": "Vilnius · 11 March 1990",
+     "near": "Vilnius",
+     "until": "Moscow responded"
+    },
+    {
+     "cue": "Lithuania declared",
+     "flag": "LTU",
+     "date": "11 Mar 1990",
+     "at": "Lithuania west",
+     "glide": "Moscow responded",
+     "until": "end"
+    },
+    {
+     "cue": "Lithuania declared",
+     "label": "LITHUANIA",
+     "at": "rep:LTU",
+     "until": "Moscow responded"
+    },
+    {
+     "cue": "Moscow responded",
+     "go": [
+      "Moscow",
+      "Vilnius"
+     ]
+    },
+    {
+     "cue": "demanding referendums",
+     "tag": "REFERENDUM"
+    },
+    {
+     "cue": "two-thirds majorities",
+     "tag": "TWO-THIRDS MAJORITY"
+    },
+    {
+     "cue": "up to five years",
+     "tag": "UP TO FIVE YEARS",
+     "until": "In March 1991"
+    },
+    {
+     "cue": "In March 1991",
+     "go": "Western USSR"
+    },
+    {
+     "cue": "In March 1991",
+     "date": "17 MARCH 1991",
+     "sub": "ALL-UNION REFERENDUM · SIX REPUBLICS BOYCOTT",
+     "until": "Then, in August 1991"
+    },
+    {
+     "cue": "Six republics refused",
+     "fill": [
+      "EST",
+      "LVA",
+      "LTU",
+      "GEO",
+      "ARM",
+      "MDA"
+     ],
+     "look": "boycott",
+     "until": "hardliners tried",
+     "accent": "seal"
+    },
+    {
+     "cue": "Then, in August 1991",
+     "go": "Moscow",
+     "shot": "region"
+    },
+    {
+     "cue": "Then, in August 1991",
+     "date": "19–21 AUGUST 1991",
+     "sub": "THE AUGUST COUP",
+     "until": "Within weeks",
+     "accent": "tension"
+    },
+    {
+     "cue": "hardliners tried",
+     "banner": "tanks91",
+     "title": "THE AUGUST COUP",
+     "sub": "Moscow · 19–21 August 1991",
+     "near": "Moscow",
+     "until": "Within weeks"
+    },
+    {
+     "cue": "to seize power",
+     "marker": "Moscow",
+     "label": "Coup attempt",
+     "sub": "19–21 August 1991",
+     "alert": true,
+     "until": "Within weeks"
+    },
+    {
+     "cue": "Within weeks",
+     "go": "overview"
+    },
+    {
+     "cue": "republic after republic",
+     "flag": [
+      "GEO",
+      "EST",
+      "LVA",
+      "UKR",
+      "BLR",
+      "MDA",
+      "AZE",
+      "KGZ",
+      "UZB",
+      "TJK",
+      "ARM",
+      "TKM"
+     ],
+     "until": "end",
+     "dates": {
+      "GEO": "9 Apr 1991",
+      "EST": "20 Aug 1991",
+      "LVA": "21 Aug 1991",
+      "UKR": "24 Aug 1991",
+      "BLR": "25 Aug 1991",
+      "MDA": "27 Aug 1991",
+      "AZE": "30 Aug 1991",
+      "KGZ": "31 Aug 1991",
+      "UZB": "31 Aug 1991",
+      "TJK": "9 Sep 1991",
+      "ARM": "23 Sep 1991",
+      "TKM": "27 Oct 1991"
+     }
+    },
+    {
+     "cue": "In September",
+     "date": "6 SEPTEMBER 1991",
+     "sub": "MOSCOW RECOGNIZES THE BALTIC STATES",
+     "until": "On December 1st"
+    },
+    {
+     "cue": "On December 1st",
+     "go": "Ukraine"
+    },
+    {
+     "cue": "On December 1st",
+     "date": "1 DECEMBER 1991",
+     "sub": "UKRAINIAN INDEPENDENCE REFERENDUM",
+     "until": "A week later"
+    },
+    {
+     "cue": "On December 1st",
+     "fill": "UKR",
+     "look": "focus",
+     "until": "A week later"
+    },
+    {
+     "cue": "more than ninety",
+     "label": "UKRAINE",
+     "at": "rep:UKR",
+     "sub": "90.3% for independence",
+     "until": "A week later"
+    },
+    {
+     "cue": "ninety percent",
+     "numeral": "90%+",
+     "sub": "of Ukrainian voters chose independence",
+     "until": "A week later",
+     "accent": "shimmer"
+    },
+    {
+     "cue": "A week later",
+     "go": [
+      "Viskuli",
+      "Minsk",
+      "Kyiv"
+     ]
+    },
+    {
+     "cue": "A week later",
+     "date": "8 DECEMBER 1991",
+     "sub": "BELOVEZHA ACCORDS",
+     "until": "On December 21st"
+    },
+    {
+     "cue": "the leaders of Russia",
+     "route": [
+      "Moscow",
+      "Kyiv",
+      "Minsk",
+      "Viskuli"
+     ],
+     "style": "converge",
+     "until": "On December 21st"
+    },
+    {
+     "cue": "the leaders of Russia",
+     "banner": "viskuli",
+     "title": "VISKULI",
+     "sub": "Belovezha Forest · 8 Dec 1991",
+     "near": "Viskuli",
+     "until": "On December 21st"
+    },
+    {
+     "cue": "hunting lodge",
+     "marker": "Viskuli",
+     "label": "Viskuli hunting lodge",
+     "sub": "Belovezha Forest",
+     "pulse": true,
+     "side": "l",
+     "until": "On December 21st"
+    },
+    {
+     "cue": "declared that the Soviet Union",
+     "document": "belovezha",
+     "caption": "THE BELOVEZHA ACCORDS · 8 DECEMBER 1991",
+     "until": "On December 21st",
+     "signatures": [
+      {
+       "img": "yeltsin",
+       "name": "B. YELTSIN · RUSSIA"
+      },
+      {
+       "img": "kravchuk",
+       "name": "L. KRAVCHUK · UKRAINE"
+      },
+      {
+       "img": "shushkevich",
+       "name": "S. SHUSHKEVICH · BELARUS"
+      }
+     ]
+    },
+    {
+     "cue": "On December 21st",
+     "go": "Kazakhstan and Central Asia",
+     "shot": "context"
+    },
+    {
+     "cue": "On December 21st",
+     "date": "21 DECEMBER 1991",
+     "sub": "ALMA-ATA PROTOCOL · 11 REPUBLICS",
+     "until": "Four days later"
+    },
+    {
+     "cue": "eleven republics",
+     "marker": "Almaty",
+     "label": "Alma-Ata",
+     "sub": "21 December 1991",
+     "pulse": true,
+     "until": "Four days later"
+    },
+    {
+     "cue": "eleven republics",
+     "banner": "almaata",
+     "title": "ALMA-ATA",
+     "sub": "21 December 1991",
+     "near": "Almaty",
+     "until": "Four days later"
+    },
+    {
+     "cue": "confirmed it",
+     "flag": "KAZ",
+     "date": "16 Dec 1991",
+     "until": "end"
+    },
+    {
+     "cue": "Four days later",
+     "date": "25 DECEMBER 1991",
+     "sub": "GORBACHEV RESIGNS",
+     "until": "stepped onto the world stage"
+    },
+    {
+     "cue": "The fifteen union republics",
+     "go": "overview"
+    },
+    {
+     "cue": "The fifteen union republics",
+     "flag": "RUS",
+     "date": "successor state",
+     "until": "end"
+    },
+    {
+     "cue": "fifteen independent states",
+     "numeral": "15",
+     "sub": "independent states",
+     "accent": "boom"
+    }
+   ]
+  },
+  {
+   "id": "07",
+   "beats": [
+    {
+     "cue": "start",
+     "flags": "hide",
+     "until": "end"
+    },
+    {
+     "cue": "Tatarstan declared",
+     "go": "Tatarstan",
+     "shot": "context"
+    },
+    {
+     "cue": "Tatarstan declared",
+     "fill": "rr:Tatarstan",
+     "look": "focus",
+     "until": "Chechnya went further"
+    },
+    {
+     "cue": "Tatarstan declared",
+     "date": "30 AUGUST 1990",
+     "sub": "TATARSTAN DECLARES SOVEREIGNTY",
+     "until": "sixty-one percent"
+    },
+    {
+     "cue": "Tatarstan declared",
+     "label": "TATARSTAN",
+     "at": "rr:Tatarstan",
+     "until": "Chechnya went further"
+    },
+    {
+     "cue": "its sovereignty",
+     "marker": "Kazan",
+     "until": "Chechnya went further"
+    },
+    {
+     "cue": "its sovereignty",
+     "banner": "kazan",
+     "title": "TATARSTAN",
+     "sub": "sovereignty declared 1990",
+     "near": "Kazan",
+     "until": "Chechnya went further"
+    },
+    {
+     "cue": "sixty-one percent",
+     "date": "21 MARCH 1992",
+     "sub": "REFERENDUM · 61.4% FOR SOVEREIGN STATUS",
+     "until": "special treaty",
+     "accent": "shimmer"
+    },
+    {
+     "cue": "But with no foreign border",
+     "rings": "rr:Tatarstan",
+     "until": "Chechnya went further"
+    },
+    {
+     "cue": "special treaty",
+     "go": [
+      "Moscow",
+      "Kazan"
+     ]
+    },
+    {
+     "cue": "special treaty",
+     "date": "15 FEBRUARY 1994",
+     "sub": "POWER-SHARING TREATY WITH MOSCOW",
+     "until": "Chechnya went further"
+    },
+    {
+     "cue": "special treaty",
+     "arrow": [
+      "Kazan",
+      "Moscow"
+     ],
+     "kind": "link",
+     "until": "Chechnya went further"
+    },
+    {
+     "cue": "Chechnya went further",
+     "go": "Chechnya",
+     "shot": "close"
+    },
+    {
+     "cue": "In November 1991",
+     "date": "1 NOVEMBER 1991",
+     "sub": "CHECHNYA DECLARES INDEPENDENCE",
+     "until": "two devastating wars"
+    },
+    {
+     "cue": "two devastating wars",
+     "go": "Chechnya",
+     "shot": "region"
+    },
+    {
+     "cue": "and again from 1999",
+     "fill": "rr:Chechnya",
+     "look": "war",
+     "until": "Abkhazia, South Ossetia",
+     "accent": "war"
+    },
+    {
+     "cue": "and again from 1999",
+     "label": "CHECHNYA",
+     "at": "rr:Chechnya",
+     "sub": "1994–1996 · 1999–2009",
+     "until": "Abkhazia, South Ossetia"
+    },
+    {
+     "cue": "and again from 1999",
+     "marker": "Grozny",
+     "until": "Abkhazia, South Ossetia"
+    },
+    {
+     "cue": "and the second ended",
+     "banner": "grozny",
+     "title": "CHECHNYA",
+     "sub": "Grozny · wars 1994–96 · 1999–2009",
+     "near": "Grozny",
+     "until": "Abkhazia, South Ossetia"
+    },
+    {
+     "cue": "and the second ended",
+     "icon": "helmet",
+     "near": "rr:Dagestan",
+     "until": "Abkhazia, South Ossetia"
+    },
+    {
+     "cue": "Abkhazia, South Ossetia",
+     "go": "breakaway regions"
+    },
+    {
+     "cue": "Abkhazia, South Ossetia",
+     "fill": "brk:Abkhazia",
+     "look": "disputed",
+     "until": "formed their Commonwealth"
+    },
+    {
+     "cue": "Abkhazia, South Ossetia",
+     "label": "ABKHAZIA",
+     "at": "brk:Abkhazia",
+     "until": "formed their Commonwealth"
+    },
+    {
+     "cue": "Abkhazia, South Ossetia",
+     "banner": "sukhumi",
+     "title": "ABKHAZIA",
+     "sub": "Sukhumi · parliament burned 1993",
+     "near": "Sukhumi",
+     "until": "Nagorno-Karabakh"
+    },
+    {
+     "cue": "South Ossetia and",
+     "fill": "brk:South Ossetia",
+     "look": "disputed",
+     "until": "formed their Commonwealth"
+    },
+    {
+     "cue": "South Ossetia and",
+     "label": "SOUTH OSSETIA",
+     "at": "brk:South Ossetia",
+     "until": "formed their Commonwealth"
+    },
+    {
+     "cue": "and Transnistria",
+     "fill": "brk:Transnistria",
+     "look": "disputed",
+     "until": "formed their Commonwealth"
+    },
+    {
+     "cue": "and Transnistria",
+     "label": "TRANSNISTRIA",
+     "at": "brk:Transnistria",
+     "until": "formed their Commonwealth"
+    },
+    {
+     "cue": "and Transnistria",
+     "banner": "bender",
+     "title": "TRANSNISTRIA",
+     "sub": "Bender · 1992",
+     "near": "Bender",
+     "until": "Nagorno-Karabakh"
+    },
+    {
+     "cue": "Nagorno-Karabakh",
+     "go": "brk:Nagorno-Karabakh",
+     "shot": "context"
+    },
+    {
+     "cue": "Nagorno-Karabakh",
+     "fill": "brk:Nagorno-Karabakh",
+     "look": "disputed",
+     "until": "in 2023 Azerbaijan"
+    },
+    {
+     "cue": "Nagorno-Karabakh",
+     "label": "NAGORNO-KARABAKH",
+     "at": "brk:Nagorno-Karabakh",
+     "sub": "self-declared republic",
+     "until": "in 2023 Azerbaijan"
+    },
+    {
+     "cue": "in 2023 Azerbaijan",
+     "fill": "brk:Nagorno-Karabakh",
+     "like": "AZE",
+     "op": 0.86,
+     "until": "formed their Commonwealth",
+     "accent": "seal"
+    },
+    {
+     "cue": "in 2023 Azerbaijan",
+     "date": "SEPTEMBER 2023",
+     "sub": "AZERBAIJAN RETAKES NAGORNO-KARABAKH · REPUBLIC DISSOLVED",
+     "until": "None of them"
+    },
+    {
+     "cue": "in 2023 Azerbaijan",
+     "label": "NAGORNO-KARABAKH",
+     "at": "brk:Nagorno-Karabakh",
+     "sub": "Azerbaijan · since 2023",
+     "until": "formed their Commonwealth"
+    },
+    {
+     "cue": "None of them",
+     "go": "breakaway regions",
+     "shot": "context"
+    },
+    {
+     "cue": "None of them",
+     "callout": "NO BROAD INTERNATIONAL RECOGNITION",
+     "until": "formed their Commonwealth"
+    },
+    {
+     "cue": "formed their Commonwealth",
+     "go": "overview"
+    },
+    {
+     "cue": "formed their Commonwealth",
+     "quote": "“…recognizing and respecting each other’s territorial integrity and the inviolability of existing borders.”",
+     "sub": "Alma-Ata Declaration, 21 December 1991",
+     "until": "uti possidetis juris"
+    },
+    {
+     "cue": "uti possidetis juris",
+     "document": "uti",
+     "until": "The fifteen union republics had"
+    },
+    {
+     "cue": "The fifteen union republics had",
+     "go": "overview"
+    },
+    {
+     "cue": "So the lines drawn",
+     "go": "Western USSR"
+    },
+    {
+     "cue": "So the lines drawn",
+     "border": "film",
+     "style": "fire",
+     "accent": "forge"
+    },
+    {
+     "cue": "So the lines drawn",
+     "border": "film",
+     "style": "gold",
+     "until": "end"
+    }
+   ]
+  },
+  {
+   "id": "08",
+   "beats": [
+    {
+     "cue": "language, religion or history",
+     "strike": [
+      "LANGUAGE",
+      "RELIGION",
+      "HISTORY"
+     ],
+     "until": "that its own founders"
+    },
+    {
+     "cue": "Lenin and Stalin built",
+     "portrait": "lenin",
+     "name": "VLADIMIR LENIN",
+     "sub": "Soviet leader · 1917–1924",
+     "until": "only on paper"
+    },
+    {
+     "cue": "Stalin built a system",
+     "portrait": "stalin",
+     "name": "JOSEPH STALIN",
+     "sub": "General Secretary · 1922–1952",
+     "until": "only on paper"
+    },
+    {
+     "cue": "only on paper",
+     "quote": "“Each Union Republic shall retain the right freely to secede from the USSR.”",
+     "sub": "Only on paper — and only on the edge of the map",
+     "until": "They never imagined"
+    },
+    {
+     "cue": "edge of the map",
+     "border": "frontier",
+     "style": "gold",
+     "until": "When the moment came"
+    },
+    {
+     "cue": "They never imagined",
+     "go": "overview"
+    },
+    {
+     "cue": "And that is why",
+     "closing": "EXACTLY 15 COUNTRIES"
+    }
+   ]
+  }
+ ]
+}
