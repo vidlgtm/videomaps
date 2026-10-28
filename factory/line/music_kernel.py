@@ -7,7 +7,7 @@ import base64, glob, json, os, shutil, subprocess, sys, time, traceback
 
 JOBS = json.loads(base64.b64decode("__JOBS__").decode())
 COMMIT, BUDGET_MIN = "__ACE_COMMIT__", float("__BUDGET_MIN__")
-W = "/kaggle/working"; ACE = "/tmp/ace"; T0 = time.time()
+W = "/kaggle/working"; ACE = "/tmp/ace"; VENV = "/tmp/ace312"; T0 = float(os.environ.get("ACE_T0") or time.time())
 DIT, LM = "acestep-v15-turbo", "acestep-5Hz-lm-1.7B"
 
 
@@ -22,9 +22,18 @@ def sh(c):
 
 res = []
 try:
-    log("music jobs:", [(j["key_hash"], j["cue"], j["duration"]) for j in JOBS])
+    if sys.version_info[:2] >= (3, 13) and os.environ.get("ACE_IN_VENV") != "1":
+        # ACE-Step 1.5 needs Python >=3.11,<3.13 and the Kaggle image moved to 3.13 (Sep 2026): a Python 3.12 environment
+        # made by uv (its own interpreter build), then this same script runs again inside it
+        log("python", sys.version.split()[0], "-> Python 3.12 environment for ACE-Step")
+        sh(f"pip install -q uv && uv venv -q --python 3.12 {VENV}")
+        os.environ.update(ACE_IN_VENV="1", ACE_T0=str(T0))
+        os.execv(f"{VENV}/bin/python", [f"{VENV}/bin/python", os.path.abspath(__file__)])
+    log("music jobs:", [(j["key_hash"], j["cue"], j["duration"]) for j in JOBS], "python", sys.version.split()[0])
     sh(f"git clone -q https://github.com/ace-step/ACE-Step-1.5 {ACE} && cd {ACE} && git checkout -q {COMMIT}")
-    sh(f"cd {ACE} && pip install -q -e . --extra-index-url https://download.pytorch.org/whl/cu128")
+    # uv reads the project's own sources (nano-vllm from the repository) and takes torch from the CUDA 12.8 index
+    sh(f"uv pip install -q --python {sys.executable} -e {ACE} --extra-index-url https://download.pytorch.org/whl/cu128 "
+       f"--index-strategy unsafe-best-match")
     log("ACE-Step installed", sh("nvidia-smi --query-gpu=name,memory.total --format=csv,noheader").strip())
     sys.path.insert(0, ACE); os.chdir(ACE)
     from acestep.handler import AceStepHandler
