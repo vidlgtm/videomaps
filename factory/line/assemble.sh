@@ -20,25 +20,40 @@ done
 echo "frames in parts: $SUM (expected $TOTAL)"; test $SUM -eq $TOTAL
 [ -n "${ASSEMBLE_TEST:-}" ] || test $TOTAL -ge 12600 || { echo "refused: $TOTAL frames is shorter than 7 minutes"; exit 1; }
 
-# Re-timing: settb=1/30,setpts=N gives every frame its own tick (its frame number) in a 1/30 s time base; in a time base
-# that does not divide 1/30 s two frames can round onto one tick and a rate conversion drops one (ffmpeg 8: 32 frames
-# lost in a 9.7 min film). -fps_mode passthrough then hands the frames to the encoder as they are (none dropped or
-# doubled). No -r with it: ffmpeg 6 and later refuse -r together with a non-CFR -fps_mode ("contradictory"); the 1/30
-# timestamps carry the 30 fps rate, checked below.
-X264="-c:v libx264 -crf 17 -preset ${X264_PRESET:-medium} -pix_fmt yuv420p -movflags +faststart"
-IN=""; F=""; C=""; i=0
-for f in $(cat parts.txt); do IN="$IN -i $f"; F="${F}[$i:v]settb=1/30,setpts=N[v$i];"; C="${C}[v$i]"; i=$((i + 1)); done
-ffmpeg -v error -y $IN -filter_complex "${F}${C}concat=n=$N:v=1:a=0,settb=1/30,setpts=N[out]" -map "[out]" -fps_mode passthrough \
-  $X264 video.mp4
+# Frame-exact join. The parts hold sub-ranges from two encoders joined by stream copy, so their timestamps and edit lists
+# are not trusted at all: every part is decoded on its own with its edit list ignored (an edit list of a stream-copied
+# join can hide frames) and re-timed to its frame order, the raw frames go in order into ONE encoder at exactly 30 fps.
+# Before the long encode every part must decode to exactly its packets with no decode error; after it the film must
+# have TOTAL frames, TOTAL/30 s and 30 fps. (Joins that trusted the timestamps lost 15-32 frames or squeezed 9.7 min of
+# frames into 129 s.)
+read -r WID HEI <<< "$(ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0:s=x "$(head -n1 parts.txt)" | head -n1 | tr 'x' ' ' | tr -cd '0-9 ')"
+FS=$(( WID * HEI * 3 / 2 ))                          # bytes of one yuv420p frame
+dec() { ffmpeg -v error -nostdin -ignore_editlist 1 -i "$1" -map 0:v:0 -vf "settb=1/30,setpts=N" -fps_mode passthrough \
+          -pix_fmt yuv420p -f rawvideo -; }
+BAD=0
+for f in $(cat parts.txt); do
+  wh=$(ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0:s=x "$f" | head -n1 | tr -cd '0-9x')
+  p=$(frames "$f"); by=$(dec "$f" 2> "$f.err" | wc -c); e=$(grep -c . "$f.err" || true)
+  echo "$(basename "$f"): ${wh}, packets $p, decoded frames $(( by / FS )) (+$(( by % FS )) bytes), decode errors $e"
+  [ "$wh" = "${WID}x${HEI}" ] && [ $(( by % FS )) -eq 0 ] && [ $(( by / FS )) -eq "$p" ] && [ "$e" -eq 0 ] || { BAD=1; head -5 "$f.err"; }
+done
+[ $BAD = 0 ] || { echo "refused: a part does not decode to exactly its frames (see above)"; exit 1; }
+for f in $(cat parts.txt); do dec "$f"; done | ffmpeg -v error -nostdin -y -f rawvideo -pix_fmt yuv420p -s "${WID}x${HEI}" -framerate 30 -i - \
+  -c:v libx264 -crf 17 -preset "${X264_PRESET:-medium}" -pix_fmt yuv420p -movflags +faststart video.mp4
 FR=$(frames video.mp4)
-if [ "$FR" != "$TOTAL" ]; then                        # second way: the concat demuxer, the same exact re-timing
-  echo "video: $FR frames (expected $TOTAL) - joining again with the concat demuxer"
-  for f in $(cat parts.txt); do echo "file '$PWD/$f'"; done > parts_list.txt
-  ffmpeg -v error -y -f concat -safe 0 -i parts_list.txt -vf "settb=1/30,setpts=N" -fps_mode passthrough $X264 video.mp4
-  FR=$(frames video.mp4)
-fi
-RATE=$(ffprobe -v error -select_streams v:0 -show_entries stream=r_frame_rate -of default=noprint_wrappers=1:nokey=1 video.mp4 | head -n1 | tr -cd '0-9/')
-echo "video rate: $RATE"; [ "$RATE" = "30/1" ] || { echo "refused: video rate $RATE (expected 30/1)"; exit 1; }
+VINFO=$(ffprobe -v error -select_streams v:0 -show_entries stream=duration,avg_frame_rate,r_frame_rate -of default=noprint_wrappers=1 video.mp4 | tr '\n' ' ')
+echo "video: $FR frames | $VINFO"
+python3 - "$FR" "$TOTAL" "$VINFO" <<'PY'
+import sys
+fr, total, info = int(sys.argv[1]), int(sys.argv[2]), dict(kv.split("=", 1) for kv in sys.argv[3].split() if "=" in kv)
+rate = lambda s: (lambda n, d: float(n) / float(d) if float(d) else 0.0)(*(s.split("/") + ["1"])[:2])
+dur, avg = float(info.get("duration", "0")), rate(info.get("avg_frame_rate", "0/1"))
+bad = [m for ok, m in ((fr == total, f"{fr} frames, expected {total}"),
+                       (abs(dur - total / 30) <= 1.5 / 30, f"{dur:.3f} s, expected {total / 30:.3f} s"),
+                       (abs(avg - 30) < 0.01, f"{avg:.4f} fps, expected 30")) if not ok]
+if bad: print("refused: the joined video is wrong - " + "; ".join(bad)); sys.exit(1)
+print(f"video ok: {fr} frames, {dur:.3f} s, {avg:g} fps")
+PY
 echo "video: $FR frames"; test "$FR" -eq "$TOTAL"
 
 ffmpeg -v error -y -i video.mp4 -i $MIX -map 0:v -map 1:a -c:v copy -c:a aac -b:a 320k -ar 48000 -movflags +faststart \
@@ -49,7 +64,7 @@ python3 $HERE/qa_sheets.py ${SLUG}_final_1080p.mp4 . 10 ${REVIEW_TIMES:-}
 {
   echo "== $TITLE"
   echo "== final: $(ffprobe -v error -show_entries stream=codec_type,duration,nb_frames,r_frame_rate -of compact ${SLUG}_final_1080p.mp4 | tr '\n' ' ')"
-  echo "== video frames: $FR (expected $TOTAL) = $(python3 -c "print(f'{$TOTAL / 30 / 60:.2f}')") min"
+  echo "== video frames: $FR (expected $TOTAL) = $(python3 -c "print(f'{$TOTAL / 30 / 60:.2f}')") min | $VINFO"
   echo "== final loudness"; ffmpeg -hide_banner -nostats -i ${SLUG}_final_1080p.mp4 -vn -af ebur128=peak=true -f null - 2>&1 | grep -E "^\s+(I|LRA|Peak):"
   [ -f "$(dirname "$MIX")/audio_report.txt" ] && { echo "== audio master"; cat "$(dirname "$MIX")/audio_report.txt"; }
   echo "== sub-ranges re-rendered frame by frame (fresh page per frame)"; cat $D/qa/*fallback* 2>/dev/null || echo none
