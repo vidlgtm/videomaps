@@ -1,0 +1,23 @@
+name: assembly-check
+# The final step's part check on the render parts of an earlier film run, in minutes: every part must decode to exactly
+# its frames with no decode error - the same code as the final job (factory/line/assemble.sh), nothing published.
+on:
+  workflow_dispatch:
+    inputs:
+      run_id: { description: 'film run whose render parts are checked (its part-* artifacts)', required: true }
+permissions:
+  contents: read
+  actions: read
+jobs:
+  parts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { pattern: 'part-*', path: parts, merge-multiple: true, run-id: "${{ inputs.run_id }}", github-token: "${{ github.token }}" }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: bash production/ci/ffmpeg.sh
+      - name: Part check (decode every part, count frames and decode errors)
+        run: ASSEMBLE_PRECHECK=1 bash factory/line/assemble.sh parts - - film_check
