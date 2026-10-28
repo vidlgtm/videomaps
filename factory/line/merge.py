@@ -12,6 +12,9 @@ usage:
         pieces of this repository (never pictures from the web) -> <publicDir>
   python factory/line/merge.py lufs <film.json> <music.json>
         measured loudness of the film's score cues -> film.json music entries
+  python factory/line/merge.py noscore <film.json>
+        stills run without the score (no cue made yet): the score cues leave film.json, so the engine and the
+        soundtrack preview use only files that exist (voice and sound effects); such stills are never approvable
   python factory/line/merge.py objects <orderDir> <objects.json> <publicDir> <engineDataDir>
         the order's 3D icons (objects collect stage) -> <publicDir>/icons/<name>_a<az>.png (publicDir - = measure only),
         <orderDir>/assets.json icons {name: {az, size, bb}} + their store credits, measured content boxes ->
@@ -104,6 +107,15 @@ def cmd_lufs(filmp, musicp):
     if miss: fail("score cues missing: " + ", ".join(miss))
 
 
+def cmd_noscore(filmp):
+    F = load(filmp)
+    cues = [m["src"] for m in F.get("music", [])]
+    F["music"] = []
+    json.dump(F, open(filmp, "w"))
+    print(f"no score: {len(cues)} cue(s) left out of these stills and of the soundtrack preview"
+          + (f" ({', '.join(cues)})" if cues else ""), flush=True)
+
+
 def icon_box(png):
     import numpy as np
     from PIL import Image
@@ -147,6 +159,7 @@ def main(a):
     elif c == "labels" and len(a) == 4: cmd_labels(*a[1:])
     elif c == "own" and len(a) == 3: cmd_own(*a[1:])
     elif c == "lufs" and len(a) == 3: cmd_lufs(*a[1:])
+    elif c == "noscore" and len(a) == 2: cmd_noscore(a[1])
     elif c == "objects" and len(a) == 5: cmd_objects(*a[1:])
     else: print(__doc__); sys.exit(1)
 

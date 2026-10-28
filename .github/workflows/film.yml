@@ -479,6 +479,7 @@ jobs:
           else
             echo "::warning::NO SCORE - the score step of the voice job did not finish; stills only, the film cannot be rendered without its score"
             echo nomusic > /tmp/nomusic
+            python3 factory/line/merge.py noscore $D/film.json
           fi
           python3 - <<'PY'
           import json, os, numpy as np
@@ -606,8 +607,11 @@ jobs:
       - name: No film without its score
         if: steps.key.outputs.nomusic == '1'
         run: |
-          echo "::error::NO SCORE - the stills are published, the film cannot be rendered without its score: see the score step of the voice job (a new cue is made on the Kaggle GPU)"
-          exit 1
+          if [ "$STAGE" = render ]; then
+            echo "::error::NO SCORE - the stills are published, the film cannot be rendered without its score: see the score step of the voice job (a new cue is made on the Kaggle GPU)"
+            exit 1
+          fi
+          echo "::warning::NO SCORE - stills and a soundtrack preview of voice and sound effects only (key with _nomusic, never approvable); the score step of the voice job makes the cues on the Kaggle GPU, then the stills are made again with them for approval"
       - name: Render only with approved stills
         if: env.STAGE == 'render' && steps.key.outputs.approved != '1'
         run: |
