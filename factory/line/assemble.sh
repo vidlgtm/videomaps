@@ -83,6 +83,13 @@ python3 $HERE/qa_sheets.py ${SLUG}_final_1080p.mp4 . 10 ${REVIEW_TIMES:-}
   echo "== still mismatches"; cat $D/qa/*FAIL* 2>/dev/null || echo none
 } > qa_report.txt
 cat qa_report.txt; ls -la *.mp4 *.jpg
+# the sound as delivered: decoded true peak of the film and of its preview at most -1.0 dBTP (AES TD1008; a lossy
+# codec adds its own overshoot, production/pipeline/master.py lowers its ceiling until the encoded sound is under)
+tpk() { ffmpeg -hide_banner -nostats -i "$1" -vn -af ebur128=peak=true -f null - 2>&1 | grep -E '^\s+Peak:' | tail -n 1 | awk '{print $2}'; }
+TPF=$(tpk ${SLUG}_final_1080p.mp4); TPP=$(tpk ${SLUG}_preview_720p.mp4)
+echo "== delivered true peak: film $TPF dBTP, preview $TPP dBTP (limit -1.0)" | tee -a qa_report.txt
+python3 -c "import sys; sys.exit(0 if all(float(v) <= -1.0 for v in sys.argv[1:]) else 1)" "$TPF" "$TPP" \
+  || { echo "refused: the delivered sound peaks over -1.0 dBTP (film $TPF, preview $TPP) - nothing published"; exit 1; }
 [ -n "${ASSEMBLE_TEST:-}" ] && { echo "self-test: nothing published"; exit 0; }
 # the release first, then its files: a transient failure is tried again (net_retry.sh) and an upload tried again
 # replaces its own half (--clobber)

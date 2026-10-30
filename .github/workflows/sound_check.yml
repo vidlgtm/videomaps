@@ -1,0 +1,45 @@
+name: sound check
+# The film's sound as it is delivered, from the assets of a film run whose stills were approved (artifact film-assets):
+# the same mix (scripts/audio_events.tsx + mix.py) and the current master (production/pipeline/master.py), encoded
+# like the film (AAC 320 kb/s) and its preview (AAC 160 kb/s) and decoded: loudness, PCM and decoded true peaks, the
+# ceiling the master needed, the loudest decoded blocks. The run's own master (artifact audio-master) is measured the
+# same way first. Nothing is published.
+on:
+  workflow_dispatch:
+    inputs:
+      run: { description: 'run id of a film run whose stills were approved (artifacts film-assets, audio-master)', required: true }
+run-name: sound check of run ${{ inputs.run }}
+permissions:
+  contents: read
+  actions: read
+jobs:
+  sound:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: film-assets, path: factory/engine, run-id: "${{ inputs.run }}", github-token: "${{ github.token }}" }
+      - uses: actions/download-artifact@v4
+        with: { name: audio-master, path: /tmp/run_master, run-id: "${{ inputs.run }}", github-token: "${{ github.token }}" }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: bash production/ci/ffmpeg.sh && pip install -q numpy
+      - name: The run's own master, as delivered
+        run: |
+          cat /tmp/run_master/audio_report.txt
+          python production/pipeline/master.py --check /tmp/run_master/mix_range.wav || echo "over the limit"
+      - name: The same mix with the current master, as delivered
+        working-directory: factory/engine
+        run: |
+          set -e
+          npm ci --no-audit --no-fund --loglevel=error
+          mkdir -p out/audio
+          node scripts/build_audio.mjs && EVENTS_OUT=out/audio_events.json node out/audio_events.cjs
+          python ../../production/pipeline/mix.py out/audio_events.json public out/audio
+          python ../../production/pipeline/master.py out/audio | tee out/audio/audio_report.txt; test "${PIPESTATUS[0]}" = 0
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: sound-check, path: factory/engine/out/audio/audio_report.txt, retention-days: 7, if-no-files-found: warn }

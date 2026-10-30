@@ -2,7 +2,8 @@
 """Reuse of the render parts of an earlier film run, when only its assembly failed (film.yml input parts_from).
 Refused unless: the run is a film.yml run whose render parts all succeeded; its stills job worked on this order with
 the stills key approved now; and nothing that makes the parts changed since its commit - only the assembly and its
-self-test, this script, the QA sheets, intake/tools, other orders, docs, and workflow lines outside the render job.
+self-test, this script, the QA sheets, the sound master, intake/tools, other orders, docs, and workflow lines outside
+the render job.
 usage: reuse_parts.py RUN_ID ORDER_DIR        env: GH_TOKEN, GITHUB_REPOSITORY (checkout with full history)"""
 import io, json, os, re, subprocess, sys, urllib.parse, urllib.request, zipfile
 
@@ -11,7 +12,8 @@ ORDER = os.path.basename(OD)
 REPO = os.environ.get("GITHUB_REPOSITORY", "vidlgtm/videomaps")
 H = {"Authorization": f"Bearer {os.environ['GH_TOKEN']}", "Accept": "application/vnd.github+json"}
 SAFE = ("factory/line/assemble.sh", "factory/line/selftest_assembly.sh", "factory/line/reuse_parts.py",
-        "factory/line/qa_sheets.py", "factory/intake/", "factory/tools/", "README", "LICENSE", ".gitignore")
+        "factory/line/qa_sheets.py", "factory/intake/", "factory/tools/", "README", "LICENSE", ".gitignore",
+        "production/pipeline/master.py")                         # the sound master: the parts are picture only
 
 
 def die(m):
