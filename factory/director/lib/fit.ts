@@ -57,22 +57,35 @@ const inward = (b: BX.SBox, lim = 240): [number, number] => {
 const moveBy = (c: any, ll: [number, number], d: [number, number]): [number, number] => {
   const q = scr(c, W(ll)), w = unproject(c, q.x + d[0], q.y + d[1]); return lonlat(w[0], w[1]);
 };
+/** every point inside the 1920x1080 frame (m px margin) at camera state c */
+const inFrame = (c: any, P: [number, number][], m = 4) => P.every((p) => { const q = scr(c, p); return q.x >= m && q.x <= 1920 - m && q.y >= m && q.y <= 1080 - m; });
 export function visibility(d: Director) {
+  const noted = new Set<string>();
   for (let pass = 0; pass < 3; pass++) {
     let changed = false;
-    /** first the shot is re-framed a little; if that would need too much, the element adapts (inner spot, other side) */
+    /** first the shot is re-framed a little; if that would need too much, the element adapts (inner spot, other side).
+     *  An adaptation counts only when it really brings the element into the frame - a bounded nudge that leaves it
+     *  outside is undone (the element keeps its true place and the audit reports it as not seen). */
     const need = (e: any, from: number, to: number, why: string, pts: (c: any) => [number, number][], adapt?: (c: any) => boolean) => {
       if (e._adapted) return;
+      const tryAdapt = (c: any) => {
+        const keep = {at: e.at, side: e.side, _fixedSide: e._fixedSide};
+        if (!adapt!(c)) return false;
+        if (inFrame(c, pts(c))) return true;
+        for (const [k, v] of Object.entries(keep)) { if (v === undefined) delete e[k]; else e[k] = v; }
+        if (!noted.has(why)) { noted.add(why); d.warn.push(`cannot bring ${why} into the shot by moving it: it keeps its place`); }
+        return false;
+      };
       for (const tc of [settle(d, from, to), Math.max(settle(d, from, to), to - 0.6)]) {
         if (tc <= from) continue;
         const c = d.path.at(tc);
         const onOverview = d.keys[d.path.keyAt(tc)]?.x !== undefined;
         if (onOverview && adapt && (why.startsWith('flag') || why.startsWith('label')) && pts(c).some((p) => !inSafe(c, p, 24))) {
-          if (adapt(c)) { e._adapted = true; changed = true; d.warn.push(`moved inward: ${why}`); return; }
+          if (tryAdapt(c)) { e._adapted = true; changed = true; d.warn.push(`moved inward: ${why}`); return; }
         }
         const r = d.ensureVisible(tc, pts(c), why);
         if (r === 'fixed') { changed = true; return; }
-        if (r === 'no' && adapt && adapt(c)) { e._adapted = true; changed = true; d.warn.push(`moved inward: ${why}`); return; }
+        if (r === 'no' && adapt && tryAdapt(c)) { e._adapted = true; changed = true; d.warn.push(`moved inward: ${why}`); return; }
       }
     };
     d.F.banners.forEach((b) => need(b, b.from, b.to, `banner ${b.title}`, (c) => extentPts(c, BX.bannerBox(c, W(b.at), b.size ?? 1)),

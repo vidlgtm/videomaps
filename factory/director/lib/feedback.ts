@@ -40,8 +40,8 @@ export function feedbackToPatches(audit: any, d: Director, film: any, patches: R
     const q = scr(c, w as [number, number]), n = unproject(c, q.x + dx, q.y + dy);
     set(e, {at: lonlat(n[0], n[1])}); return true;
   };
-  for (const v of audit.offscreen ?? []) {
-    const e = elOf(v.a, v.t0); if (!e) continue;
+  const fixOff = (v: any) => {
+    const e = elOf(v.a, v.t0); if (!e) return;
     const [x0, y0, x1, y1] = v.box, m = 40;
     const dx = x0 < 0 ? -x0 + m : x1 > 1920 ? 1920 - x1 - m : 0, dy = y0 < 0 ? -y0 + m : y1 > 1080 ? 1080 - y1 - m : 0;
     const c = d.path.at(v.t0 + 0.2);
@@ -54,6 +54,31 @@ export function feedbackToPatches(audit: any, d: Director, film: any, patches: R
       const p = innerPoint('rep:' + e.el.iso, c, 70, 110, e.el.date ? 60 : 30);
       if (p) set(e, {at: lonlat(p[0], p[1])}); else camShift(v.t0, -dx, -dy);
     } else camShift(v.t0, -dx, -dy);
+  };
+  for (const v of audit.offscreen ?? []) fixOff(v);
+  // UNSEEN: a story element the viewer does not really see. Under a clip -> it starts when the clip ends (and keeps
+  // 2 s); a flag cut by an overview -> that overview frames a little wider; partly cut by the frame -> moved inward as
+  // above. Entirely outside the shot: no blind repair - the camera has to go there (the line stops on it).
+  const widened = new Set<string>();
+  const camWiden = (t: number) => {
+    const i = d.path.keyAt(t), k = d.keys[i], src = k?.src;
+    if (!src || src.includes('/drift') || k.x === undefined || widened.has(src)) return;
+    widened.add(src);
+    const q = P[src] ?? {};
+    P[src] = {...q, wmul: r3(clamp((q.wmul ?? 1) * 1.06, 0.8, 1.25))};
+  };
+  for (const v of audit.unseen ?? []) {
+    const e = elOf(v.a, v.tm); if (!e) continue;
+    if (v.why === 'clip') {
+      const ends = (film.clips ?? []).filter((c: any) => c.from < v.t1 && c.to > v.t0 + 0.3).map((c: any) => c.to);
+      if (!ends.length) continue;
+      const nf = r3(Math.max(...ends) + 0.15), k = e.arr === 'flags' ? 't' : 'from';
+      if (nf >= (e.el.to ?? Infinity) + 1.5) continue;
+      set(e, {[k]: nf, ...(e.el.to !== undefined && e.el.to < nf + 2.0 ? {to: r3(nf + 2.0)} : {})});
+    } else if (v.why === 'off') {
+      if (e.arr === 'flags') camWiden(v.tm);
+      else if (v.box && v.box[2] > 0 && v.box[0] < 1920 && v.box[3] > 0 && v.box[1] < 1080) fixOff({...v, t0: v.tm});
+    }
   }
   // HIDDEN (audit "smothered"): an element kept under a higher one for most of its life. Per hiding element:
   // 1. a date card takes the other top corner; 2. a billboard / free label steps aside just enough to clear

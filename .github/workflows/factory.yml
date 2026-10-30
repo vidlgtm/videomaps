@@ -149,13 +149,20 @@ jobs:
           best=999999; bp=0
           for pass in 1 2 3 4 5 6; do
             npx -y tsx tools/audit.ts out/audit$pass.json > out/audit$pass.txt; tail -n 40 out/audit$pass.txt
-            n=$(python3 -c "import json; a=json.load(open('out/audit$pass.json')); print(len(a['overlaps']) + len(a['offscreen']) + len(a.get('smothered', [])) + len(a.get('cliplabels', [])))")
+            n=$(python3 -c "import json; a=json.load(open('out/audit$pass.json')); print(len(a['overlaps']) + len(a['offscreen']) + len(a.get('smothered', [])) + len(a.get('cliplabels', [])) + len(a.get('unseen', [])))")
             echo "pass $pass: $n problems"
             if [ "$n" -lt "$best" ]; then best=$n; bp=$pass; cp src/data/film.json out/film_best.json; cp ../orders/$ORDER/out/director_report.txt out/director_report_best.txt; fi
             if [ "$n" = "0" ] || [ $pass = 6 ]; then break; fi
             npx -y tsx ../director/main.ts ../orders/$ORDER --feedback out/audit$pass.json
           done
           cp out/film_best.json src/data/film.json; echo "BEST pass $bp: $best problems"
+          if [ "$best" != "0" ]; then
+            # no film leaves the director with a known problem (something not seen, cut, hidden or overlapping)
+            grep -E '^(OVERLAP|OFFSCREEN|HIDDEN|UNSEEN|CLIPLABELS)' out/audit$bp.txt | sed 's/^/::error::/' || true
+            echo "::error::the director could not solve $best problem(s) - the order needs a change (see the lines above)"
+            cp out/director_report_best.txt out/director_report.txt; cp src/data/film.json out/ 2>/dev/null || true
+            exit 1
+          fi
           npx -y tsx tools/uhd_need.ts /tmp/need.json | tail -n 6
           echo "uhd=$(python3 -c "import json; print(json.dumps(json.load(open('/tmp/need.json'))['uhd']))")" >> $GITHUB_OUTPUT
           echo "hd=$(python3 -c "import json; print(json.dumps(json.load(open('/tmp/need.json'))['hd']))")" >> $GITHUB_OUTPUT

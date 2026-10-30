@@ -9,7 +9,10 @@ import type {Order, Storyboard, Assets, Constitution, Beat} from './types';
 
 type RB = {key: string; pid: string; c: number; i: number; t: number; t1: number; b: Beat};
 type Shot = {t: number; place: Place | null; kind: string; key: string; explicit: boolean; box: Box | null; pt: [number, number] | null;
-  variant?: number; tiltAdd?: number; wMul?: number; hold?: boolean; shiftW?: [number, number]; box0?: Box | null; pts?: [number, number][]};
+  variant?: number; tiltAdd?: number; wMul?: number; hold?: boolean; shiftW?: [number, number]; box0?: Box | null; pts?: [number, number][];
+  /** overview group framing: the world extent of every element this shot must show, and the widening / slide its
+   *  current keys were built with (so every element judged in one pass aims at the same framing) */
+  need?: Record<string, [number, number][]>; _wm?: number; _shift?: [number, number]};
 const OPTS = new Set(['cue', 'until', 'look', 'like', 'except', 'style', 'at', 'glide', 'sub', 'side', 'pulse', 'alert', 'dot', 'num', 'group',
   'title', 'near', 'name', 'caption', 'signatures', 'size', 'kind', 'layers', 'tempo', 'steps', 'labels', 'shot', 'params', 'hi', 'hi_cue', 'op', 'color',
   'width', 'note', 'dates', 'km', 'text', 'italic', 'order', 'stagger']);
@@ -129,18 +132,25 @@ export class Director {
     }
   }
   inWindow(t: number) { return this.windows.find((w) => t > w.from + 0.2 && t < w.to - 0.3) ?? null; }
-  /** map elements that would start under a full-frame clip wait for its end (screen cards stay: they draw above clips) */
+  /** a 3D overlay clip (transparent video) dims the map under it (engine Overlays): map elements are not seen there */
+  inOverlay(t: number) { return this.F.clips.find((c: any) => c.kind === 'doll' && t > c.from + 0.25 && t < c.to - 0.3) ?? null; }
+  /** map elements that would start under a full-frame clip or a 3D overlay wait for its end (screen cards stay: they
+   *  draw above clips); one left with under 1.2 s after the clip keeps 2 s on screen instead of being dropped */
   afterWindows() {
+    const under = (t: number) => this.inWindow(t) ?? this.inOverlay(t);
     const shift = (e: any, a: string, k: number) => {
-      const w = this.inWindow(e[a]); if (!w) return true;
+      const w = under(e[a]); if (!w) return true;
       const nf = w.to - 0.2 + k * 0.15;
-      const end = e.to ?? this.END;
-      if (end < nf + 1.2) { this.warn.push(`dropped ${e.text ?? e.title ?? e.city ?? e.iso ?? e.name ?? 'element'} (it would only show under a full-frame clip)`); return false; }
+      const name = e.text ?? e.title ?? e.city ?? e.iso ?? e.name ?? 'element';
+      if ((e.to ?? this.END) < nf + 1.2) {
+        if (e.to === undefined || nf + 2.0 > this.END - 0.3) { this.warn.push(`dropped ${name} (it would only show under a clip)`); return false; }
+        e.to = r3(nf + 2.0); this.warn.push(`${name} waits for the clip to end and keeps 2 s on screen: ${r3(nf)}-${e.to}`);
+      }
       e[a] = r3(nf); return true;
     };
-    for (const n of ['labels', 'markers', 'banners', 'icons', 'rings', 'lines', 'dot_shows']) { let k = 0; this.F[n] = this.F[n].filter((e) => shift(e, 'from', this.inWindow(e.from) ? k++ : 0)); }
+    for (const n of ['labels', 'markers', 'banners', 'icons', 'rings', 'lines', 'dot_shows']) { let k = 0; this.F[n] = this.F[n].filter((e) => shift(e, 'from', under(e.from) ? k++ : 0)); }
     let k = 0;
-    this.F.flags = this.F.flags.filter((e) => shift(e, 't', this.inWindow(e.t) ? k++ : 0));
+    this.F.flags = this.F.flags.filter((e) => shift(e, 't', under(e.t) ? k++ : 0));
     this.F.arrows = this.F.arrows.filter((e) => shift(e, 't', 0));
   }
 
@@ -195,7 +205,7 @@ export class Director {
     let ov = 0;
     this.shots.forEach((s, i) => {
       let k = this.shotKey(s, ov);
-      if (!s.place) ov++;
+      if (!s.place) { ov++; s._wm = s.wMul ?? 1; s._shift = s.shiftW ? [s.shiftW[0], s.shiftW[1]] : [0, 0]; }
       // never repeat a framing within 60 s (except straight after itself)
       for (let v = 0; v < 4; v++) {
         const similar = keys.filter((q, j) => j < keys.length - 1 && q.t > s.t - 60 && keyDistance(q, k) < 0.14);
@@ -231,18 +241,30 @@ export class Director {
   /** 'ok' = already visible, 'fixed' = the shot was re-framed a little, 'no' = would need too much (the element adapts instead) */
   ensureVisible(t: number, pts: [number, number][], why: string): 'ok' | 'fixed' | 'no' {
     const c = this.path.at(t);
-    if (pts.every((p) => inSafe(c, p, 24))) return 'ok';
     const i = this.path.keyAt(t), k = this.keys[i];
     const s = this.shots.find((x) => x.key === k.src);
+    if (s && !s.place) (s.need ??= {})[why] = pts;                          // every element an overview shows joins its group
+    if (pts.every((p) => inSafe(c, p, 24))) return 'ok';
     if (!s) return 'no';
-    if (!s.place) {                                                          // overview: slide (never wider than the canvas)
-      const q = pts.map((p) => scr(c, p));
-      const lo = Math.min(...q.map((p) => p.y)), hi = Math.max(...q.map((p) => p.y)), le = Math.min(...q.map((p) => p.x)), ri = Math.max(...q.map((p) => p.x));
-      const dy = hi > 960 ? hi - 960 : lo < 120 ? lo - 120 : 0, dx = ri > 1800 ? ri - 1800 : le < 120 ? le - 120 : 0;
-      if (Math.abs(dx) < 4 && Math.abs(dy) < 4) return 'no';
-      const cur = s.shiftW ?? [0, 0], nx = clamp(cur[0] + dx / c.zoom, -650, 650), ny = clamp(cur[1] + dy / c.zoom, -650, 650);
-      if (Math.abs(nx - cur[0]) < 2 && Math.abs(ny - cur[1]) < 2) return 'no';
-      s.shiftW = [nx, ny]; this.warn.push(`camera: overview slid for ${why}`); return 'fixed';
+    if (!s.place) {
+      // overview: GROUP framing - the whole group of elements this shot must show is framed at once (slide; widen,
+      // bounded, when the group is larger than the frame band). One element at a time would push the others out.
+      // Judged on the keys as built, so every element of one pass aims at the same framing (no compounding).
+      const q = Object.values(s.need!).flat().map((p) => scr(c, p));
+      let lo = Math.min(...q.map((p) => p.y)), hi = Math.max(...q.map((p) => p.y)), le = Math.min(...q.map((p) => p.x)), ri = Math.max(...q.map((p) => p.x));
+      const BW = 1800 - 120, BH = 960 - 120, wm0 = s._wm ?? 1;
+      const g = Math.max((ri - le) / BW, (hi - lo) / BH);
+      const wm = g > 1 ? Math.min(1.25, wm0 * g * 1.03) : wm0, f = wm0 / wm;  // wider shot: screen offsets shrink about the centre
+      [le, ri] = [960 + (le - 960) * f, 960 + (ri - 960) * f]; [lo, hi] = [540 + (lo - 540) * f, 540 + (hi - 540) * f];
+      const dy = hi - lo > BH ? (lo + hi) / 2 - 540 : hi > 960 ? hi - 960 : lo < 120 ? lo - 120 : 0;
+      const dx = ri - le > BW ? (le + ri) / 2 - 960 : ri > 1800 ? ri - 1800 : le < 120 ? le - 120 : 0;
+      const base = s._shift ?? [0, 0], z = c.zoom * f;
+      const nx = clamp(base[0] + dx / z, -650, 650), ny = clamp(base[1] + dy / z, -650, 650), cur = s.shiftW ?? [0, 0];
+      if (Math.abs(wm - (s.wMul ?? 1)) < 0.004 && Math.abs(nx - cur[0]) < 2 && Math.abs(ny - cur[1]) < 2) return 'no';
+      const wider = wm > (s.wMul ?? 1) + 0.004;
+      s.wMul = wm; s.shiftW = [nx, ny];
+      this.warn.push(wider ? `camera: overview widened x${(wm / wm0).toFixed(2)} for ${why}` : `camera: overview slid for ${why}`);
+      return 'fixed';
     }
     // the original target of the shot bounds every re-framing: at most 1.35x its size, never compounding
     if (s.box0 === undefined) s.box0 = s.box ?? (s.pt ? [s.pt[0] - 80, s.pt[1] - 80, s.pt[0] + 80, s.pt[1] + 80] : null);

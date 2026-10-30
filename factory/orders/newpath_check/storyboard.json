@@ -1085,6 +1085,14 @@
      "until": "Karelo-Finnish"
     },
     {
+     "cue": "Karelo-Finnish",
+     "go": [
+      "Karelia",
+      "Karelian Isthmus"
+     ],
+     "shot": "region"
+    },
+    {
      "cue": "on the border with Finland",
      "label": "FINLAND",
      "at": "ctx:FIN",
