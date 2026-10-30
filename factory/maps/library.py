@@ -12,7 +12,7 @@ usage:
                                                                          the library has, build + publish the missing ones
   python factory/maps/library.py engine  <mapDir> <engineDir>            basemap + tiles + indexes (+ geo.json) into the engine
 env: GH_TOKEN (contents: write) for publishing."""
-import json, os, re, subprocess, sys, time, urllib.error, urllib.parse, urllib.request
+import http.client, json, os, random, re, subprocess, sys, time, urllib.error, urllib.parse, urllib.request
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -42,31 +42,75 @@ LEGACY = {
 
 
 # ------------------------------------------------------------------ GitHub releases
+# Transient failures (timeouts, dropped connections, HTTP 408 425 429 5xx, rate limits) are tried again: truncated
+# exponential backoff with jitter (1, 2, 4 ... 32 s + up to 1 s), the server's Retry-After / rate-limit reset when it
+# gives one, and no attempt later than NET_DEADLINE s after the first. 404 and the other 4xx are final at once.
+TRANSIENT = {408, 425, 429, 500, 502, 503, 504}
+NET_DEADLINE = float(os.environ.get("NET_DEADLINE", "300"))
+NET_ERRORS = (urllib.error.URLError, http.client.HTTPException, ConnectionError, TimeoutError, OSError)
+
+
+def rate_limited(e):
+    """a 403 / 429 that is a GitHub rate limit (primary: remaining 0; secondary: retry-after or its message)"""
+    if e.code not in (403, 429): return False
+    if e.headers.get("Retry-After") or e.headers.get("X-RateLimit-Remaining") == "0": return True
+    try: return b"rate limit" in (e.read() or b"").lower()
+    except Exception: return e.code == 429
+
+
+def pause(attempt, e=None):
+    """seconds to wait before attempt + 1"""
+    d = min(2 ** attempt, 32) + random.random()
+    h = getattr(e, "headers", None)
+    if h is not None:
+        ra, rem, rst = (h.get("Retry-After") or "").strip(), h.get("X-RateLimit-Remaining"), (h.get("X-RateLimit-Reset") or "").strip()
+        if ra.isdigit(): d = max(d, float(ra))
+        elif rem == "0" and rst.isdigit(): d = max(d, float(rst) - time.time() + 1)
+        elif getattr(e, "code", 0) in (403, 429): d = max(d, 60.0)        # a secondary limit without a time: one minute
+    return d
+
+
+def again(what, attempt, t0, e):
+    """sleeps before the next attempt, or raises e when the deadline would pass"""
+    d = pause(attempt, e)
+    if time.time() - t0 + d > NET_DEADLINE:
+        print(f"network: giving up on {what} after {attempt + 1} attempts: {e}", flush=True)
+        raise e
+    print(f"network: {what}: {e} - again in {d:.1f} s", flush=True)
+    time.sleep(d)
+
+
 def gh(path, method="GET", data=None, body=None, ctype=None, base=API):
     tok = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
     h = {"Accept": "application/vnd.github+json", "User-Agent": "videomaps-maps"}
     if tok: h["Authorization"] = "Bearer " + tok
     if data is not None: body = json.dumps(data).encode(); ctype = "application/json"
     if ctype: h["Content-Type"] = ctype
-    for i in range(5):
+    t0, i = time.time(), 0
+    while True:
         try:
             with urllib.request.urlopen(urllib.request.Request(base + path, data=body, headers=h, method=method), timeout=600) as r:
                 raw = r.read()
                 return json.loads(raw) if raw else {}
         except urllib.error.HTTPError as e:
             if e.code == 404: return None
-            if e.code == 422 and method == "POST": raise
-            if i == 4: raise
-        except Exception:
-            if i == 4: raise
-        time.sleep(3 + 5 * i)
+            if e.code not in TRANSIENT and not rate_limited(e): raise
+            again(f"{method} {path[:80]}", i, t0, e)
+        except NET_ERRORS as e:
+            again(f"{method} {path[:80]}", i, t0, e)
+        i += 1
 
 
 def release(tag, create=False, note=""):
     r = gh(f"/releases/tags/{tag}")
     if r or not create: return r
-    return gh("/releases", "POST", {"tag_name": tag, "name": tag, "body": note or "map library", "target_commitish": "main",
-                                    "draft": False, "prerelease": True})
+    try:
+        return gh("/releases", "POST", {"tag_name": tag, "name": tag, "body": note or "map library", "target_commitish": "main",
+                                        "draft": False, "prerelease": True})
+    except urllib.error.HTTPError as e:
+        r = gh(f"/releases/tags/{tag}") if e.code == 422 else None       # made by an attempt whose answer was lost
+        if r: return r
+        raise
 
 
 def assets(rel):
@@ -80,27 +124,41 @@ def assets(rel):
 
 
 def upload(rel, path, name, replace=True):
+    data = open(path, "rb").read()
     for a in assets(rel):
         if a["name"] == name:
-            if not replace: return
+            if not replace and a.get("state", "uploaded") == "uploaded": return
             gh(f"/releases/assets/{a['id']}", "DELETE")
     ctype = "image/jpeg" if name.endswith(".jpg") else "application/json"
-    gh(f"/releases/{rel['id']}/assets?name={urllib.parse.quote(name)}", "POST", body=open(path, "rb").read(), ctype=ctype, base=UPLOADS)
+    for k in range(3):
+        try:
+            gh(f"/releases/{rel['id']}/assets?name={urllib.parse.quote(name)}", "POST", body=data, ctype=ctype, base=UPLOADS)
+            return
+        except urllib.error.HTTPError as e:
+            if e.code != 422 or k == 2: raise
+        # 422: an asset of that name is there - an attempt whose answer was lost (keep it if whole) or a broken one
+        for a in assets(rel):
+            if a["name"] == name:
+                if a.get("state") == "uploaded" and a.get("size") == len(data): return
+                gh(f"/releases/assets/{a['id']}", "DELETE")
 
 
-def download(url, path, tries=5):
+def download(url, path):
+    """True when the file arrived, False when the address does not exist (404); other failures raise"""
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-    for i in range(tries):
+    t0, i = time.time(), 0
+    while True:
         try:
             with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "videomaps-maps"}), timeout=600) as r:
                 open(path + ".part", "wb").write(r.read())
             os.replace(path + ".part", path); return True
         except urllib.error.HTTPError as e:
             if e.code == 404: return False
-            if i == tries - 1: raise
-        except Exception:
-            if i == tries - 1: raise
-        time.sleep(2 + 3 * i)
+            if e.code not in TRANSIENT and not rate_limited(e): raise
+            again("download " + url.rsplit("/", 1)[-1], i, t0, e)
+        except NET_ERRORS as e:
+            again("download " + url.rsplit("/", 1)[-1], i, t0, e)
+        i += 1
 
 
 def library_index():
@@ -130,9 +188,8 @@ def order_extent(o):
         p = "cache/ne_10m_admin_0_countries_lakes.geojson"
         os.makedirs("cache", exist_ok=True)
         if not os.path.exists(p):
-            r = requests.get("https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_admin_0_countries_lakes.geojson",
-                             timeout=600, headers={"User-Agent": "videomaps-maps"}); r.raise_for_status()
-            open(p, "wb").write(r.content)
+            if not download("https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_admin_0_countries_lakes.geojson", p):
+                raise SystemExit("MAP ERROR: the Natural Earth countries file is not at its address (404)")
         found = set()
         for f in json.load(open(p, encoding="utf-8"))["features"]:
             pr = {k.lower(): v for k, v in f["properties"].items()}

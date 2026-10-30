@@ -32,7 +32,12 @@ OUT = ORDER / "out"; REV = OUT / "ws_review"
 WORKD = Path("/tmp/ws_run")
 
 
+# gh commands go through net_retry.sh: a transient failure (timeout, HTTP 5xx, rate limit) is tried again
+NET = str(Path(__file__).resolve().parents[1] / "tools" / "net_retry.sh")
+
+
 def run(cmd, check=True, **kw):
+    if cmd and cmd[0] == "gh": cmd = ["bash", NET, *cmd]
     r = subprocess.run(cmd, capture_output=True, text=True, **kw)
     if check and r.returncode:
         print("FAILED:", " ".join(map(str, cmd[:5])), "\n", r.stdout[-1500:], "\n", r.stderr[-1500:], flush=True); sys.exit(1)

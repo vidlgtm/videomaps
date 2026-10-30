@@ -48,7 +48,12 @@ CUTCODE = (HERE / "cut.py").read_bytes()
 KERNEL = (HERE / "objects_kernel.py").read_text()
 
 
+# gh commands go through net_retry.sh: a transient failure (timeout, HTTP 5xx, rate limit) is tried again
+NET = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tools", "net_retry.sh")
+
+
 def run(cmd, check=True, **kw):
+    if cmd and cmd[0] == "gh": cmd = ["bash", NET, *cmd]
     r = subprocess.run(cmd, capture_output=True, text=True, **kw)
     if check and r.returncode:
         print("FAILED:", " ".join(map(str, cmd[:6])), "\n", r.stdout[-1500:], "\n", r.stderr[-1500:], flush=True); sys.exit(1)

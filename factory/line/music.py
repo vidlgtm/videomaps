@@ -29,7 +29,12 @@ def fail(msg, code=2):
     print("MUSIC ERROR:", msg, flush=True); sys.exit(code)
 
 
+# gh commands go through net_retry.sh: a transient failure (timeout, HTTP 5xx, rate limit) is tried again
+NET = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tools", "net_retry.sh")
+
+
 def sh(cmd, check=True):
+    if cmd and cmd[0] == "gh": cmd = ["bash", NET, *cmd]
     r = subprocess.run(cmd, capture_output=True, text=True)
     if check and r.returncode: fail(f"{' '.join(map(str, cmd))[:200]}\n{r.stdout[-800:]}\n{r.stderr[-800:]}", 1)
     return r

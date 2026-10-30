@@ -84,6 +84,10 @@ python3 $HERE/qa_sheets.py ${SLUG}_final_1080p.mp4 . 10 ${REVIEW_TIMES:-}
 } > qa_report.txt
 cat qa_report.txt; ls -la *.mp4 *.jpg
 [ -n "${ASSEMBLE_TEST:-}" ] && { echo "self-test: nothing published"; exit 0; }
-gh release delete $TAG --repo $GITHUB_REPOSITORY -y --cleanup-tag 2>/dev/null || true
-gh release create $TAG --repo $GITHUB_REPOSITORY --title "$TITLE" --notes "$TITLE" \
+# the release first, then its files: a transient failure is tried again (net_retry.sh) and an upload tried again
+# replaces its own half (--clobber)
+NET="$HERE/../tools/net_retry.sh"
+bash "$NET" gh release delete $TAG --repo $GITHUB_REPOSITORY -y --cleanup-tag 2>/dev/null || true
+bash "$NET" gh release create $TAG --repo $GITHUB_REPOSITORY --title "$TITLE" --notes "$TITLE"
+bash "$NET" gh release upload $TAG --repo $GITHUB_REPOSITORY --clobber \
   ${SLUG}_final_1080p.mp4 ${SLUG}_preview_720p.mp4 qa_sheet_*.jpg qa_report.txt ${EXTRA_ASSETS:-}

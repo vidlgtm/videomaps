@@ -23,6 +23,7 @@ env: GH_TOKEN, GITHUB_REPOSITORY"""
 import json, os, subprocess, sys
 
 REPO = os.environ.get("GITHUB_REPOSITORY", "vidlgtm/videomaps")
+NET = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tools", "net_retry.sh")
 
 
 def fail(msg):
@@ -30,7 +31,7 @@ def fail(msg):
 
 
 def gh_download(tag, name, dest_dir=None, out=None):
-    cmd = ["gh", "release", "download", tag, "-R", REPO, "-p", name, "--clobber"]
+    cmd = ["bash", NET, "gh", "release", "download", tag, "-R", REPO, "-p", name, "--clobber"]   # transient failures: again
     cmd += ["-O", out] if out else ["-D", dest_dir]
     r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode: fail(f"cannot download {name} from release {tag}: {r.stderr.strip()[-300:]}")

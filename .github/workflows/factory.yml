@@ -29,6 +29,7 @@ env:
   STILLS: ${{ inputs.stills }}
   COMPARE: ${{ inputs.compare || 'test_v5' }}
   REL: https://github.com/${{ github.repository }}/releases/download
+  NET: ${{ github.workspace }}/factory/tools/net_retry.sh     # a download / upload that meets a transient failure is tried again
 jobs:
   station:
     runs-on: ubuntu-24.04
@@ -49,7 +50,7 @@ jobs:
           if [ ! -f "$S" ]; then echo "::error::$S is missing (factory/intake/store.py puts the order's pictures in its store)"; exit 1; fi
           R=$(python3 -c "import json; print(json.load(open('$S'))['release'])")
           mkdir -p factory/orders/$ORDER/store_files
-          gh release download "$R" -R ${{ github.repository }} -D factory/orders/$ORDER/store_files --clobber
+          bash "$NET" gh release download "$R" -R ${{ github.repository }} -D factory/orders/$ORDER/store_files --clobber
           echo "order store $R: $(ls factory/orders/$ORDER/store_files | wc -l) files"
       - uses: actions/cache@v4
         with:
@@ -218,20 +219,20 @@ jobs:
           cp ../orders/$ORDER/data/*.json src/data/ 2>/dev/null || true
           cp ../../art/direction/film.json src/data/film.json
           if [ "$ORDER" = "ussr15" ]; then
-            curl -sfL --retry 3 -o $PUB/voice.wav "$REL/voice4/voice.wav"
-            curl -sfL --retry 3 -o /tmp/sfx.zip "$REL/stage1/sfx.zip" && (cd $PUB/sfx && unzip -q -o /tmp/sfx.zip)
-            for c in c1_hook c2_origins c3_annex c4_collapse c5_resolution; do curl -sfL --retry 3 -o $PUB/music/music_$c.mp3 "$REL/stage1/music_$c.mp3"; done
-            curl -sfL --retry 3 -o $PUB/caucasus.mp4 "$REL/cauc3/caucasus.mp4"
-            curl -sfL --retry 3 -o $PUB/matryoshka.webm "$REL/assets4/matryoshka.webm"
-            curl -sfL --retry 3 -o /tmp/uhd.zip "$REL/assets4/uhd.zip" && (cd $PUB && unzip -q -o /tmp/uhd.zip && rm -f uhd/index.json)
-            curl -sfL --retry 3 -o /tmp/uhd5.zip "$REL/tiles5/uhd5.zip" && (cd $PUB && unzip -q -o /tmp/uhd5.zip)
-            for f in basemap_v2.jpg basemap_v2_half.jpg globe_night.jpg hd_tiles.zip; do curl -sfL --retry 3 -o /tmp/$f "$REL/assets3/$f"; done
+            bash "$NET" curl -fsSL --connect-timeout 30 --speed-limit 1000 --speed-time 60 -o $PUB/voice.wav "$REL/voice4/voice.wav"
+            bash "$NET" curl -fsSL --connect-timeout 30 --speed-limit 1000 --speed-time 60 -o /tmp/sfx.zip "$REL/stage1/sfx.zip" && (cd $PUB/sfx && unzip -q -o /tmp/sfx.zip)
+            for c in c1_hook c2_origins c3_annex c4_collapse c5_resolution; do bash "$NET" curl -fsSL --connect-timeout 30 --speed-limit 1000 --speed-time 60 -o $PUB/music/music_$c.mp3 "$REL/stage1/music_$c.mp3"; done
+            bash "$NET" curl -fsSL --connect-timeout 30 --speed-limit 1000 --speed-time 60 -o $PUB/caucasus.mp4 "$REL/cauc3/caucasus.mp4"
+            bash "$NET" curl -fsSL --connect-timeout 30 --speed-limit 1000 --speed-time 60 -o $PUB/matryoshka.webm "$REL/assets4/matryoshka.webm"
+            bash "$NET" curl -fsSL --connect-timeout 30 --speed-limit 1000 --speed-time 60 -o /tmp/uhd.zip "$REL/assets4/uhd.zip" && (cd $PUB && unzip -q -o /tmp/uhd.zip && rm -f uhd/index.json)
+            bash "$NET" curl -fsSL --connect-timeout 30 --speed-limit 1000 --speed-time 60 -o /tmp/uhd5.zip "$REL/tiles5/uhd5.zip" && (cd $PUB && unzip -q -o /tmp/uhd5.zip)
+            for f in basemap_v2.jpg basemap_v2_half.jpg globe_night.jpg hd_tiles.zip; do bash "$NET" curl -fsSL --connect-timeout 30 --speed-limit 1000 --speed-time 60 -o /tmp/$f "$REL/assets3/$f"; done
             mv /tmp/basemap_v2.jpg /tmp/basemap_v2_half.jpg $PUB/
             ffmpeg -v error -y -i /tmp/globe_night.jpg -vf scale=4096:2048 -q:v 2 $PUB/globe_night_4k.jpg
             (cd $PUB && unzip -q -o /tmp/hd_tiles.zip && rm -f hd/index.json)
-            curl -sfL --retry 3 -o /tmp/hd5.zip "$REL/tiles5/hd5.zip" && (cd $PUB && unzip -q -o /tmp/hd5.zip)
-            curl -sfL --retry 3 -o /tmp/icons.zip "$REL/assets4/icons.zip" && (cd $PUB/icons && unzip -q -o /tmp/icons.zip)
-            curl -sfL --retry 3 -o $PUB/clips/opening.mp4 "$REL/opening/opening.mp4"
+            bash "$NET" curl -fsSL --connect-timeout 30 --speed-limit 1000 --speed-time 60 -o /tmp/hd5.zip "$REL/tiles5/hd5.zip" && (cd $PUB && unzip -q -o /tmp/hd5.zip)
+            bash "$NET" curl -fsSL --connect-timeout 30 --speed-limit 1000 --speed-time 60 -o /tmp/icons.zip "$REL/assets4/icons.zip" && (cd $PUB/icons && unzip -q -o /tmp/icons.zip)
+            bash "$NET" curl -fsSL --connect-timeout 30 --speed-limit 1000 --speed-time 60 -o $PUB/clips/opening.mp4 "$REL/opening/opening.mp4"
           fi
           (mkdir -p /tmp/s2 && cd /tmp/s2 && python $GITHUB_WORKSPACE/production/pipeline/sfx2.py > /dev/null && cp out/sfx/*.wav $GITHUB_WORKSPACE/factory/engine/$PUB/sfx/)
           cp ../../fonts/*.ttf $PUB/fonts/
@@ -334,7 +335,7 @@ jobs:
         run: |
           set -e
           mkdir -p /tmp/ref out/compare
-          gh release download "$COMPARE" -R ${{ github.repository }} -p 't*.jpg' -D /tmp/ref || true
+          bash "$NET" gh release download "$COMPARE" -R ${{ github.repository }} -p 't*.jpg' -D /tmp/ref --clobber || true
           python3 - <<'PY'
           import glob, os
           from PIL import Image, ImageDraw, ImageFont
@@ -375,7 +376,8 @@ jobs:
           set -e
           cp ../../art/direction/director_report.txt ../../art/direction/audit*.txt ../../art/direction/CREDITS.txt out/ 2>/dev/null || true
           mkdir -p out/station && cp ../../art/pack/sheets/* ../../art/pack/station_report.txt ../../art/pack/station_compare.txt ../../art/pack/pack.json out/station/ 2>/dev/null || true
-          gh release delete "$TAG" -y --cleanup-tag -R ${{ github.repository }} 2>/dev/null || true
-          gh release create "$TAG" -R ${{ github.repository }} --title "$TAG" --notes "factory: automatic director + processing station - order $ORDER" \
+          bash "$NET" gh release delete "$TAG" -y --cleanup-tag -R ${{ github.repository }} 2>/dev/null || true
+          bash "$NET" gh release create "$TAG" -R ${{ github.repository }} --title "$TAG" --notes "factory: automatic director + processing station - order $ORDER"
+          bash "$NET" gh release upload "$TAG" -R ${{ github.repository }} --clobber \
             out/stills/*.jpg out/stills_station/*.jpg out/compare/*.jpg out/compare/*.pdf out/*.txt out/station/* src/data/film.json 2>/dev/null \
-            || gh release create "$TAG" -R ${{ github.repository }} --title "$TAG" --notes "factory" out/stills/*.jpg out/*.txt src/data/film.json
+            || bash "$NET" gh release upload "$TAG" -R ${{ github.repository }} --clobber out/stills/*.jpg out/*.txt src/data/film.json

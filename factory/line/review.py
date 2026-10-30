@@ -7,8 +7,12 @@ usage:
         approval key of the stills: the order's files (without "approved"), film.json (without its build time), the voice
         timeline and the names of every asset -> the film rendered later is exactly the one whose stills were approved
   python factory/line/review.py approved <orderDir> <key>           exit 0 when order.json "approved": {"stills": key}
+  python factory/line/review.py station_key <orderDir>
+        key of the station's assets: the order's files (without "approved"), the station code, the house fonts and the
+        station job -> the assets are built once and the same ones serve the stills and the render (a depth or face
+        model on another processor can move a focus point by 0.001, which would change the stills)
   python factory/line/review.py parts <total_s> [frames_per_part=900] [max_parts=18]   render matrix -> JSON list"""
-import glob, hashlib, json, math, os, sys
+import glob, hashlib, json, math, os, re, sys
 
 ORDER_FILES = ("order.json", "narration.json", "storyboard.json", "sources.json", "scenes.json", "store.json", "objects.json")
 
@@ -61,11 +65,33 @@ def stills_key(odir, edir, music=None):
     return h.hexdigest()[:16]
 
 
+def station_key(odir, root=None):
+    root = root or os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
+    h = hashlib.sha256(b"station-assets-v1\n")
+    for f in ORDER_FILES:
+        p = os.path.join(odir, f)
+        if not os.path.exists(p): continue
+        h.update(f.encode() + b"\n")
+        if f == "order.json":
+            o = json.load(open(p, encoding="utf-8")); o.pop("approved", None)
+            h.update(json.dumps(o, sort_keys=True).encode())
+        else:
+            h.update(open(p, "rb").read())
+    for f in sorted(glob.glob(os.path.join(root, "factory", "station", "*.py")) + glob.glob(os.path.join(root, "fonts", "*.ttf"))):
+        h.update(os.path.relpath(f, root).encode() + b"\n" + hashlib.sha256(open(f, "rb").read()).digest())
+    wf = open(os.path.join(root, ".github", "workflows", "film.yml"), encoding="utf-8").read()
+    m = re.search(r"^  station:\n(.*?)(?=^  [a-z_]+:\n)", wf, re.S | re.M)
+    if not m: raise SystemExit("station_key: no station job in film.yml")
+    h.update(m.group(0).encode())
+    return h.hexdigest()[:16]
+
+
 def main(a):
     if not a: print(__doc__); sys.exit(1)
     c = a[0]
     if c == "times" and len(a) == 3: print(" ".join(str(t) for t in times(a[1], a[2])))
     elif c == "key" and len(a) in (3, 4): print(stills_key(a[1], a[2], a[3] if len(a) == 4 else None))
+    elif c == "station_key" and len(a) == 2: print(station_key(a[1]))
     elif c == "approved" and len(a) == 3:
         o = json.load(open(os.path.join(a[1], "order.json"), encoding="utf-8"))
         ok = (o.get("approved") or {}).get("stills") == a[2]

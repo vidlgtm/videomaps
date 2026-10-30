@@ -38,6 +38,7 @@ env:
   TAG: ${{ inputs.tag || format('film_{0}', inputs.order) }}
   OD: factory/orders/${{ inputs.order }}
   REL: https://github.com/${{ github.repository }}/releases/download
+  NET: ${{ github.workspace }}/factory/tools/net_retry.sh     # a download / upload that meets a transient failure is tried again
 jobs:
   check:
     runs-on: ubuntu-24.04
@@ -82,7 +83,7 @@ jobs:
           M=$(python3 -c "import json; v=(json.load(open('$OD/order.json', encoding='utf-8')).get('voice') or {}).get('master'); print(v['release'] + ' ' + v['file'] if v else '')")
           if [ -n "$M" ]; then
             set -- $M
-            gh release download "$1" -R ${{ github.repository }} -p "$2" -O out/voice/voice.wav
+            bash "$NET" gh release download "$1" -R ${{ github.repository }} -p "$2" -O out/voice/voice.wav --clobber
             cp $OD/data/timeline.json out/voice/timeline.json
             python3 factory/line/srt.py out/voice/timeline.json out/voice/subtitles.srt
             echo "master voice $1/$2 with its timeline"
@@ -100,9 +101,9 @@ jobs:
           PY
             VK=$(cat /tmp/vkey); C=voice_cache; R=${{ github.repository }}
             rm -f out/voice/timeline.json
-            if gh release download "$C" -R "$R" -p "${VK}_timeline.json" -O out/voice/timeline.json 2>/dev/null && [ -s out/voice/timeline.json ]; then
-              gh release download "$C" -R "$R" -p "${VK}_voice.wav" -O out/voice/voice.wav
-              gh release download "$C" -R "$R" -p "${VK}_subtitles.srt" -O out/voice/subtitles.srt
+            if bash "$NET" gh release download "$C" -R "$R" -p "${VK}_timeline.json" -O out/voice/timeline.json --clobber 2>/dev/null && [ -s out/voice/timeline.json ]; then
+              bash "$NET" gh release download "$C" -R "$R" -p "${VK}_voice.wav" -O out/voice/voice.wav --clobber
+              bash "$NET" gh release download "$C" -R "$R" -p "${VK}_subtitles.srt" -O out/voice/subtitles.srt --clobber
               echo "voice $VK: made earlier from these exact takes (release $C)"
             else
               rm -f out/voice/timeline.json
@@ -111,12 +112,12 @@ jobs:
               pip install -q soundfile num2words "numpy<2.3" scipy pyloudnorm pyworld
               if [ -f $OD/store.json ] && python3 -c "import json, sys; sys.exit(0 if any(k.startswith('vo_') for k in json.load(open('$OD/store.json'))['items']) else 1)"; then
                 SR=$(python3 -c "import json; print(json.load(open('$OD/store.json'))['release'])")
-                mkdir -p $OD/store_files && gh release download "$SR" -R "$R" -p 'vo_*' -D $OD/store_files --clobber
+                mkdir -p $OD/store_files && bash "$NET" gh release download "$SR" -R "$R" -p 'vo_*' -D $OD/store_files --clobber
               fi
               python -u factory/line/voice.py $OD out/voice
-              gh release view "$C" -R "$R" > /dev/null 2>&1 || gh release create "$C" -R "$R" --title "$C" --notes "voice reads of the orders, kept by content (narration + takes + voice code)"
+              bash "$NET" gh release view "$C" -R "$R" > /dev/null 2>&1 || bash "$NET" gh release create "$C" -R "$R" --title "$C" --notes "voice reads of the orders, kept by content (narration + takes + voice code)"
               mkdir -p /tmp/vc && for f in voice.wav timeline.json subtitles.srt align_report.txt dsp_report.txt; do cp "out/voice/$f" "/tmp/vc/${VK}_$f"; done
-              gh release upload "$C" -R "$R" --clobber /tmp/vc/*
+              bash "$NET" gh release upload "$C" -R "$R" --clobber /tmp/vc/*
               echo "voice $VK: made from the takes, kept in release $C"
             fi
             echo "$VK" > out/voice/voice_key.txt
@@ -143,8 +144,9 @@ jobs:
           bash production/ci/ffmpeg.sh
           ffmpeg -v error -y -i out/voice/voice.wav -c:a libmp3lame -b:a 128k out/voice/voice_preview.mp3
           R="${TAG}_voice"
-          gh release delete "$R" -y --cleanup-tag -R ${{ github.repository }} 2>/dev/null || true
-          gh release create "$R" -R ${{ github.repository }} --title "$R" --notes "the read of order $ORDER: word times (words.txt), timeline, subtitles, listening copy" \
+          bash "$NET" gh release delete "$R" -y --cleanup-tag -R ${{ github.repository }} 2>/dev/null || true
+          bash "$NET" gh release create "$R" -R ${{ github.repository }} --title "$R" --notes "the read of order $ORDER: word times (words.txt), timeline, subtitles, listening copy"
+          bash "$NET" gh release upload "$R" -R ${{ github.repository }} --clobber \
             out/voice/words.txt out/voice/timeline.json out/voice/subtitles.srt out/voice/voice_preview.mp3
       - name: Film length (at least 7 minutes)
         run: |
@@ -207,7 +209,7 @@ jobs:
             if [ -f $OD/store.json ]; then
               R=$(python3 -c "import json; print(json.load(open('$OD/store.json'))['release'])")
               mkdir -p $OD/store_files
-              gh release download "$R" -R ${{ github.repository }} -p '*.geojson' -D $OD/store_files --clobber 2>/dev/null || echo "no shapes in the order store"
+              bash "$NET" gh release download "$R" -R ${{ github.repository }} -p '*.geojson' -D $OD/store_files --clobber 2>/dev/null || echo "no shapes in the order store"
               S=$OD/store_files
             fi
             python -u factory/maps/geo_build.py out/map $OD $S out/map/geo.json
@@ -228,17 +230,36 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: '3.11' }
+      # built once: the stills and the render use the same station assets (release station_cache, by content)
+      - name: Station assets made earlier from these exact inputs
+        id: sc
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          set -e
+          K=$(python3 factory/line/review.py station_key "$OD")
+          echo "key=$K" >> "$GITHUB_OUTPUT"
+          mkdir -p out/pack
+          if bash "$NET" gh release download station_cache -R ${{ github.repository }} -p "pack_$K.tar.gz" -O /tmp/pack.tar.gz --clobber 2>/dev/null; then
+            tar -xzf /tmp/pack.tar.gz -C out/pack && rm -f /tmp/pack.tar.gz
+            echo "hit=1" >> "$GITHUB_OUTPUT"
+            echo "station assets $K: made earlier from these exact inputs (release station_cache) - $(find out/pack -type f | wc -l) files"
+          else
+            echo "hit=0" >> "$GITHUB_OUTPUT"
+            echo "station assets $K: not made yet"
+          fi
       - name: Order store - the order's pictures with their licences
+        if: steps.sc.outputs.hit != '1'
         env: { GH_TOKEN: "${{ github.token }}" }
         run: |
           set -e
           mkdir -p $OD/store_files
           if [ -f $OD/store.json ]; then
             R=$(python3 -c "import json; print(json.load(open('$OD/store.json'))['release'])")
-            gh release download "$R" -R ${{ github.repository }} -D $OD/store_files --clobber
+            bash "$NET" gh release download "$R" -R ${{ github.repository }} -D $OD/store_files --clobber
           fi
           echo "order store: $(ls $OD/store_files | wc -l) files"
       - uses: actions/cache@v4
+        if: steps.sc.outputs.hit != '1'
         with:
           path: |
             ~/.u2net
@@ -246,12 +267,14 @@ jobs:
             factory/station/cache
           key: station-models-v1
       - name: Processing station - photos, signatures and flags -> film-ready assets + credits
+        if: steps.sc.outputs.hit != '1'
         run: |
           set -e
           pip install -q torch torchvision --index-url https://download.pytorch.org/whl/cpu
           pip install -q "transformers==4.57.6" "rembg[cpu]" spandrel "pillow==11.2.1" requests numpy scipy opencv-python-headless cairosvg
           python -u factory/station/station.py process $OD
       - name: Manim documents from the order's texts (official Manim image)
+        if: steps.sc.outputs.hit != '1'
         run: |
           set -e
           mkdir -p out/pack/clips
@@ -287,7 +310,24 @@ jobs:
           fi
           ls -la out/pack/clips
       - name: Clip lengths, review sheets, report
+        if: steps.sc.outputs.hit != '1'
         run: python -u factory/station/station.py finish $OD
+      - name: Keep the station assets for the render (release station_cache)
+        if: steps.sc.outputs.hit != '1'
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          set -e
+          K="${{ steps.sc.outputs.key }}"
+          tar -czf "/tmp/pack_$K.tar.gz" -C out/pack .
+          bash "$NET" gh release view station_cache -R ${{ github.repository }} > /dev/null 2>&1 \
+            || bash "$NET" gh release create station_cache -R ${{ github.repository }} --title station_cache --notes "processing station assets kept by content (order files, station code, fonts, station job)"
+          # assets kept earlier under this key are never replaced (the approved stills were made from them)
+          if bash "$NET" gh release view station_cache -R ${{ github.repository }} --json assets -q '.assets[].name' | grep -qx "pack_$K.tar.gz"; then
+            echo "station assets $K: already kept - left as they are"
+          else
+            bash "$NET" gh release upload station_cache -R ${{ github.repository }} --clobber "/tmp/pack_$K.tar.gz"   # --clobber: a retry replaces its own half
+            echo "station assets $K kept: $(du -h "/tmp/pack_$K.tar.gz" | cut -f1)"
+          fi
       - uses: actions/upload-artifact@v4
         if: always()
         with: { name: pack, path: out/pack, retention-days: 7, if-no-files-found: warn }
@@ -472,7 +512,7 @@ jobs:
           python -u factory/maps/library.py tiles out/map art/direction/need.json
           python -u factory/maps/library.py engine out/map $E
           # house sound effects (same for every film) + fonts + flags
-          curl -sfL --retry 3 -o /tmp/sfx.zip "$REL/stage1/sfx.zip" && (cd $PUB/sfx && unzip -q -o /tmp/sfx.zip)
+          bash "$NET" curl -fsSL --connect-timeout 30 --speed-limit 1000 --speed-time 60 -o /tmp/sfx.zip "$REL/stage1/sfx.zip" && (cd $PUB/sfx && unzip -q -o /tmp/sfx.zip)
           (mkdir -p /tmp/s2 && cd /tmp/s2 && python $GITHUB_WORKSPACE/production/pipeline/sfx2.py > /dev/null && cp out/sfx/*.wav $GITHUB_WORKSPACE/$PUB/sfx/)
           cp fonts/*.ttf $PUB/fonts/
           (cd /tmp && npm i --no-audit --no-fund --loglevel=error flag-icons@7.6.0 && cp -r node_modules/flag-icons/flags/4x3/. $GITHUB_WORKSPACE/$PUB/flags/4x3/)
@@ -619,8 +659,10 @@ jobs:
           cp ../../art/direction/director_report.txt ../../art/direction/audit*.txt ../../art/direction/CREDITS.txt out/ 2>/dev/null || true
           cp ../../art/music/music_report.txt ../../art/map/map_sheet.jpg out/review/ 2>/dev/null || true
           mkdir -p out/station && cp ../../art/pack/sheets/* ../../art/pack/station_report.txt out/station/ 2>/dev/null || true
-          gh release delete "$R" -y --cleanup-tag -R ${{ github.repository }} 2>/dev/null || true
-          gh release create "$R" -R ${{ github.repository }} --title "$R" --notes "review stills, station stills, soundtrack preview - order $ORDER - key $(cat out/review/stills_key.txt)" \
+          bash "$NET" gh release delete "$R" -y --cleanup-tag -R ${{ github.repository }} 2>/dev/null || true
+          # the release first, then its files (an upload that is tried again replaces its own half: --clobber)
+          bash "$NET" gh release create "$R" -R ${{ github.repository }} --title "$R" --notes "review stills, station stills, soundtrack preview - order $ORDER - key $(cat out/review/stills_key.txt)"
+          bash "$NET" gh release upload "$R" -R ${{ github.repository }} --clobber \
             out/review/* out/stills/*.jpg out/stills_station/*.jpg out/*.txt out/station/* src/data/film.json
       - name: No film without its score
         if: steps.key.outputs.nomusic == '1'
