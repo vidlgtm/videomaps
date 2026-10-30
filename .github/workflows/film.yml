@@ -550,20 +550,31 @@ jobs:
           items, seen = [], set()
           for k, kind in (('banners', 'banner'), ('docs', 'document'), ('cutouts', 'portrait')):
               for e in sorted(F[k], key=lambda e: e['from']):
-                  if e['img'] in seen: continue
-                  seen.add(e['img'])
-                  if any(x['img'] == e['img'] and x['from'] <= T <= x['to'] for x in F[k] for T in cmp): continue
+                  key = (e['img'], round(e['from'], 1)) if k == 'banners' else e['img']   # every banner moment; each document / portrait once
+                  if key in seen: continue
+                  seen.add(key)
+                  if k == 'banners':
+                      if any(e['from'] + 0.6 <= T <= e['to'] - 0.4 for T in cmp): continue
+                  elif any(x['img'] == e['img'] and x['from'] <= T <= x['to'] for x in F[k] for T in cmp): continue
                   d = e['to'] - e['from']; n = len(e.get('sigs') or [])
                   t = min(e['from'] + 3.8, e['to'] - 0.45) if n else e['from'] + min(1.6, 0.55 * d)
                   items.append([round(t, 2), f"{kind} {e['img'].split('/')[-1].rsplit('.', 1)[0].replace('_cut', '')}" + (f" ({n} signatures)" if n else '')])
           for c in sorted(F['clips'], key=lambda c: c['from']):
               if c['src'] in docclips and c['src'] not in seen:
                   seen.add(c['src']); items.append([round(c['to'] - 0.5, 2), f"Manim document {c['src'].split('/')[-1][:-4]}"])
+          # flag drops: one still per group of flags landing together (when the last one has landed)
+          groups = []
+          for t, iso in sorted((f['t'], f['iso']) for f in F.get('flags', [])):
+              if groups and t - groups[-1][-1][0] <= 1.5: groups[-1].append((t, iso))
+              else: groups.append([(t, iso)])
+          for g in groups:
+              if any(g[0][0] + 0.6 <= T <= g[-1][0] + 2.5 for T in cmp): continue
+              items.append([round(g[-1][0] + 1.0, 2), 'flags ' + ' '.join(i for _, i in g)])
           items.sort(); keep = []
           for t, l in items:
               if keep and t - keep[-1][0] < 0.8: keep[-1][1] += ' + ' + l
               else: keep.append([t, l])
-          keep = keep[:20]
+          keep = keep[:32]
           json.dump({f"s{str(t).replace('.', '_')}.jpg": l for t, l in keep}, open('out/stills_station/labels.json', 'w'), indent=1)
           open('/tmp/station_times', 'w').write(' '.join(str(t) for t, _ in keep))
           print('station stills:', keep)

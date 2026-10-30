@@ -59,9 +59,9 @@ type Life = {id: string; kind: string; last: number; alive: number; hid: number;
 const life = new Map<string, Life>();
 const smothered: any[] = [];
 const endLife = (r: Life) => {
-  // >= 1 s hidden and at least half of its life; a billboard (banner / icon: a picture tied to the narration) already
-  // when a quarter of its life is lost
-  const part = r.kind === 'banner' || r.kind === 'icon' ? 0.25 : 0.5;
+  // >= 1 s hidden and at least half of its life; a billboard (banner / icon: a picture tied to the narration) must
+  // never blink out and back: >= 1 s hidden and a tenth of its life is already a problem
+  const part = r.kind === 'banner' || r.kind === 'icon' ? 0.1 : 0.5;
   if (r.alive < 30 || r.hid < 30 || r.hid < part * r.alive) return;
   const top = [...r.by.entries()].sort((x, y) => y[1] - x[1])[0];
   if (!top) return;
